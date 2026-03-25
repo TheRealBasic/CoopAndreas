@@ -93,6 +93,17 @@ Then build the server from the repository root:
 xmake --build server
 ```
 
+### Root CMake configure (canonical for CMake-based tooling)
+
+If your tooling expects a root `CMakeLists.txt`, configure from the repository root:
+
+```bash
+cmake -S . -B build
+cmake --build build -j2
+```
+
+This CMake entry point delegates to `cmake/CMakeLists.txt` and provides optional `xmake` bridge targets (for example: `cmake --build build --target coopandreas-xmake`).
+
 ## Donate
 https://send.monobank.ua/jar/8wPrs73MBa
 
