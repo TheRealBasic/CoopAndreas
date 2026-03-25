@@ -220,6 +220,7 @@ void CNetwork::HandlePlayerDisconnected(ENetEvent& event)
 
     CPedManager::RemoveAllHostedAndNotify(player);
     CVehicleManager::RemoveAllHostedAndNotify(player);
+    CPlayerPackets::OnPlayerDisconnectedFromCutsceneVote(player->m_iPlayerId);
 
     // remove
     CPlayerManager::Remove(player);

@@ -3,6 +3,8 @@
 #include "CKeySync.h"
 #include <CCutsceneMgr.h>
 
+static uint32_t g_cutsceneSessionToken = 0;
+
 static void __cdecl CMenuManager__DrawFrontEnd_FixChat_Hook(float alpha)
 {
     CFont::SetAlphaFade(alpha);
@@ -137,7 +139,9 @@ void CCutsceneMgr__StartCutscene_Hook()
         CPackets::StartCutscene packet{};
         packet.currArea = CGame::currArea;
         strncpy_s(packet.name, CCutsceneMgr::ms_cutsceneName, 8);
+        packet.sessionToken = ++g_cutsceneSessionToken;
         CNetwork::SendPacket(CPacketsID::START_CUTSCENE, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
+        CPacketHandler::CutsceneSkipVote__OnSessionStart(packet.sessionToken);
     }
 }
 
@@ -147,8 +151,8 @@ bool CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook()
 
     if (result)
     {
-        CPackets::SkipCutscene packet{};
-        CNetwork::SendPacket(CPacketsID::SKIP_CUTSCENE, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
+        CPacketHandler::CutsceneSkipVote__Trigger();
+        return false;
     }
 
     return result;
@@ -197,11 +201,11 @@ void GameHooks::InjectHooks()
     CTheZones__Update_Dest = injector::GetBranchDestination(0x53BF49).as_int();
     patch::RedirectCall(0x53BF49, CTheZones__Update_Hook);
 
-    //patch::RedirectCall(0x48072B, CCutsceneMgr__StartCutscene_Hook);
+    patch::RedirectCall(0x48072B, CCutsceneMgr__StartCutscene_Hook);
     
-    //patch::RedirectCall(0x5B1947, CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook);
-   // patch::RedirectCall(0x469F0E, CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook);
-   // patch::RedirectCall(0x475459, CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook);
+    patch::RedirectCall(0x5B1947, CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook);
+    patch::RedirectCall(0x469F0E, CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook);
+    patch::RedirectCall(0x475459, CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook);
 
     patch::RedirectJump(PURECALL, __purecall_Hook);
 

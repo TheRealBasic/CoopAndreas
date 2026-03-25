@@ -80,6 +80,7 @@ void CPlayerManager::AssignHostToFirstPlayer()
 	if (host != nullptr)
 		host->m_bIsHost = false;
 
+	CPlayerPackets::ResetCutsceneVoteStateForHostMigration();
 	player->m_bIsHost = true;
 
 	CPlayerPackets::PlayerSetHost setHostPacket = { player->m_iPlayerId };

@@ -25,4 +25,7 @@ public:
 	static void CreateConfig();
 	static uint16_t GetConfigPort();
 	static uint16_t GetConfigMaxPlayers();
+	static double GetCutsceneSkipVoteThresholdRatio();
+	static uint16_t GetCutsceneSkipVoteMinPlayers();
+	static uint16_t GetCutsceneSkipVoteLockMs();
 };

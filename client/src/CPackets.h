@@ -48,6 +48,7 @@ enum CPacketsID : unsigned short
 	MASS_PACKET_SEQUENCE,
 	START_CUTSCENE,
 	SKIP_CUTSCENE,
+	CUTSCENE_SKIP_VOTE_UPDATE,
 	OPCODE_SYNC,
 	ON_MISSION_FLAG_SYNC,
 	UPDATE_ENTITY_BLIP,
@@ -122,6 +123,7 @@ public:
 			0, // MASS_PACKET_SEQUENCE
 			sizeof(StartCutscene), // START_CUTSCENE,
 			sizeof(SkipCutscene), // SKIP_CUTSCENE,
+			sizeof(CutsceneSkipVoteUpdate), // CUTSCENE_SKIP_VOTE_UPDATE,
 			0, // OPCODE_SYNC,
 			sizeof(OnMissionFlagSync), // ON_MISSION_FLAG_SYNC,
 			sizeof(UpdateEntityBlip), // UPDATE_ENTITY_BLIP,
@@ -490,12 +492,23 @@ public:
 	{
 		char name[8];
 		uint8_t currArea; // AKA interior
+		uint32_t sessionToken;
 	};
 
 	struct SkipCutscene
 	{
 		int playerid;
-		int votes; // temporary unused
+		int votes;
+		uint32_t sessionToken;
+	};
+
+	struct CutsceneSkipVoteUpdate
+	{
+		int voterid;
+		int currentVotes;
+		int requiredVotes;
+		uint32_t sessionToken;
+		bool thresholdReached;
 	};
 
 	struct OnMissionFlagSync 

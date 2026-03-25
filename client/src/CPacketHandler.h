@@ -55,6 +55,10 @@ public:
 	static void MassPacketSequence__Handle(void* data, int size);
 	static void StartCutscene__Handle(void* data, int size);
 	static void SkipCutscene__Handle(void* data, int size);
+	static void CutsceneSkipVoteUpdate__Handle(void* data, int size);
+	static void CutsceneSkipVote__Trigger();
+	static void DrawCutsceneSkipVoteHud();
+	static void CutsceneSkipVote__OnSessionStart(uint32_t sessionToken);
 	static void OpCodeSync__Handle(void* data, int size);
 	static void OnMissionFlagSync__Handle(void* data, int size);
 	static void OnMissionFlagSync__Trigger();

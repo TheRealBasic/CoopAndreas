@@ -243,6 +243,7 @@ public:
 				if (FrontEndMenuManager.m_bPrefsShowHud)
 				{
 					CNetworkPlayerList::Draw();
+					CPacketHandler::DrawCutsceneSkipVoteHud();
 				}
 
 				if (FrontEndMenuManager.m_bPrefsShowHud && CCore::Version.stage != SEMVER_STAGE_RELEASE)

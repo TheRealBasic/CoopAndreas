@@ -16,6 +16,21 @@
 #include <CAimSync.h>
 #include <game_sa/CTagManager.h>
 
+namespace
+{
+	struct CutsceneVoteHudState
+	{
+		bool active = false;
+		bool localVoteSent = false;
+		int currentVotes = 0;
+		int requiredVotes = 0;
+		uint32_t sessionToken = 0;
+		uint32_t lastUpdateAt = 0;
+	};
+
+	CutsceneVoteHudState g_cutsceneVoteHudState;
+}
+
 // PlayerConnected
 
 void CPacketHandler::PlayerConnected__Handle(void* data, int size)
@@ -1517,6 +1532,7 @@ void CPacketHandler::StartCutscene__Handle(void* data, int size)
 	}
 	CGame::currArea = packet->currArea;
 	CCutsceneMgr::StartCutscene();
+	CutsceneSkipVote__OnSessionStart(packet->sessionToken);
 }
 
 // SkipCutscene
@@ -1528,6 +1544,67 @@ void CPacketHandler::SkipCutscene__Handle(void* data, int size)
 	CHud::m_BigMessage[1][0] = 0;
 	CCutsceneMgr::ms_wasCutsceneSkipped = 1;
 	CCutsceneMgr::FinishCutscene();
+
+	g_cutsceneVoteHudState.active = false;
+	g_cutsceneVoteHudState.localVoteSent = false;
+	g_cutsceneVoteHudState.currentVotes = 0;
+	g_cutsceneVoteHudState.requiredVotes = 0;
+	g_cutsceneVoteHudState.sessionToken = packet->sessionToken;
+}
+
+void CPacketHandler::CutsceneSkipVoteUpdate__Handle(void* data, int size)
+{
+	CPackets::CutsceneSkipVoteUpdate* packet = (CPackets::CutsceneSkipVoteUpdate*)data;
+
+	g_cutsceneVoteHudState.active = true;
+	g_cutsceneVoteHudState.currentVotes = packet->currentVotes;
+	g_cutsceneVoteHudState.requiredVotes = packet->requiredVotes;
+	g_cutsceneVoteHudState.sessionToken = packet->sessionToken;
+	g_cutsceneVoteHudState.lastUpdateAt = GetTickCount();
+
+	if (packet->voterid == CNetworkPlayerManager::m_nMyId)
+	{
+		g_cutsceneVoteHudState.localVoteSent = true;
+	}
+}
+
+void CPacketHandler::CutsceneSkipVote__Trigger()
+{
+	if (!CNetwork::m_bConnected || !g_cutsceneVoteHudState.active)
+	{
+		return;
+	}
+
+	if (g_cutsceneVoteHudState.localVoteSent)
+	{
+		CChat::AddMessage("{cecedb}[Cutscene] You already voted to skip.");
+		return;
+	}
+
+	CPackets::SkipCutscene packet{};
+	packet.sessionToken = g_cutsceneVoteHudState.sessionToken;
+	CNetwork::SendPacket(CPacketsID::SKIP_CUTSCENE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+	g_cutsceneVoteHudState.localVoteSent = true;
+	CChat::AddMessage("{cecedb}[Cutscene] Vote sent.");
+}
+
+void CPacketHandler::CutsceneSkipVote__OnSessionStart(uint32_t sessionToken)
+{
+	g_cutsceneVoteHudState = {};
+	g_cutsceneVoteHudState.active = true;
+	g_cutsceneVoteHudState.sessionToken = sessionToken;
+}
+
+void CPacketHandler::DrawCutsceneSkipVoteHud()
+{
+	if (!g_cutsceneVoteHudState.active || g_cutsceneVoteHudState.requiredVotes <= 0)
+	{
+		return;
+	}
+
+	char message[64];
+	sprintf_s(message, "Vote to skip: %d/%d", g_cutsceneVoteHudState.currentVotes, g_cutsceneVoteHudState.requiredVotes);
+	CDXFont::Draw(10, RsGlobal.maximumHeight - (int)(CDXFont::m_fFontSize * 4), message, D3DCOLOR_ARGB(255, 255, 255, 255));
 }
 
 // OpCodeSync
