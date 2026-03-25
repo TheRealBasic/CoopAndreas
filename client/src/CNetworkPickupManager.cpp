@@ -76,3 +76,8 @@ void CNetworkPickupManager::Process()
 		pickup.lastCollectAttemptTick = now;
 	}
 }
+
+void CNetworkPickupManager::Reset()
+{
+	ms_pickups.clear();
+}

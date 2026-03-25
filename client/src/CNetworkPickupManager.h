@@ -24,6 +24,7 @@ public:
 	static void HandleCreate(const CPackets::PickupCreate& packet);
 	static void HandleState(const CPackets::PickupStateChange& packet);
 	static void Process();
+	static void Reset();
 
 private:
 	static inline std::unordered_map<int, Pickup> ms_pickups{};

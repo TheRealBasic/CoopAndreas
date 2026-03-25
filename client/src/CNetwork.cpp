@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CNetworkFireManager.h"
+#include "CNetworkPickupManager.h"
 #include "../shared/semver.h"
 
 ENetHost* CNetwork::m_pClient = nullptr;
@@ -109,6 +110,7 @@ void CNetwork::Disconnect()
 
 	m_bConnected = false;
 	CNetworkFireManager::Reset();
+	CNetworkPickupManager::Reset();
 }
 
 void CNetwork::InitListeners()
