@@ -13,7 +13,7 @@ Legend:
   - **Acceptance criteria:** pickup state changes persist across reconnects for all connected peers and late joiners.
   - **Acceptance criteria:** collectible categories (graffiti/horseshoes/snapshots/oysters) do not duplicate or respawn incorrectly after host migration/rejoin.
   - **Acceptance criteria:** dropped money/weapons appear, can be collected once, and are removed consistently across at least 2 peers.
-- [ ] **Wanted level sync**. **[P0][M]**
+- [x] **Wanted level sync**. **[P0][M]** ✅ Completed (2026-03-25).
   - **Acceptance criteria:** wanted level changes are mirrored and verified across 2+ peers in free roam and mission contexts.
   - **Acceptance criteria:** reconnecting peer receives current wanted level without requiring a manual refresh.
 - [ ] **Passenger sync completion** (`gamepad support`, `radio sync`). **[P0][M]**
