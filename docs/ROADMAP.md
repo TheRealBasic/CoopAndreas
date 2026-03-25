@@ -22,7 +22,7 @@ Legend:
 - [ ] **Vehicle sync completion** (`force hydraulics sync`, `trailer sync`). **[P0][L]**
   - **Acceptance criteria:** hydraulic state transitions replicate reliably without visual divergence.
   - **Acceptance criteria:** trailer attach/detach and trailer physics state remain consistent across 2+ peers over 5+ minutes.
-- [ ] **NPC sync completion** (`in vehicle: horn/siren`, `aim`, `shots`, `task sync`). **[P0][L]**
+- [x] **NPC sync completion** (`in vehicle: horn/siren`, `aim`, `shots`, `task sync`). **[P0][L]** ✅ Completed (2026-03-25).
   - **Acceptance criteria:** NPC in-vehicle horn/siren state changes replicate in real time for all peers.
   - **Acceptance criteria:** NPC aiming and firing targets/impact events match across 2+ peers.
   - **Acceptance criteria:** task/state machine replication avoids stuck or desynced behavior over mission-length sessions.

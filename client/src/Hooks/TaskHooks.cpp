@@ -122,7 +122,7 @@ static void __declspec(naked) CTaskManager__SetTaskSecondary_Hook()
     {
         pNetworkPed = CNetworkPedManager::GetPed(pTaskMgr->m_pPed);
 
-        if (pNetworkPed)
+        if (pNetworkPed && pNetworkPed->m_bSyncing)
         {
 #ifdef TASK_LOG
             CChat::AddMessage("SET SECONDARY %s", CDebugPedTasks::TaskNames[pTask->GetId()]);
