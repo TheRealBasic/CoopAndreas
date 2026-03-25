@@ -194,23 +194,37 @@ class CPedPackets
 
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
+				if (size != sizeof(CPedPackets::PedOnFoot))
+				{
+					std::cout << "[Warn][PedOnFoot] event=invalid_size size=" << size << " expected=" << sizeof(CPedPackets::PedOnFoot) << "\n";
+					return;
+				}
+
 				CPedPackets::PedOnFoot* packet = (CPedPackets::PedOnFoot*)data;
+				auto player = CPlayerManager::GetPlayer(peer);
+
+				if (!player)
+				{
+					std::cout << "[Warn][PedOnFoot] event=unknown_player\n";
+					return;
+				}
 
 				CPed* ped = CPedManager::GetPed(packet->pedid);
 
-				if (ped)
+				if (!ped)
 				{
-					auto player = CPlayerManager::GetPlayer(peer);
-
-					if (ped->m_pSyncer != player)
-					{
-						std::cout << "[Alert] " + player->GetName() + " tries to sync (on foot) someone else's pedestrian, possible hack or bug (please let us know)\n";
-						return;
-					}
-
-					ped->m_vecPos = packet->pos;
-					CNetwork::SendPacketToAll(CPacketsID::PED_ONFOOT, packet, sizeof * packet, (ENetPacketFlag)0, peer);
+					std::cout << "[Warn][PedOnFoot] event=ped_not_found pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
+					return;
 				}
+
+				if (ped->m_pSyncer != player)
+				{
+					std::cout << "[Alert][PedOnFoot] event=unauthorized_sync pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				ped->m_vecPos = packet->pos;
+				CNetwork::SendPacketToAll(CPacketsID::PED_ONFOOT, packet, sizeof * packet, (ENetPacketFlag)0, peer);
 			}
 		};
 
@@ -226,7 +240,56 @@ class CPedPackets
 		{
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
-				// TODO: protect
+				if (size < 10) // int pedid, int taskid, uint8 taskSlot, bool bPrimary
+				{
+					std::cout << "[Warn][PedAddTask] event=invalid_size size=" << size << " min=10\n";
+					return;
+				}
+
+				auto player = CPlayerManager::GetPlayer(peer);
+				if (!player)
+				{
+					std::cout << "[Warn][PedAddTask] event=unknown_player\n";
+					return;
+				}
+
+				char* cursor = (char*)data;
+				int pedid = 0;
+				int taskid = 0;
+				uint8_t taskSlot = 0;
+				uint8_t bPrimary = 0;
+
+				std::memcpy(&pedid, cursor, sizeof(pedid));
+				cursor += sizeof(pedid);
+				std::memcpy(&taskid, cursor, sizeof(taskid));
+				cursor += sizeof(taskid);
+				std::memcpy(&taskSlot, cursor, sizeof(taskSlot));
+				cursor += sizeof(taskSlot);
+				std::memcpy(&bPrimary, cursor, sizeof(bPrimary));
+
+				if (taskSlot > 4 || bPrimary > 1)
+				{
+					std::cout << "[Warn][PedAddTask] event=invalid_fields pedid=" << pedid
+							  << " taskid=" << taskid
+							  << " taskSlot=" << (int)taskSlot
+							  << " bPrimary=" << (int)bPrimary
+							  << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				auto ped = CPedManager::GetPed(pedid);
+				if (!ped)
+				{
+					std::cout << "[Warn][PedAddTask] event=ped_not_found pedid=" << pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				if (ped->m_pSyncer != player)
+				{
+					std::cout << "[Alert][PedAddTask] event=unauthorized pedid=" << pedid << " taskid=" << taskid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
 				CNetwork::SendPacketToAll(CPacketsID::PED_ADD_TASK, data, size, ENET_PACKET_FLAG_RELIABLE, peer);
 			}
 		};
@@ -267,14 +330,31 @@ class CPedPackets
 
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
+				if (size != sizeof(CPedPackets::PedDriverUpdate))
+				{
+					std::cout << "[Warn][PedDriverUpdate] event=invalid_size size=" << size << " expected=" << sizeof(CPedPackets::PedDriverUpdate) << "\n";
+					return;
+				}
+
 				CPedPackets::PedDriverUpdate* packet = (CPedPackets::PedDriverUpdate*)data;
 
 				auto ped = CPedManager::GetPed(packet->pedid);
 				auto player = CPlayerManager::GetPlayer(peer);
-
-				if (ped && ped->m_pSyncer != player)
+				if (!player)
 				{
-					std::cout << "[Alert] " + player->GetName() + " tries to sync (driver) someone else's pedestrian, possible hack or bug (please let us know)\n";
+					std::cout << "[Warn][PedDriverUpdate] event=unknown_player\n";
+					return;
+				}
+
+				if (!ped)
+				{
+					std::cout << "[Warn][PedDriverUpdate] event=ped_not_found pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				if (ped->m_pSyncer != player)
+				{
+					std::cout << "[Alert][PedDriverUpdate] event=unauthorized_sync pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
 					return;
 				}
 
@@ -300,14 +380,31 @@ class CPedPackets
 
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
+				if (size != sizeof(CPedPackets::PedShotSync))
+				{
+					std::cout << "[Warn][PedShotSync] event=invalid_size size=" << size << " expected=" << sizeof(CPedPackets::PedShotSync) << "\n";
+					return;
+				}
+
 				CPedPackets::PedShotSync* packet = (CPedPackets::PedShotSync*)data;
 
 				auto ped = CPedManager::GetPed(packet->pedid);
 				auto player = CPlayerManager::GetPlayer(peer);
-
-				if (ped && ped->m_pSyncer != player)
+				if (!player)
 				{
-					//std::cout << "[Alert] " + player->GetName() + " tries to sync (shots) someone else's pedestrian, possible hack or bug (please let us know)\n";
+					std::cout << "[Warn][PedShotSync] event=unknown_player\n";
+					return;
+				}
+
+				if (!ped)
+				{
+					std::cout << "[Warn][PedShotSync] event=ped_not_found pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				if (ped->m_pSyncer != player)
+				{
+					std::cout << "[Alert][PedShotSync] event=unauthorized_sync pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
 					return;
 				}
 
@@ -327,14 +424,31 @@ class CPedPackets
 
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
+				if (size != sizeof(CPedPackets::PedPassengerSync))
+				{
+					std::cout << "[Warn][PedPassengerSync] event=invalid_size size=" << size << " expected=" << sizeof(CPedPackets::PedPassengerSync) << "\n";
+					return;
+				}
+
 				CPedPackets::PedPassengerSync* packet = (CPedPackets::PedPassengerSync*)data;
 
 				auto ped = CPedManager::GetPed(packet->pedid);
 				auto player = CPlayerManager::GetPlayer(peer);
-
-				if (ped && ped->m_pSyncer != player)
+				if (!player)
 				{
-					std::cout << "[Alert] " + player->GetName() + " tries to sync (passenger) someone else's pedestrian, possible hack or bug (please let us know)\n";
+					std::cout << "[Warn][PedPassengerSync] event=unknown_player\n";
+					return;
+				}
+
+				if (!ped)
+				{
+					std::cout << "[Warn][PedPassengerSync] event=ped_not_found pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				if (ped->m_pSyncer != player)
+				{
+					std::cout << "[Alert][PedPassengerSync] event=unauthorized_sync pedid=" << packet->pedid << " player=" << player->GetName() << "\n";
 					return;
 				}
 
@@ -484,10 +598,32 @@ class CPedPackets
 			{
 				if (size < 9) // int playerid, int pedid, uint8_t size
 				{
+					std::cout << "[Warn][PerformTaskSequence] event=invalid_size size=" << size << " min=9\n";
 					return;
 				}
 
 				auto player = CPlayerManager::GetPlayer(peer);
+				if (!player)
+				{
+					std::cout << "[Warn][PerformTaskSequence] event=unknown_player\n";
+					return;
+				}
+
+				int pedid = 0;
+				std::memcpy(&pedid, (char*)data + sizeof(int), sizeof(pedid));
+				auto ped = CPedManager::GetPed(pedid);
+
+				if (!ped)
+				{
+					std::cout << "[Warn][PerformTaskSequence] event=ped_not_found pedid=" << pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
+
+				if (ped->m_pSyncer != player)
+				{
+					std::cout << "[Alert][PerformTaskSequence] event=unauthorized pedid=" << pedid << " player=" << player->GetName() << "\n";
+					return;
+				}
 				
 				*(int*)data = player->m_iPlayerId;
 
