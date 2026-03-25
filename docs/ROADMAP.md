@@ -16,7 +16,7 @@ Legend:
 - [x] **Wanted level sync**. **[P0][M]** ✅ Completed (2026-03-25).
   - **Acceptance criteria:** wanted level changes are mirrored and verified across 2+ peers in free roam and mission contexts.
   - **Acceptance criteria:** reconnecting peer receives current wanted level without requiring a manual refresh.
-- [ ] **Passenger sync completion** (`gamepad support`, `radio sync`). **[P0][M]**
+- [x] **Passenger sync completion** (`gamepad support`, `radio sync`). **[P0][M]** ✅ Completed (2026-03-25).
   - **Acceptance criteria:** controller inputs map correctly for non-driver passenger actions on all clients.
   - **Acceptance criteria:** radio station selection/state stays consistent for driver + passengers across 2+ peers.
 - [ ] **Vehicle sync completion** (`force hydraulics sync`, `trailer sync`). **[P0][L]**
