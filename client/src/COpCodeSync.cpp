@@ -38,6 +38,7 @@
 #include "CEntryExitMarkerSync.h"
 #include <CTaskSequenceSync.h>
 #include <CNetworkAnimQueue.h>
+#include "CMissionSyncState.h"
 
 // Keep sorted!
 const SSyncedOpCode syncedOpcodes[] =
@@ -393,7 +394,7 @@ void BuildAndSendOpcode()
 
 bool IsOpcodeRequiresStrictCheck(uint16_t opcode)
 {
-    if (opcode == 0x713 || COpCodeSync::ms_bProcessingTaskSequence) // task_drive_by
+    if (opcode == 0x713 || CMissionSyncState::IsProcessingTaskSequence()) // task_drive_by
     {
         return false;
     }
@@ -471,7 +472,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                 {
                     /*if (header.opcode == 0x0605)    
                         CChat::AddMessage("Parsing ped...");*/
-                    if (COpCodeSync::ms_bProcessingTaskSequence && scriptParamsBuffer[i].value == -1)
+                    if (CMissionSyncState::IsProcessingTaskSequence() && scriptParamsBuffer[i].value == -1)
                     {
                         break;
                     }
@@ -663,17 +664,9 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
     //}
     
     // TODO: refactor
-    if (lastOpCodeProcessed == 0x0701) // end_scene_skip
+    if (!CMissionSyncState::HandleOpCodePreExecute(lastOpCodeProcessed))
     {
-        CHud::m_BigMessage[1][0] = 0;
-    }
-    else if (lastOpCodeProcessed == 0x02E7) // start_cutscene
-    {
-        if(CCutsceneMgr::ms_cutsceneLoadStatus != 2)
-        {
-            COpCodeSync::ms_bLoadingCutscene = true;
-            return; // dont process opcode
-        }
+        return; // defer opcode execution until mission state is ready
     }
 
 
@@ -696,7 +689,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                 CStreaming::RequestModel(25575 + id, eStreamingFlags::MISSION_REQUIRED | eStreamingFlags::GAME_REQUIRED);
                 CStreaming::LoadAllRequestedModels(false);
 
-                if (COpCodeSync::ms_bProcessingTaskSequence)
+                if (CMissionSyncState::IsProcessingTaskSequence())
                 {
                     CTaskSequenceSync::ms_bFailedToProcessSequence = true;
                 }
@@ -863,6 +856,7 @@ void __fastcall CRunningScript__ShutdownThisScript_Hook(CRunningScript* This, SK
 
 void COpCodeSync::Init()
 {
+    CMissionSyncState::Init();
     DWORD temp;
     injector::UnprotectMemory(0x464080, 5, temp);
     injector::UnprotectMemory(0x463D50, 6, temp);
