@@ -41,6 +41,7 @@ void CNetworkPlayer::CreatePed(int id, CVector position)
 	*m_pPed->m_pPlayerData->m_pPedClothesDesc = m_pPedClothesDesc;
 
 	CClothes::RebuildPlayer(m_pPed, false);
+	ResetInterpolation(position, 0.0f, 0.0f);
 }
 
 void CNetworkPlayer::DestroyPed()
@@ -75,6 +76,18 @@ void CNetworkPlayer::Respawn()
 
 
 	this->CreatePed(m_iPlayerId, m_playerOnFoot.position);
+}
+
+void CNetworkPlayer::ResetInterpolation(const CVector& position, float currentRotation, float aimingRotation)
+{
+	m_interpSnapshots.clear();
+	InterpSnapshot snapshot{};
+	snapshot.position = position;
+	snapshot.currentRotation = currentRotation;
+	snapshot.aimingRotation = aimingRotation;
+	snapshot.arrivalTickMs = GetTickCount();
+	snapshot.serverSequence = ++m_nSnapshotSequence;
+	m_interpSnapshots.push_back(snapshot);
 }
 
 int CNetworkPlayer::GetInternalId() // most used for CWorld::PlayerInFocus

@@ -27,6 +27,7 @@ CNetworkVehicle::CNetworkVehicle(int vehicleid, int modelid, CVector pos, float 
     {
         m_eStreamState = eStreamState::Streamed;
         ApplyCachedStateToEntity();
+        ResetInterpolationFromCached();
     }
 
 }
@@ -113,6 +114,7 @@ bool CNetworkVehicle::StreamIn()
     }
 
     ApplyCachedStateToEntity();
+    ResetInterpolationFromCached();
     m_eStreamState = eStreamState::Streamed;
     m_nLastStreamStateChangeTick = GetTickCount();
     return true;
@@ -161,6 +163,12 @@ void CNetworkVehicle::ApplyCachedStateToEntity()
     if (!m_pVehicle || !CUtil::IsValidEntityPtr(m_pVehicle) || !m_pVehicle->m_matrix)
         return;
 
+    if (m_cachedState.roll.Magnitude() < 0.001f || m_cachedState.up.Magnitude() < 0.001f)
+    {
+        m_cachedState.roll = m_pVehicle->m_matrix->right;
+        m_cachedState.up = m_pVehicle->m_matrix->up;
+    }
+
     m_pVehicle->m_matrix->pos = m_cachedState.position;
     m_pVehicle->m_matrix->right = m_cachedState.roll;
     m_pVehicle->m_matrix->up = m_cachedState.up;
@@ -175,6 +183,21 @@ void CNetworkVehicle::ApplyCachedStateToEntity()
         m_nPaintJob = m_cachedState.paintjob;
         m_pVehicle->SetRemap(m_nPaintJob);
     }
+}
+
+void CNetworkVehicle::ResetInterpolationFromCached()
+{
+    m_interpSnapshots.clear();
+    InterpSnapshot snapshot{};
+    snapshot.position = m_cachedState.position;
+    snapshot.roll = m_cachedState.roll;
+    snapshot.up = m_cachedState.up;
+    snapshot.velocity = m_cachedState.velocity;
+    snapshot.turnSpeed = m_cachedState.turnSpeed;
+    snapshot.health = m_cachedState.health;
+    snapshot.arrivalTickMs = GetTickCount();
+    snapshot.serverSequence = ++m_nSnapshotSequence;
+    m_interpSnapshots.push_back(snapshot);
 }
 
 void CNetworkVehicle::SetPassengerSeatState(uint8_t seatId, const PassengerSeatState& state, bool applyToAudio)

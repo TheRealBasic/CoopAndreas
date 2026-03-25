@@ -1,16 +1,44 @@
 #include "stdafx.h"
 #include "CNetworkVehicle.h"
 #include <unordered_map>
+#include <algorithm>
+#include <cmath>
 
 std::vector<CNetworkVehicle*> CNetworkVehicleManager::m_pVehicles;
 CNetworkVehicle* CNetworkVehicleManager::m_apTempVehicles[255];
 CNetworkVehicleManager::StreamConfig CNetworkVehicleManager::m_streamConfig{};
 CNetworkVehicleManager::Telemetry CNetworkVehicleManager::m_telemetry{};
+CNetworkVehicleManager::InterpStats CNetworkVehicleManager::m_interpStats{};
 
 static std::unordered_map<int, size_t> s_vehicleModelRefs;
 static uint32_t s_lastVehicleStreamTick = 0;
 static uint32_t s_streamChurnWindowStart = 0;
 static size_t s_streamChurnCounter = 0;
+
+namespace
+{
+	CVector SlerpUnitVector(const CVector& from, const CVector& to, float t)
+	{
+		CVector a = from;
+		CVector b = to;
+		float aLen = a.Magnitude();
+		float bLen = b.Magnitude();
+		if (aLen < 0.0001f || bLen < 0.0001f)
+			return from + (to - from) * t;
+		a /= aLen;
+		b /= bLen;
+
+		float dot = std::max(-1.0f, std::min(1.0f, a.x * b.x + a.y * b.y + a.z * b.z));
+		if (dot > 0.9995f)
+			return (a + (b - a) * t);
+		float theta = std::acos(dot) * t;
+		CVector rel = b - a * dot;
+		float relLen = rel.Magnitude();
+		if (relLen > 0.0001f)
+			rel /= relLen;
+		return a * std::cos(theta) + rel * std::sin(theta);
+	}
+}
 
 CNetworkVehicle* CNetworkVehicleManager::GetVehicle(int vehicleid)
 {
@@ -105,6 +133,63 @@ void CNetworkVehicleManager::UpdateIdle()
 	builder.Send();
 }
 
+void CNetworkVehicleManager::ProcessRemoteVehicles()
+{
+	m_interpStats.bufferedSnapshots = 0;
+	m_interpStats.correctionCount = 0;
+	const uint32_t now = GetTickCount();
+	const uint32_t renderTick = now > InterpTuning::interpolationDelayMs ? now - InterpTuning::interpolationDelayMs : 0;
+
+	for (auto* vehicle : m_pVehicles)
+	{
+		if (!vehicle || vehicle->m_bSyncing || !vehicle->m_pVehicle || !CUtil::IsValidEntityPtr(vehicle->m_pVehicle))
+			continue;
+
+		auto& snapshots = vehicle->m_interpSnapshots;
+		if (snapshots.empty())
+			continue;
+		while (snapshots.size() > 2 && snapshots[1].arrivalTickMs <= renderTick)
+			snapshots.pop_front();
+		m_interpStats.bufferedSnapshots += snapshots.size();
+
+		if (snapshots.size() == 1 || renderTick <= snapshots.front().arrivalTickMs)
+		{
+			const auto& s = snapshots.front();
+			if ((s.position - vehicle->m_pVehicle->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+			{
+				vehicle->m_nInterpCorrectionCount++;
+				m_interpStats.correctionCount++;
+			}
+			vehicle->m_pVehicle->m_matrix->pos = s.position;
+			vehicle->m_pVehicle->m_matrix->right = s.roll;
+			vehicle->m_pVehicle->m_matrix->up = s.up;
+			vehicle->m_pVehicle->m_vecMoveSpeed = s.velocity;
+			vehicle->m_pVehicle->m_vecTurnSpeed = s.turnSpeed;
+			continue;
+		}
+
+		const auto& from = snapshots.front();
+		const auto& to = snapshots[1];
+		float span = static_cast<float>(to.arrivalTickMs - from.arrivalTickMs);
+		float t = span > 0.0f ? std::max(0.0f, std::min(1.0f, (renderTick - from.arrivalTickMs) / span)) : 1.0f;
+
+		CVector interpPos = from.position + (to.position - from.position) * t;
+		if ((interpPos - vehicle->m_pVehicle->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+		{
+			vehicle->m_nInterpCorrectionCount++;
+			m_interpStats.correctionCount++;
+			interpPos = to.position;
+			t = 1.0f;
+		}
+
+		vehicle->m_pVehicle->m_matrix->pos = interpPos;
+		vehicle->m_pVehicle->m_matrix->right = SlerpUnitVector(from.roll, to.roll, t);
+		vehicle->m_pVehicle->m_matrix->up = SlerpUnitVector(from.up, to.up, t);
+		vehicle->m_pVehicle->m_vecMoveSpeed = from.velocity + (to.velocity - from.velocity) * t;
+		vehicle->m_pVehicle->m_vecTurnSpeed = from.turnSpeed + (to.turnSpeed - from.turnSpeed) * t;
+	}
+}
+
 void CNetworkVehicleManager::TickStreaming(uint32_t tickCount)
 {
 	if (tickCount < s_lastVehicleStreamTick + m_streamConfig.tickIntervalMs)
@@ -183,6 +268,19 @@ void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const C
 	vehicle->m_cachedState.color2 = packet.color2;
 	vehicle->m_cachedState.health = packet.health;
 	vehicle->m_cachedState.locked = (eDoorLock)packet.locked;
+
+	CNetworkVehicle::InterpSnapshot snapshot{};
+	snapshot.position = packet.pos;
+	snapshot.roll = packet.roll;
+	snapshot.up = packet.rot;
+	snapshot.velocity = packet.velocity;
+	snapshot.turnSpeed = packet.turnSpeed;
+	snapshot.health = packet.health;
+	snapshot.arrivalTickMs = GetTickCount();
+	snapshot.serverSequence = ++vehicle->m_nSnapshotSequence;
+	vehicle->m_interpSnapshots.push_back(snapshot);
+	while (vehicle->m_interpSnapshots.size() > InterpTuning::maxSnapshotBuffer)
+		vehicle->m_interpSnapshots.pop_front();
 }
 
 void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const CPackets::VehicleDriverUpdate& packet)
@@ -200,6 +298,19 @@ void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const C
 	vehicle->m_cachedState.paintjob = packet.paintjob;
 	vehicle->m_cachedState.locked = (eDoorLock)packet.locked;
 	vehicle->m_cachedState.driverPlayerId = packet.playerid;
+
+	CNetworkVehicle::InterpSnapshot snapshot{};
+	snapshot.position = packet.pos;
+	snapshot.roll = packet.roll;
+	snapshot.up = packet.rot;
+	snapshot.velocity = packet.velocity;
+	snapshot.turnSpeed = vehicle->m_cachedState.turnSpeed;
+	snapshot.health = packet.health;
+	snapshot.arrivalTickMs = GetTickCount();
+	snapshot.serverSequence = ++vehicle->m_nSnapshotSequence;
+	vehicle->m_interpSnapshots.push_back(snapshot);
+	while (vehicle->m_interpSnapshots.size() > InterpTuning::maxSnapshotBuffer)
+		vehicle->m_interpSnapshots.pop_front();
 }
 
 void CNetworkVehicleManager::AddModelRef(int modelId)
@@ -229,6 +340,11 @@ void CNetworkVehicleManager::ReleaseModelRef(int modelId)
 const CNetworkVehicleManager::Telemetry& CNetworkVehicleManager::GetTelemetry()
 {
 	return m_telemetry;
+}
+
+const CNetworkVehicleManager::InterpStats& CNetworkVehicleManager::GetInterpStats()
+{
+	return m_interpStats;
 }
 
 void CNetworkVehicleManager::UpdatePassenger(CVehicle* vehicle, CPlayerPed* localPlayer)

@@ -1,11 +1,13 @@
 #include "stdafx.h"
 #include "CNetworkVehicle.h"
 #include "CNetworkPed.h"
+#include <algorithm>
 
 std::vector<CNetworkPed*> CNetworkPedManager::m_pPeds;
 CNetworkPed* CNetworkPedManager::m_apTempPeds[255];
 CNetworkPedManager::StreamConfig CNetworkPedManager::m_streamConfig{};
 CNetworkPedManager::Telemetry CNetworkPedManager::m_telemetry{};
+CNetworkPedManager::InterpStats CNetworkPedManager::m_interpStats{};
 
 static uint32_t s_lastPedStreamTick = 0;
 static uint32_t s_pedChurnWindowStart = 0;
@@ -117,9 +119,14 @@ void CNetworkPedManager::Update()
 
 void CNetworkPedManager::Process()
 {
+	m_interpStats.bufferedSnapshots = 0;
+	m_interpStats.correctionCount = 0;
+	const uint32_t now = GetTickCount();
+	const uint32_t renderTick = now > InterpTuning::interpolationDelayMs ? now - InterpTuning::interpolationDelayMs : 0;
+
 	for (auto networkPed : m_pPeds)
 	{
-		if (networkPed->m_bSyncing)
+		if (!networkPed || networkPed->m_bSyncing)
 			continue;
 
 		CPed* ped = networkPed->m_pPed;
@@ -127,9 +134,50 @@ void CNetworkPedManager::Process()
 		if (ped == nullptr)
 			continue;
 
-		ped->m_fAimingRotation = networkPed->m_fAimingRotation;
-		ped->m_fCurrentRotation = networkPed->m_fCurrentRotation;
-		ped->field_73C = networkPed->m_fLookDirection;
+		auto& snapshots = networkPed->m_interpSnapshots;
+		if (snapshots.empty())
+			continue;
+
+		while (snapshots.size() > 2 && snapshots[1].arrivalTickMs <= renderTick)
+			snapshots.pop_front();
+
+		m_interpStats.bufferedSnapshots += snapshots.size();
+
+		if (snapshots.size() == 1 || renderTick <= snapshots.front().arrivalTickMs)
+		{
+			const auto& snap = snapshots.front();
+			if ((snap.position - ped->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+			{
+				networkPed->m_nInterpCorrectionCount++;
+				m_interpStats.correctionCount++;
+			}
+
+			ped->m_matrix->pos = snap.position;
+			ped->m_vecMoveSpeed = snap.velocity;
+			ped->m_fCurrentRotation = networkPed->m_fCurrentRotation = snap.currentRotation;
+			ped->m_fAimingRotation = networkPed->m_fAimingRotation = snap.aimingRotation;
+			ped->field_73C = networkPed->m_fLookDirection = snap.lookDirection;
+			continue;
+		}
+
+		const auto& from = snapshots.front();
+		const auto& to = snapshots[1];
+		float span = static_cast<float>(to.arrivalTickMs - from.arrivalTickMs);
+		float t = span > 0.0f ? std::max(0.0f, std::min(1.0f, (renderTick - from.arrivalTickMs) / span)) : 1.0f;
+		CVector interpPos = from.position + (to.position - from.position) * t;
+		if ((interpPos - ped->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+		{
+			networkPed->m_nInterpCorrectionCount++;
+			m_interpStats.correctionCount++;
+			interpPos = to.position;
+			t = 1.0f;
+		}
+
+		ped->m_matrix->pos = interpPos;
+		ped->m_vecMoveSpeed = from.velocity + (to.velocity - from.velocity) * t;
+		ped->m_fCurrentRotation = networkPed->m_fCurrentRotation = from.currentRotation + (to.currentRotation - from.currentRotation) * t;
+		ped->m_fAimingRotation = networkPed->m_fAimingRotation = from.aimingRotation + (to.aimingRotation - from.aimingRotation) * t;
+		ped->field_73C = networkPed->m_fLookDirection = (int)(from.lookDirection + (to.lookDirection - from.lookDirection) * t);
 	}
 }
 
@@ -206,11 +254,30 @@ void CNetworkPedManager::CacheNetworkState(CNetworkPed* ped, const CPackets::Ped
 	ped->m_cachedState.armour = packet.armour;
 	ped->m_cachedState.weapon = packet.weapon;
 	ped->m_cachedState.ammo = packet.ammo;
+
+	CNetworkPed::InterpSnapshot snapshot{};
+	snapshot.position = packet.pos;
+	snapshot.velocity = packet.velocity;
+	snapshot.currentRotation = packet.currentRotation;
+	snapshot.aimingRotation = packet.aimingRotation;
+	snapshot.lookDirection = packet.lookDirection;
+	snapshot.health = packet.health;
+	snapshot.armour = packet.armour;
+	snapshot.arrivalTickMs = GetTickCount();
+	snapshot.serverSequence = ++ped->m_nSnapshotSequence;
+	ped->m_interpSnapshots.push_back(snapshot);
+	while (ped->m_interpSnapshots.size() > InterpTuning::maxSnapshotBuffer)
+		ped->m_interpSnapshots.pop_front();
 }
 
 const CNetworkPedManager::Telemetry& CNetworkPedManager::GetTelemetry()
 {
 	return m_telemetry;
+}
+
+const CNetworkPedManager::InterpStats& CNetworkPedManager::GetInterpStats()
+{
+	return m_interpStats;
 }
 
 void CNetworkPedManager::AssignHost()

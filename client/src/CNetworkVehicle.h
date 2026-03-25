@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 class CNetworkVehicle
 {
 private:
@@ -26,6 +27,17 @@ public:
 		eDoorLock locked = DOORLOCK_UNLOCKED;
 		unsigned char driverPlayerId = 255;
 	};
+	struct InterpSnapshot
+	{
+		CVector position{};
+		CVector roll{};
+		CVector up{};
+		CVector velocity{};
+		CVector turnSpeed{};
+		float health = 1000.0f;
+		uint32_t serverSequence = 0;
+		uint32_t arrivalTickMs = 0;
+	};
 
 	struct PassengerSeatState
 	{
@@ -50,6 +62,9 @@ public:
 	uint32_t m_nLastStreamDistanceFailTick = 0;
 	int m_nFailedStreamInAttempts = 0;
 	PassengerSeatState m_passengerSeatState[8]{};
+	std::deque<InterpSnapshot> m_interpSnapshots{};
+	uint32_t m_nSnapshotSequence = 0;
+	uint32_t m_nInterpCorrectionCount = 0;
 
 	~CNetworkVehicle();
 	CNetworkVehicle(int vehicleid, int modelid, CVector pos, float rotation, unsigned char color1, unsigned char color2, unsigned char createdBy);
@@ -58,6 +73,7 @@ public:
 	void StreamOut();
 	void CacheAuthoritativeState();
 	void ApplyCachedStateToEntity();
+	void ResetInterpolationFromCached();
 	void SetPassengerSeatState(uint8_t seatId, const PassengerSeatState& state, bool applyToAudio);
 	void ClearPassengerSeatState(uint8_t seatId);
 	bool HasDriver();

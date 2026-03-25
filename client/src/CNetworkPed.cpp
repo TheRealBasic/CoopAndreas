@@ -134,6 +134,7 @@ bool CNetworkPed::StreamIn()
     CWorld::Add(m_pPed);
 
     ApplyCachedStateToEntity();
+    ResetInterpolationFromCached();
 
     m_eStreamState = eStreamState::Streamed;
     m_nLastStreamStateChangeTick = GetTickCount();
@@ -192,6 +193,22 @@ void CNetworkPed::ApplyCachedStateToEntity()
     m_pPed->field_73C = m_fLookDirection = m_cachedState.lookDirection;
     m_pPed->m_fHealth = m_fHealth = m_cachedState.health;
     m_pPed->m_fArmour = m_cachedState.armour;
+}
+
+void CNetworkPed::ResetInterpolationFromCached()
+{
+    m_interpSnapshots.clear();
+    InterpSnapshot snapshot{};
+    snapshot.position = m_cachedState.position;
+    snapshot.velocity = m_cachedState.velocity;
+    snapshot.aimingRotation = m_cachedState.aimingRotation;
+    snapshot.currentRotation = m_cachedState.currentRotation;
+    snapshot.lookDirection = m_cachedState.lookDirection;
+    snapshot.health = m_cachedState.health;
+    snapshot.armour = m_cachedState.armour;
+    snapshot.arrivalTickMs = GetTickCount();
+    snapshot.serverSequence = ++m_nSnapshotSequence;
+    m_interpSnapshots.push_back(snapshot);
 }
 
 CNetworkPed::~CNetworkPed()
