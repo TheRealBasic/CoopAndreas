@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <chrono>
+#include <cstring>
 
 #include "CPacketListener.h"
 #include "CPacket.h"
@@ -294,7 +295,8 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
 
     int freeId = CPlayerManager::GetFreeID();
     CPlayer* player = new CPlayer(peer, freeId);
-    strcpy_s(player->m_Name, packet->name);
+    std::strncpy(player->m_Name, packet->name, sizeof(player->m_Name) - 1);
+    player->m_Name[sizeof(player->m_Name) - 1] = '\0';
     CPlayerManager::Add(player);
 
     uint32_t packedVersion = semver_parse(COOPANDREAS_VERSION, nullptr);
@@ -330,7 +332,8 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
         CPlayerPackets::PlayerConnected newPlayerPacket{};
         newPlayerPacket.id = i->m_iPlayerId;
         newPlayerPacket.isAlreadyConnected = true;
-        strcpy_s(newPlayerPacket.name, i->m_Name);
+        std::strncpy(newPlayerPacket.name, i->m_Name, sizeof(newPlayerPacket.name) - 1);
+        newPlayerPacket.name[sizeof(newPlayerPacket.name) - 1] = '\0';
 
         CNetwork::SendPacket(peer, CPacketsID::PLAYER_CONNECTED, &newPlayerPacket, sizeof(CPlayerPackets::PlayerConnected), ENET_PACKET_FLAG_RELIABLE);
 
@@ -420,7 +423,8 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
         packet.pos = i->m_vecPos;
         packet.pedType = i->m_nPedType;
         packet.createdBy = i->m_nCreatedBy;
-        strncpy_s(packet.specialModelName, i->m_szSpecialModelName, strlen(i->m_szSpecialModelName));
+        std::strncpy(packet.specialModelName, i->m_szSpecialModelName, sizeof(packet.specialModelName) - 1);
+        packet.specialModelName[sizeof(packet.specialModelName) - 1] = '\0';
         CNetwork::SendPacket(peer, CPacketsID::PED_SPAWN, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
     }
 

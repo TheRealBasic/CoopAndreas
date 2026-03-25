@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <unordered_map>
 #include "CVector.h"
+#include "enet/enet.h"
 
 class CPlayer;
-struct ENetPeer;
 
 class CFireSyncManager
 {

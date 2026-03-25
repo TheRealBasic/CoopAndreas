@@ -71,9 +71,9 @@ public:
 		bool thresholdReached;
 	};
 
-	static inline CutsceneSkipVoteState ms_cutsceneSkipVoteState{};
-	static inline CutsceneSkipVoteConfig ms_cutsceneSkipVoteConfig{};
-	static inline bool ms_isCutsceneSkipVoteConfigLoaded = false;
+	static CutsceneSkipVoteState ms_cutsceneSkipVoteState;
+	static CutsceneSkipVoteConfig ms_cutsceneSkipVoteConfig;
+	static bool ms_isCutsceneSkipVoteConfigLoaded;
 
 	static void EnsureCutsceneSkipVoteConfigLoaded()
 	{

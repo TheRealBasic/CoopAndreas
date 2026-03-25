@@ -3,6 +3,9 @@
 #include "CPlayerManager.h"
 
 std::vector<CPlayer*> CPlayerManager::m_pPlayers;
+CPlayerPackets::CutsceneSkipVoteState CPlayerPackets::ms_cutsceneSkipVoteState{};
+CPlayerPackets::CutsceneSkipVoteConfig CPlayerPackets::ms_cutsceneSkipVoteConfig{};
+bool CPlayerPackets::ms_isCutsceneSkipVoteConfigLoaded = false;
 
 void CPlayerManager::Add(CPlayer* player)
 {
