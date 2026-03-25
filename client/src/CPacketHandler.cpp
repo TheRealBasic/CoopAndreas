@@ -15,6 +15,7 @@
 #include <CProjectileInfo.h>
 #include <CAimSync.h>
 #include <game_sa/CTagManager.h>
+#include <CNetworkPickupManager.h>
 
 namespace
 {
@@ -2032,4 +2033,16 @@ void CPacketHandler::TeleportPlayerScripted__Handle(void* data, int size)
 	playerPed->m_fAimingRotation = packet->heading;
 	playerPed->SetHeading(packet->heading);
 	playerPed->UpdateRwMatrix();
+}
+
+void CPacketHandler::PickupCreate__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PickupCreate*)data;
+	CNetworkPickupManager::HandleCreate(*packet);
+}
+
+void CPacketHandler::PickupStateChange__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PickupStateChange*)data;
+	CNetworkPickupManager::HandleState(*packet);
 }

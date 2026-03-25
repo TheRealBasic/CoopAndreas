@@ -15,6 +15,7 @@
 #include <CEntryExitMarkerSync.h>
 #include <CNetworkStaticBlip.h>
 #include <CNetworkAnimQueue.h>
+#include <CNetworkPickupManager.h>
 #include <game_sa/CTagManager.h>
 #include <CPedPlacement.h>
 #include <CGeneral.h>
@@ -201,6 +202,7 @@ public:
 					}
 
 					CNetworkPedManager::Process();
+					CNetworkPickupManager::Process();
 
 					if (GetAsyncKeyState(VK_F7) && GetAsyncKeyState(VK_F10) && GetAsyncKeyState(VK_NUMPAD1))
 					{
