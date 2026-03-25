@@ -73,25 +73,38 @@ xmake --build proxy
 
 ### Server
 
-Install build tools first (CMake is used by dependencies and xmake drives project builds):
+Install build prerequisites first (xmake is the primary build system, CMake is only needed for root-level wrapper tooling):
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y cmake xmake
+sudo apt-get install -y build-essential clang cmake xmake
 ```
 
 Verify your toolchain:
 
 ```bash
+g++ --version
+clang --version
 cmake --version
 xmake --version
 ```
 
-Then build the server from the repository root:
+Build the server from the repository root:
 
 ```bash
+# 1) Configure xmake for your desired mode (debug or release)
+xmake f -m release
+
+# 2) Build the Linux server target
 xmake --build server
+
+# 3) (optional) run the server binary
+./build/linux/x86_64/release/server
 ```
+
+Linux build notes:
+- The server bundles ENet sources from `third_party/enet` and links pthreads for threading support.
+- Linux socket APIs come from glibc (no separate socket library is required, unlike Windows `ws2_32`).
 
 ### Root CMake configure (canonical for CMake-based tooling)
 
