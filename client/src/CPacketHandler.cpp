@@ -1057,7 +1057,7 @@ void CPacketHandler::PlayerKeySync__Handle(void* data, int size)
 
 void CPacketHandler::PedAddTask__Handle(void* data, int size)
 {
-	//CTaskSync::DeSerializeTask(data);
+	CTaskSync::DeSerializeTask(data, size);
 }
 
 // PedDriverUpdate

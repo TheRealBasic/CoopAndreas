@@ -51,7 +51,7 @@ bool __fastcall CWeapon__Fire_Hook(CWeapon* This, SKIP_EDX, CPed* owner, CVector
 {
     CNetworkPed* ped = CNetworkPedManager::GetPed(owner);
 
-    if (ped)
+    if (ped && ped->m_bSyncing && CNetwork::m_bConnected)
     {
         CPackets::PedShotSync packet{};
         packet.pedid = ped->m_nPedId;

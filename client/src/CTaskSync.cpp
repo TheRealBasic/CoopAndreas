@@ -132,9 +132,13 @@ void* CTaskSync::SerializeTask(CTask* t, CNetworkPed* owner, bool bPrimary, unsi
     return data;
 }
 
-void CTaskSync::DeSerializeTask(void* data)
+void CTaskSync::DeSerializeTask(void* data, int size)
 {
+    if (data == nullptr || size < static_cast<int>(sizeof(int) + sizeof(int) + sizeof(unsigned char) + sizeof(bool)))
+        return;
+
     char* currentPtr = (char*)data;
+    char* dataEnd = currentPtr + size;
 
     int pedId = 0;
     int taskId = 0;
@@ -143,6 +147,9 @@ void CTaskSync::DeSerializeTask(void* data)
 
 
     bool b = false;
+
+    if (currentPtr + sizeof(pedId) + sizeof(taskId) + sizeof(taskSlot) + sizeof(bPrimary) > dataEnd)
+        return;
 
     READ(pedId);
     READ(taskId);
@@ -165,6 +172,8 @@ void CTaskSync::DeSerializeTask(void* data)
     {
         unsigned int m_nType;
 
+        if (currentPtr + sizeof(m_nType) > dataEnd)
+            return;
         READ(m_nType);
 
         CTaskComplexJump* task = new CTaskComplexJump(m_nType);
@@ -178,6 +187,8 @@ void CTaskSync::DeSerializeTask(void* data)
     {
         CTaskComplexWander* task = plugin::CallAndReturn<CTaskComplexWander*, 0x673D00>(networkPed->m_pPed);
 
+        if (currentPtr + sizeof(task->m_nMoveState) + sizeof(task->m_nDir) + sizeof(b) + sizeof(task->m_fTargetRadius) > dataEnd)
+            return;
         READ(task->m_nMoveState);
         READ(task->m_nDir);
         READ(b);
@@ -193,6 +204,8 @@ void CTaskSync::DeSerializeTask(void* data)
         uint8_t carDrivingStyle = 0;
         float cruiseSpeed = 0.0f;
 
+        if (currentPtr + sizeof(vehicleId) + sizeof(carDrivingStyle) + sizeof(cruiseSpeed) > dataEnd)
+            return;
         READ(vehicleId);
         READ(carDrivingStyle);
         READ(cruiseSpeed);
