@@ -27,6 +27,14 @@ public:
 		unsigned char driverPlayerId = 255;
 	};
 
+	struct PassengerSeatState
+	{
+		unsigned char gamepadFlags = 0;
+		signed char radioStation = -1;
+		unsigned char radioState = 0;
+		uint32_t lastRadioApplyTick = 0;
+	};
+
 	int m_nVehicleId = -1;
 	CVehicle* m_pVehicle = nullptr;
 	int m_nModelId = 0;
@@ -41,6 +49,7 @@ public:
 	uint32_t m_nLastStreamStateChangeTick = 0;
 	uint32_t m_nLastStreamDistanceFailTick = 0;
 	int m_nFailedStreamInAttempts = 0;
+	PassengerSeatState m_passengerSeatState[8]{};
 
 	~CNetworkVehicle();
 	CNetworkVehicle(int vehicleid, int modelid, CVector pos, float rotation, unsigned char color1, unsigned char color2, unsigned char createdBy);
@@ -49,6 +58,8 @@ public:
 	void StreamOut();
 	void CacheAuthoritativeState();
 	void ApplyCachedStateToEntity();
+	void SetPassengerSeatState(uint8_t seatId, const PassengerSeatState& state, bool applyToAudio);
+	void ClearPassengerSeatState(uint8_t seatId);
 	bool HasDriver();
 	
 	static CNetworkVehicle* CreateHosted(CVehicle* vehicle);
