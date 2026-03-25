@@ -73,7 +73,25 @@ xmake --build proxy
 
 ### Server
 
-TODO
+Install build tools first (CMake is used by dependencies and xmake drives project builds):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y cmake xmake
+```
+
+Verify your toolchain:
+
+```bash
+cmake --version
+xmake --version
+```
+
+Then build the server from the repository root:
+
+```bash
+xmake --build server
+```
 
 ## Donate
 https://send.monobank.ua/jar/8wPrs73MBa
