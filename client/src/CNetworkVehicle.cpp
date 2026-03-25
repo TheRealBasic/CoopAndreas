@@ -18,17 +18,34 @@ CNetworkVehicle::CNetworkVehicle(int vehicleid, int modelid, CVector pos, float 
     m_nTempId = 255;
     m_nModelId = modelid;
     m_nCreatedBy = createdBy;
+    m_cachedState.position = pos;
+    m_cachedState.health = 1000.0f;
+    m_cachedState.color1 = color1;
+    m_cachedState.color2 = color2;
 
-    if (!CreateVehicle(vehicleid, modelid, pos, rotation, color1, color2))
-        return;
+    if (CreateVehicle(vehicleid, modelid, pos, rotation, color1, color2))
+    {
+        m_eStreamState = eStreamState::Streamed;
+        ApplyCachedStateToEntity();
+    }
 
 }
 
 bool CNetworkVehicle::CreateVehicle(int vehicleid, int modelid, CVector pos, float rotation, unsigned char color1, unsigned char color2)
 {
     unsigned char oldFlags = CStreaming::ms_aInfoForModel[modelid].m_nFlags;
-    CStreaming::RequestModel(modelid, GAME_REQUIRED);
-    CStreaming::LoadAllRequestedModels(false);
+    CStreaming::RequestModel(modelid, GAME_REQUIRED | eStreamingFlags::PRIORITY_REQUEST);
+
+    const uint32_t startTick = GetTickCount();
+    while (CStreaming::ms_aInfoForModel[modelid].m_nLoadState != LOADSTATE_LOADED)
+    {
+        CStreaming::LoadAllRequestedModels(false);
+        if (GetTickCount() - startTick > 500)
+        {
+            return false;
+        }
+        Sleep(10);
+    }
 
     if (!(oldFlags & GAME_REQUIRED))
     {
@@ -82,7 +99,82 @@ bool CNetworkVehicle::CreateVehicle(int vehicleid, int modelid, CVector pos, flo
     m_pVehicle->m_nSecondaryColor = color2;
     CWorld::Add(m_pVehicle);
 
+	return true;
+}
+
+bool CNetworkVehicle::StreamIn()
+{
+    m_eStreamState = eStreamState::StreamingIn;
+    if (!CreateVehicle(m_nVehicleId, m_nModelId, m_cachedState.position, 0.0f, m_cachedState.color1, m_cachedState.color2))
+    {
+        m_nFailedStreamInAttempts++;
+        m_eStreamState = eStreamState::NotStreamed;
+        return false;
+    }
+
+    ApplyCachedStateToEntity();
+    m_eStreamState = eStreamState::Streamed;
+    m_nLastStreamStateChangeTick = GetTickCount();
     return true;
+}
+
+void CNetworkVehicle::StreamOut()
+{
+    m_eStreamState = eStreamState::StreamingOut;
+    CacheAuthoritativeState();
+
+    if (m_pVehicle && CUtil::IsValidEntityPtr(m_pVehicle))
+    {
+        if (m_nBlipHandle != -1)
+        {
+            CRadar::ClearBlipForEntity(eBlipType::BLIP_CAR, CPools::GetVehicleRef(m_pVehicle));
+            m_nBlipHandle = -1;
+        }
+
+        plugin::Command<Commands::DELETE_CAR>(CPools::GetVehicleRef(m_pVehicle));
+    }
+
+    m_pVehicle = nullptr;
+    m_eStreamState = eStreamState::NotStreamed;
+    m_nLastStreamStateChangeTick = GetTickCount();
+}
+
+void CNetworkVehicle::CacheAuthoritativeState()
+{
+    if (!m_pVehicle || !CUtil::IsValidEntityPtr(m_pVehicle) || !m_pVehicle->m_matrix)
+        return;
+
+    m_cachedState.position = m_pVehicle->m_matrix->pos;
+    m_cachedState.roll = m_pVehicle->m_matrix->right;
+    m_cachedState.up = m_pVehicle->m_matrix->up;
+    m_cachedState.velocity = m_pVehicle->m_vecMoveSpeed;
+    m_cachedState.turnSpeed = m_pVehicle->m_vecTurnSpeed;
+    m_cachedState.health = m_pVehicle->m_fHealth;
+    m_cachedState.color1 = m_pVehicle->m_nPrimaryColor;
+    m_cachedState.color2 = m_pVehicle->m_nSecondaryColor;
+    m_cachedState.paintjob = m_nPaintJob;
+    m_cachedState.locked = m_pVehicle->m_eDoorLock;
+}
+
+void CNetworkVehicle::ApplyCachedStateToEntity()
+{
+    if (!m_pVehicle || !CUtil::IsValidEntityPtr(m_pVehicle) || !m_pVehicle->m_matrix)
+        return;
+
+    m_pVehicle->m_matrix->pos = m_cachedState.position;
+    m_pVehicle->m_matrix->right = m_cachedState.roll;
+    m_pVehicle->m_matrix->up = m_cachedState.up;
+    m_pVehicle->m_vecMoveSpeed = m_cachedState.velocity;
+    m_pVehicle->m_vecTurnSpeed = m_cachedState.turnSpeed;
+    m_pVehicle->m_fHealth = m_cachedState.health;
+    m_pVehicle->m_nPrimaryColor = m_cachedState.color1;
+    m_pVehicle->m_nSecondaryColor = m_cachedState.color2;
+    m_pVehicle->m_eDoorLock = m_cachedState.locked;
+    if (m_nPaintJob != m_cachedState.paintjob)
+    {
+        m_nPaintJob = m_cachedState.paintjob;
+        m_pVehicle->SetRemap(m_nPaintJob);
+    }
 }
 
 CNetworkVehicle::~CNetworkVehicle()
@@ -93,17 +185,10 @@ CNetworkVehicle::~CNetworkVehicle()
         vehicleRemovePacket.vehicleid = m_nVehicleId;
         CNetwork::SendPacket(CPacketsID::VEHICLE_REMOVE, &vehicleRemovePacket, sizeof vehicleRemovePacket, ENET_PACKET_FLAG_RELIABLE);
     }
-    else
-    {
-        if (m_pVehicle && CUtil::IsValidEntityPtr(m_pVehicle))
-        {
-            if (m_nBlipHandle != -1)
-            {
-                CRadar::ClearBlipForEntity(eBlipType::BLIP_CAR, CPools::GetVehicleRef(m_pVehicle));
-            }
-            plugin::Command<Commands::DELETE_CAR>(CPools::GetVehicleRef(m_pVehicle));
-        }
-    }
+	else
+	{
+		StreamOut();
+	}
 }
 
 bool CNetworkVehicle::HasDriver()

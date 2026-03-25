@@ -1,8 +1,16 @@
 #include "stdafx.h"
 #include "CNetworkVehicle.h"
+#include <unordered_map>
 
 std::vector<CNetworkVehicle*> CNetworkVehicleManager::m_pVehicles;
 CNetworkVehicle* CNetworkVehicleManager::m_apTempVehicles[255];
+CNetworkVehicleManager::StreamConfig CNetworkVehicleManager::m_streamConfig{};
+CNetworkVehicleManager::Telemetry CNetworkVehicleManager::m_telemetry{};
+
+static std::unordered_map<int, size_t> s_vehicleModelRefs;
+static uint32_t s_lastVehicleStreamTick = 0;
+static uint32_t s_streamChurnWindowStart = 0;
+static size_t s_streamChurnCounter = 0;
 
 CNetworkVehicle* CNetworkVehicleManager::GetVehicle(int vehicleid)
 {
@@ -45,6 +53,10 @@ CNetworkVehicle* CNetworkVehicleManager::GetVehicle(CEntity* vehicle)
 void CNetworkVehicleManager::Add(CNetworkVehicle* vehicle)
 {
 	CNetworkVehicleManager::m_pVehicles.push_back(vehicle);
+	if (vehicle)
+	{
+		AddModelRef(vehicle->m_nModelId);
+	}
 }
 
 void CNetworkVehicleManager::Remove(CNetworkVehicle* vehicle)
@@ -52,6 +64,10 @@ void CNetworkVehicleManager::Remove(CNetworkVehicle* vehicle)
 	auto it = std::find(m_pVehicles.begin(), m_pVehicles.end(), vehicle);
 	if (it != m_pVehicles.end())
 	{
+		if (vehicle)
+		{
+			ReleaseModelRef(vehicle->m_nModelId);
+		}
 		m_pVehicles.erase(it);
 	}
 }
@@ -69,6 +85,7 @@ void CNetworkVehicleManager::UpdateDriver(CVehicle* vehicle)
 void CNetworkVehicleManager::UpdateIdle()
 {
 	CNetworkVehicleManager::RemoveHostedUnused();
+	TickStreaming(GetTickCount());
 
 	CMassPacketBuilder builder;
 
@@ -86,6 +103,132 @@ void CNetworkVehicleManager::UpdateIdle()
 	}
 
 	builder.Send();
+}
+
+void CNetworkVehicleManager::TickStreaming(uint32_t tickCount)
+{
+	if (tickCount < s_lastVehicleStreamTick + m_streamConfig.tickIntervalMs)
+		return;
+
+	s_lastVehicleStreamTick = tickCount;
+	if (!FindPlayerPed(0) || !FindPlayerPed(0)->m_matrix)
+		return;
+
+	CVector localPos = FindPlayerPed(0)->m_matrix->pos;
+	size_t streamedNow = 0;
+
+	for (auto* vehicle : m_pVehicles)
+	{
+		if (!vehicle)
+			continue;
+
+		bool shouldStayStreamed = vehicle->m_bMissionCritical;
+		CVector delta = vehicle->m_cachedState.position - localPos;
+		float distance = delta.Magnitude();
+		if (!shouldStayStreamed)
+		{
+			if (vehicle->m_eStreamState == CNetworkVehicle::eStreamState::Streamed)
+				shouldStayStreamed = distance <= m_streamConfig.streamOutRadius;
+			else
+				shouldStayStreamed = distance <= m_streamConfig.streamInRadius;
+		}
+
+		if (shouldStayStreamed && streamedNow < m_streamConfig.maxStreamed)
+		{
+			if (!vehicle->m_pVehicle)
+			{
+				if (!vehicle->StreamIn())
+					m_telemetry.failedSpawns++;
+				s_streamChurnCounter++;
+			}
+			streamedNow++;
+		}
+		else if (vehicle->m_pVehicle)
+		{
+			vehicle->StreamOut();
+			s_streamChurnCounter++;
+		}
+	}
+
+	if (s_streamChurnWindowStart == 0)
+		s_streamChurnWindowStart = tickCount;
+	if (tickCount - s_streamChurnWindowStart >= 60000)
+	{
+		m_telemetry.streamChurnPerMinute = s_streamChurnCounter;
+		s_streamChurnCounter = 0;
+		s_streamChurnWindowStart = tickCount;
+	}
+
+	m_telemetry.totalNetworkEntities = m_pVehicles.size();
+	m_telemetry.streamedEntities = streamedNow;
+	m_telemetry.pendingModelLoads = 0;
+	for (const auto& [modelId, refs] : s_vehicleModelRefs)
+	{
+		if (refs > 0 && CStreaming::ms_aInfoForModel[modelId].m_nLoadState != LOADSTATE_LOADED)
+			m_telemetry.pendingModelLoads++;
+	}
+}
+
+void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const CPackets::VehicleIdleUpdate& packet)
+{
+	if (!vehicle)
+		return;
+
+	vehicle->m_cachedState.position = packet.pos;
+	vehicle->m_cachedState.roll = packet.roll;
+	vehicle->m_cachedState.up = packet.rot;
+	vehicle->m_cachedState.velocity = packet.velocity;
+	vehicle->m_cachedState.turnSpeed = packet.turnSpeed;
+	vehicle->m_cachedState.color1 = packet.color1;
+	vehicle->m_cachedState.color2 = packet.color2;
+	vehicle->m_cachedState.health = packet.health;
+	vehicle->m_cachedState.locked = (eDoorLock)packet.locked;
+}
+
+void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const CPackets::VehicleDriverUpdate& packet)
+{
+	if (!vehicle)
+		return;
+
+	vehicle->m_cachedState.position = packet.pos;
+	vehicle->m_cachedState.roll = packet.roll;
+	vehicle->m_cachedState.up = packet.rot;
+	vehicle->m_cachedState.velocity = packet.velocity;
+	vehicle->m_cachedState.color1 = packet.color1;
+	vehicle->m_cachedState.color2 = packet.color2;
+	vehicle->m_cachedState.health = packet.health;
+	vehicle->m_cachedState.paintjob = packet.paintjob;
+	vehicle->m_cachedState.locked = (eDoorLock)packet.locked;
+	vehicle->m_cachedState.driverPlayerId = packet.playerid;
+}
+
+void CNetworkVehicleManager::AddModelRef(int modelId)
+{
+	if (modelId < 0)
+		return;
+	s_vehicleModelRefs[modelId]++;
+}
+
+void CNetworkVehicleManager::ReleaseModelRef(int modelId)
+{
+	auto it = s_vehicleModelRefs.find(modelId);
+	if (it == s_vehicleModelRefs.end())
+		return;
+
+	if (it->second > 0)
+		it->second--;
+
+	if (it->second == 0)
+	{
+		CStreaming::SetModelIsDeletable(modelId);
+		CStreaming::SetModelTxdIsDeletable(modelId);
+		s_vehicleModelRefs.erase(it);
+	}
+}
+
+const CNetworkVehicleManager::Telemetry& CNetworkVehicleManager::GetTelemetry()
+{
+	return m_telemetry;
 }
 
 void CNetworkVehicleManager::UpdatePassenger(CVehicle* vehicle, CPlayerPed* localPlayer)

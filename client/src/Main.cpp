@@ -117,6 +117,7 @@ public:
 					}
 
 					unsigned int tickCount = GetTickCount();
+					CNetworkPlayerManager::TickStreamingController(tickCount);
 
 					CPassengerEnter::Process();
 

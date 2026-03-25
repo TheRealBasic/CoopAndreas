@@ -4,6 +4,12 @@
 
 std::vector<CNetworkPed*> CNetworkPedManager::m_pPeds;
 CNetworkPed* CNetworkPedManager::m_apTempPeds[255];
+CNetworkPedManager::StreamConfig CNetworkPedManager::m_streamConfig{};
+CNetworkPedManager::Telemetry CNetworkPedManager::m_telemetry{};
+
+static uint32_t s_lastPedStreamTick = 0;
+static uint32_t s_pedChurnWindowStart = 0;
+static size_t s_pedChurnCounter = 0;
 
 CNetworkPed* CNetworkPedManager::GetPed(int pedid)
 {
@@ -66,6 +72,7 @@ void CNetworkPedManager::Remove(CNetworkPed* ped)
 void CNetworkPedManager::Update()
 {
 	CNetworkPedManager::RemoveHostedUnused();
+	TickStreaming(GetTickCount());
 
 	CMassPacketBuilder builder;
 
@@ -124,6 +131,86 @@ void CNetworkPedManager::Process()
 		ped->m_fCurrentRotation = networkPed->m_fCurrentRotation;
 		ped->field_73C = networkPed->m_fLookDirection;
 	}
+}
+
+void CNetworkPedManager::TickStreaming(uint32_t tickCount)
+{
+	if (tickCount < s_lastPedStreamTick + m_streamConfig.tickIntervalMs)
+		return;
+
+	s_lastPedStreamTick = tickCount;
+	if (!FindPlayerPed(0) || !FindPlayerPed(0)->m_matrix)
+		return;
+
+	CVector localPos = FindPlayerPed(0)->m_matrix->pos;
+	size_t streamedNow = 0;
+
+	for (auto* ped : m_pPeds)
+	{
+		if (!ped)
+			continue;
+
+		bool shouldStayStreamed = ped->m_bMissionCritical;
+		CVector delta = ped->m_cachedState.position - localPos;
+		float distance = delta.Magnitude();
+		if (!shouldStayStreamed)
+		{
+			if (ped->m_eStreamState == CNetworkPed::eStreamState::Streamed)
+				shouldStayStreamed = distance <= m_streamConfig.streamOutRadius;
+			else
+				shouldStayStreamed = distance <= m_streamConfig.streamInRadius;
+		}
+
+		if (shouldStayStreamed && streamedNow < m_streamConfig.maxStreamed)
+		{
+			if (!ped->m_pPed)
+			{
+				if (!ped->StreamIn())
+					m_telemetry.failedSpawns++;
+				s_pedChurnCounter++;
+			}
+			streamedNow++;
+		}
+		else if (ped->m_pPed)
+		{
+			ped->StreamOut();
+			s_pedChurnCounter++;
+		}
+	}
+
+	if (s_pedChurnWindowStart == 0)
+		s_pedChurnWindowStart = tickCount;
+	if (tickCount - s_pedChurnWindowStart >= 60000)
+	{
+		m_telemetry.streamChurnPerMinute = s_pedChurnCounter;
+		s_pedChurnCounter = 0;
+		s_pedChurnWindowStart = tickCount;
+	}
+
+	m_telemetry.totalNetworkEntities = m_pPeds.size();
+	m_telemetry.streamedEntities = streamedNow;
+	m_telemetry.pendingModelLoads = 0;
+}
+
+void CNetworkPedManager::CacheNetworkState(CNetworkPed* ped, const CPackets::PedOnFoot& packet)
+{
+	if (!ped)
+		return;
+
+	ped->m_cachedState.position = packet.pos;
+	ped->m_cachedState.velocity = packet.velocity;
+	ped->m_cachedState.aimingRotation = packet.aimingRotation;
+	ped->m_cachedState.currentRotation = packet.currentRotation;
+	ped->m_cachedState.lookDirection = packet.lookDirection;
+	ped->m_cachedState.health = packet.health;
+	ped->m_cachedState.armour = packet.armour;
+	ped->m_cachedState.weapon = packet.weapon;
+	ped->m_cachedState.ammo = packet.ammo;
+}
+
+const CNetworkPedManager::Telemetry& CNetworkPedManager::GetTelemetry()
+{
+	return m_telemetry;
 }
 
 void CNetworkPedManager::AssignHost()

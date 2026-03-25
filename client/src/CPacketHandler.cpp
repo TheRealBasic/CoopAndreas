@@ -383,6 +383,8 @@ void CPacketHandler::VehicleIdleUpdate__Handle(void* data, int size)
 	if (vehicle == nullptr)
 		return;
 
+	CNetworkVehicleManager::CacheNetworkState(vehicle, *packet);
+
 	if (!vehicle->m_pVehicle)
 		return;
 
@@ -475,6 +477,8 @@ void CPacketHandler::VehicleDriverUpdate__Handle(void* data, int size)
 
 	if (vehicle == nullptr || player == nullptr)
 		return;
+
+	CNetworkVehicleManager::CacheNetworkState(vehicle, *packet);
 
 	if (!CUtil::IsValidEntityPtr(vehicle->m_pVehicle))
 		return;
@@ -868,6 +872,8 @@ void CPacketHandler::PedOnFoot__Handle(void* data, int size)
 
 	if (!ped)
 		return;
+
+	CNetworkPedManager::CacheNetworkState(ped, *packet);
 
 	if (!ped->m_pPed)
 		return;
