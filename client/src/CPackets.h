@@ -461,7 +461,9 @@ public:
 	{
 		int playerid;
 		float stats[14];
+		int money;
 	};
+	static_assert(sizeof(PlayerStats) == 64, "CPackets::PlayerStats layout mismatch");
 
 	struct RebuildPlayer
 	{

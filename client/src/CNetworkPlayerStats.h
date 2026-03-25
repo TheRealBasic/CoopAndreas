@@ -4,6 +4,7 @@ class CNetworkPlayerStats
 public:
 	std::array<float, 83> m_aStatsFloat{};
 	std::array<int, 224> m_aStatsInt{};
+	int m_nMoney = 0;
 
 	CNetworkPlayerStats();
 
@@ -23,5 +24,6 @@ public:
     void SetFloatStat(size_t index, float value);
     int GetIntStat(size_t index) const;
     void SetIntStat(size_t index, int value);
+	int GetMoney() const;
+	void SetMoney(int value);
 };
-

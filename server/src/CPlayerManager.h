@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <climits>
 
 #include "CControllerState.h"
 #include "CPlayer.h"
@@ -257,6 +258,7 @@ public:
 	{
 		int playerid;
 		float stats[14];
+		int money;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
@@ -264,13 +266,16 @@ public:
 			{
 				CPlayerPackets::PlayerStats* packet = (CPlayerPackets::PlayerStats*)data;
 				packet->playerid = player->m_iPlayerId;
+				packet->money = std::clamp(packet->money, 0, INT_MAX);
 				CNetwork::SendPacketToAll(CPacketsID::PLAYER_STATS, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
 
 				memcpy(player->m_afStats, packet->stats, sizeof(packet->stats));
+				player->m_nMoney = packet->money;
 				player->m_ucSyncFlags.bStatsModified = true;
 			}
 		}
 	};
+	static_assert(sizeof(PlayerStats) == 64, "CPlayerPackets::PlayerStats layout mismatch");
 
 	struct RebuildPlayer
 	{

@@ -24,6 +24,7 @@ class CPlayer
 		int m_nVehicleId = -1;
 		bool m_bCorrectVersion = false;
 		float m_afStats[14]{};
+		int m_nMoney = 0;
 		unsigned int m_anModelKeys[10]{};
 		unsigned int m_anTextureKeys[18]{};
 		float m_fFatStat;

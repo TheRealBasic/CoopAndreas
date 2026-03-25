@@ -1318,6 +1318,8 @@ void CPacketHandler::PlayerStats__Handle(void* data, int size)
 			eStats statId = CStatsSync::m_aeSyncedStats[i];
 			networkPlayer->m_stats[statId] = packet->stats[i];
 		}
+
+		networkPlayer->m_stats.SetMoney(packet->money);
 	}
 }
 
