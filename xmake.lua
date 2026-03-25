@@ -3,9 +3,12 @@ set_project("CoopAndreas")
 local force_msvc = true;
 
 set_languages("cxx17")
-set_arch("x86")
-set_plat("windows")
-set_toolchains("clang-cl") -- required to generate compile_commands.json properly
+
+if is_os("windows") then
+    set_arch("x86")
+    set_plat("windows")
+    set_toolchains("clang-cl") -- required to generate compile_commands.json properly
+end
 
 add_rules("plugin.compile_commands.autoupdate")
 add_rules("mode.debug", "mode.release")

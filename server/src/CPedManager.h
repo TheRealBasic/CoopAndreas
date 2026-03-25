@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <strings.h>
 #include <vector>
 #include <algorithm>
 
@@ -68,7 +69,7 @@ class CPedPackets
 
 					for (int i = 0; i < 52; i++)
 					{
-						if (_strnicmp(packet->specialModelName, CPedManager::ms_aszAllowedSpecialActors[i], strlen(CPedManager::ms_aszAllowedSpecialActors[i])))
+						if (strncasecmp(packet->specialModelName, CPedManager::ms_aszAllowedSpecialActors[i], strlen(CPedManager::ms_aszAllowedSpecialActors[i])) == 0)
 						{
 							isSpecialModelValid = true;
 							break;
@@ -83,7 +84,8 @@ class CPedPackets
 				CNetwork::SendPacketToAll(CPacketsID::PED_SPAWN, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
 		
 				CPed* ped = new CPed(packet->pedid, player, packet->modelId, packet->pedType, packet->pos, packet->createdBy);
-				strncpy_s(ped->m_szSpecialModelName, packet->specialModelName, 7);
+				std::strncpy(ped->m_szSpecialModelName, packet->specialModelName, sizeof(ped->m_szSpecialModelName) - 1);
+				ped->m_szSpecialModelName[sizeof(ped->m_szSpecialModelName) - 1] = '\0';
 				CPedManager::Add(ped);
 
 				// send it back to the syncer of the ped so that he knows the id
@@ -134,7 +136,8 @@ class CPedPackets
 						pedSpawnPacket.modelId = ped->m_nModelId;
 						pedSpawnPacket.pedType = ped->m_nPedType;
 						pedSpawnPacket.pos = ped->m_vecPos;
-						strncpy_s(pedSpawnPacket.specialModelName, sizeof(pedSpawnPacket.specialModelName), ped->m_szSpecialModelName, _TRUNCATE);
+						std::strncpy(pedSpawnPacket.specialModelName, ped->m_szSpecialModelName, sizeof(pedSpawnPacket.specialModelName) - 1);
+						pedSpawnPacket.specialModelName[sizeof(pedSpawnPacket.specialModelName) - 1] = '\0';
 						pedSpawnPacket.tempid = 0xFF;
 						pedSpawnPacket.createdBy = ped->m_nCreatedBy;
 						CNetwork::SendPacket(peer, CPacketsID::PED_SPAWN, &pedSpawnPacket, sizeof(pedSpawnPacket), ENET_PACKET_FLAG_RELIABLE);
