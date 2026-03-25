@@ -73,6 +73,9 @@ enum CPacketsID : unsigned short
 	TAG_UPDATE,
 	UPDATE_ALL_TAGS,
 	TELEPORT_PLAYER_SCRIPTED,
+	PICKUP_CREATE,
+	PICKUP_COLLECT_REQUEST,
+	PICKUP_STATE_CHANGE,
 	PACKET_ID_MAX
 };
 
@@ -136,6 +139,21 @@ public:
 			sizeof(RemoveCheckpoint), // REMOVE_CHECKPOINT,
 			0, // ENEX_SYNC,
 			sizeof(CreateStaticBlip), // CREATE_STATIC_BLIP,
+			sizeof(SetVehicleCreatedBy), // SET_VEHICLE_CREATED_BY
+			sizeof(SetPlayerTask), // SET_PLAYER_TASK
+			sizeof(PedSay), // PED_SAY
+			sizeof(PedClaimOnRelease), // PED_CLAIM_ON_RELEASE
+			sizeof(PedCancelClaim), // PED_CANCEL_CLAIM
+			sizeof(PedResetAllClaims), // PED_RESET_ALL_CLAIMS
+			sizeof(PedTakeHost), // PED_TAKE_HOST
+			0, // PERFORM_TASK_SEQUENCE
+			sizeof(AddProjectile), // ADD_PROJECTILE
+			sizeof(TagUpdate), // TAG_UPDATE
+			sizeof(UpdateAllTags), // UPDATE_ALL_TAGS
+			sizeof(TeleportPlayerScripted), // TELEPORT_PLAYER_SCRIPTED
+			sizeof(PickupCreate), // PICKUP_CREATE
+			sizeof(PickupCollectRequest), // PICKUP_COLLECT_REQUEST
+			sizeof(PickupStateChange), // PICKUP_STATE_CHANGE
 		};
 
 		return m_nPacketSize[id];
@@ -665,5 +683,33 @@ public:
 		int playerid;
 		CVector pos;
 		float heading;
+	};
+
+	struct PickupCreate
+	{
+		int pickupid;
+		uint8_t type;
+		uint8_t category;
+		CVector position;
+		int modelid;
+		bool collected;
+		uint32_t respawnMs;
+		int amount;
+		uint8_t weaponid;
+		uint16_t ammo;
+	};
+
+	struct PickupCollectRequest
+	{
+		int pickupid;
+		int playerid;
+		CVector playerPosition;
+	};
+
+	struct PickupStateChange
+	{
+		int pickupid;
+		bool collected;
+		int collectorPlayerId;
 	};
 };

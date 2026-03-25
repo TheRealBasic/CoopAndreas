@@ -17,6 +17,7 @@
 #include "NetworkEntityType.h"
 #include "PlayerDisconnectReason.h"
 #include "ConfigManager.h"
+#include "CPickupManager.h"
 
 class CPlayerManager
 {
@@ -247,6 +248,11 @@ public:
 					player->RemoveFromVehicle();
 				}
 
+				player->m_vecPosition = packet->position;
+				player->m_ucCurrentWeapon = packet->weapon;
+				player->m_usCurrentAmmo = packet->ammo;
+				player->m_bHasJetpack = packet->hasJetpack;
+
 				CNetwork::SendPacketToAll(CPacketsID::PLAYER_ONFOOT, packet, sizeof * packet, (ENetPacketFlag)0, peer);
 			}
 		}
@@ -446,7 +452,14 @@ public:
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
 			CPlayerPackets::RespawnPlayer* packet = (CPlayerPackets::RespawnPlayer*)data;
-			packet->playerid = CPlayerManager::GetPlayer(peer)->m_iPlayerId;
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player)
+			{
+				return;
+			}
+
+			CPickupManager::CreateDropsForPlayerDeath(player);
+			packet->playerid = player->m_iPlayerId;
 			CNetwork::SendPacketToAll(CPacketsID::RESPAWN_PLAYER, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};

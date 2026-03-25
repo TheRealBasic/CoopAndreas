@@ -83,4 +83,6 @@ public:
 	static void UpdateAllTags__Handle(void* data, int size);
 	static void UpdateAllTags__Trigger();
 	static void TeleportPlayerScripted__Handle(void* data, int size);
+	static void PickupCreate__Handle(void* data, int size);
+	static void PickupStateChange__Handle(void* data, int size);
 };

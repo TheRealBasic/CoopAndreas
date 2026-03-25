@@ -29,6 +29,10 @@ class CPlayer
 		unsigned int m_anTextureKeys[18]{};
 		float m_fFatStat;
 		float m_fMuscleStat;
+		CVector m_vecPosition{};
+		unsigned char m_ucCurrentWeapon = 0;
+		unsigned short m_usCurrentAmmo = 0;
+		bool m_bHasJetpack = false;
 		CVector m_vecWaypointPos{};
 		struct {
 			uint8_t bStatsModified : 1;

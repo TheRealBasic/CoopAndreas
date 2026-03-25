@@ -12,6 +12,7 @@
 #include "CPlayerManager.h"
 #include "CVehicleManager.h"
 #include "CPedManager.h"
+#include "CPickupManager.h"
 
 #include "semver.h"
 #include "PlayerDisconnectReason.h"
@@ -49,6 +50,7 @@ bool CNetwork::Init(unsigned short port)
     ENetEvent event;
     while (true) // waiting for event
     {
+        CPickupManager::ProcessRespawns();
         enet_host_service(server, &event, 1);
         switch (event.type)
         {
@@ -134,6 +136,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::TAG_UPDATE, CPlayerPackets::TagUpdate::Handle);
     CNetwork::AddListener(CPacketsID::UPDATE_ALL_TAGS, CPlayerPackets::UpdateAllTags::Handle);
     CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPlayerPackets::TeleportPlayerScripted::Handle);
+    CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);
 }
 
 void CNetwork::SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag)
@@ -416,6 +419,8 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             CNetwork::SendPacket(peer, CPacketsID::ENEX_SYNC, CPlayerPackets::EnExSync::ms_vLastData.data(), CPlayerPackets::EnExSync::ms_vLastData.size(), ENET_PACKET_FLAG_RELIABLE);
         }
     }
+
+    CPickupManager::SendSnapshot(peer);
 
     CPlayerPackets::PlayerHandshake handshakePacket = { freeId };
     CNetwork::SendPacket(peer, CPacketsID::PLAYER_HANDSHAKE, &handshakePacket, sizeof handshakePacket, ENET_PACKET_FLAG_RELIABLE);
