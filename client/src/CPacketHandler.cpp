@@ -731,6 +731,9 @@ void CPacketHandler::VehicleComponentRemove__Handle(void* data, int size)
 
 CPackets::VehiclePassengerUpdate* CPacketHandler::VehiclePassengerUpdate__Collect(CNetworkVehicle* vehicle, CPlayerPed* localPlayer)
 {
+	if (vehicle == nullptr || vehicle->m_pVehicle == nullptr || localPlayer == nullptr)
+		return nullptr;
+
 	CPackets::VehiclePassengerUpdate* packet = new CPackets::VehiclePassengerUpdate;
 	CPad* pad = localPlayer->GetPadFromPlayer();
 
@@ -745,14 +748,22 @@ CPackets::VehiclePassengerUpdate* CPacketHandler::VehiclePassengerUpdate__Collec
 	packet->gamepadFlags = 0;
 	packet->radioStation = -1;
 	packet->radioState = 0;
+	bool foundSeat = false;
 
 	for (int i = 0; i < vehicle->m_pVehicle->m_nMaxPassengers; i++)
 	{
 		if (vehicle->m_pVehicle->m_apPassengers[i] == localPlayer)
 		{
 			packet->seatid = i;
+			foundSeat = true;
 			break;
 		}
+	}
+
+	if (!foundSeat || packet->seatid >= 7)
+	{
+		delete packet;
+		return nullptr;
 	}
 
 	if (pad)
@@ -765,16 +776,15 @@ CPackets::VehiclePassengerUpdate* CPacketHandler::VehiclePassengerUpdate__Collec
 			packet->gamepadFlags |= 1 << 2;
 	}
 
-	static uint32_t s_lastRadioChangeTick = 0;
 	const uint32_t now = GetTickCount();
 	auto& seatState = vehicle->m_passengerSeatState[packet->seatid + 1];
 
 	packet->radioStation = seatState.radioStation;
 	packet->radioState = seatState.radioState;
 	const bool radioPressed = (packet->gamepadFlags & ((1 << 0) | (1 << 1))) != 0;
-	if (radioPressed && now - s_lastRadioChangeTick >= 300)
+	if (radioPressed && now - seatState.lastRadioApplyTick >= 300)
 	{
-		s_lastRadioChangeTick = now;
+		seatState.lastRadioApplyTick = now;
 		packet->radioState |= 1 << 0; // has radio change
 		if (packet->radioStation < 0)
 			packet->radioStation = 0;

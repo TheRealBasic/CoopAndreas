@@ -351,6 +351,8 @@ void CNetworkVehicleManager::UpdatePassenger(CVehicle* vehicle, CPlayerPed* loca
 {
 	CNetworkVehicle* networkVehicle = CNetworkVehicleManager::GetVehicle(vehicle);
 	CPackets::VehiclePassengerUpdate* packet = CPacketHandler::VehiclePassengerUpdate__Collect(networkVehicle, localPlayer);
+	if (packet == nullptr)
+		return;
 	CNetwork::SendPacket(CPacketsID::VEHICLE_PASSENGER_UPDATE, packet, sizeof * packet);
 	delete packet;
 }
