@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <CMissionSyncState.h>
 #include "CTaskSync.h"
 #include "CNetworkVehicle.h"
 #include "CNetworkPed.h"
@@ -1843,7 +1844,7 @@ void CPacketHandler::PlayMissionAudio__Handle(void* data, int size)
 	
 	CPackets::PlayMissionAudio* packet = (CPackets::PlayMissionAudio*)data;
 	plugin::CallMethod<0x507290>(&AudioEngine, packet->slotid, packet->audioid); // CAudioEngine__PreloadMissionAudio
-	COpCodeSync::ms_abLoadingMissionAudio[packet->slotid] = true;
+	CMissionSyncState::MarkMissionAudioLoading(packet->slotid);
 }
 
 // UpdateCheckpoint

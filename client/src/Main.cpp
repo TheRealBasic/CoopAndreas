@@ -10,6 +10,7 @@
 #include <CFireManager.h>
 #include <semver.h>
 #include <COpCodeSync.h>
+#include <CMissionSyncState.h>
 #include <CStatsSync.h>
 #include <CNetworkCheckpoint.h>
 #include <CEntryExitManager.h>
@@ -87,28 +88,8 @@ public:
 				
 				if (CNetwork::m_bConnected)
 				{
-					// TODO: refactor
-					if (COpCodeSync::ms_bLoadingCutscene
-						&& !CLocalPlayer::m_bIsHost
-						&& CCutsceneMgr::ms_cutsceneName[0]
-						&& CCutsceneMgr::ms_cutsceneLoadStatus == 2)
-					{
-						COpCodeSync::ms_bLoadingCutscene = false;
-						Command<Commands::START_CUTSCENE>();
-					}
-
-					if (!CLocalPlayer::m_bIsHost)
-					{
-						for (uint8_t i = 0; i < 4; i++)
-						{
-							if (COpCodeSync::ms_abLoadingMissionAudio[i]
-								&& plugin::CallMethodAndReturn<int8_t, 0x5072A0>(&AudioEngine, i) == 1) // CAudioEngine__GetMissionAudioLoadingStatus
-							{
-								plugin::CallMethod<0x5072B0>(&AudioEngine, i); // CAudioEngine__PlayLoadedMissionAudio
-								COpCodeSync::ms_abLoadingMissionAudio[i] = false;
-							}
-						}
-					}
+					CMissionSyncState::ProcessDeferredCutsceneStart();
+					CMissionSyncState::ProcessMissionAudioLoading();
 
 					if (CLocalPlayer::m_bIsHost
 						&& CTheScripts::OnAMissionFlag

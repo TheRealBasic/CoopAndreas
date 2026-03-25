@@ -117,6 +117,17 @@ cmake --build build -j2
 
 This CMake entry point delegates to `cmake/CMakeLists.txt` and provides optional `xmake` bridge targets (for example: `cmake --build build --target coopandreas-xmake`).
 
+
+## Developer note: mission sync state
+
+`CMissionSyncState` centralizes mission/cutscene transient state on the client side.
+
+- **Opcode pre-execution stage:** specific opcodes are routed through a small handler table (`HandleOpCodePreExecute`). `0x0701` clears skip HUD text immediately; `0x02E7` (start cutscene) is deferred until cutscene assets are loaded.
+- **Frame update stage:** `Main.cpp` now calls `ProcessDeferredCutsceneStart()` and `ProcessMissionAudioLoading()` every networked frame instead of inline checks.
+- **Host behavior:** host does not auto-play deferred mission audio/cutscene start from this state module; it remains authoritative and only syncs the opcode/events.
+- **Non-host behavior:** non-host clients wait for cutscene load status/audio slot readiness, then trigger `START_CUTSCENE` / `PlayLoadedMissionAudio` exactly once and clear the pending flags.
+- **Task sequence status:** sequence processing status is tracked in this module and toggled by `CTaskSequenceSync` around replayed opcode execution.
+
 ## Donate
 https://send.monobank.ua/jar/8wPrs73MBa
 

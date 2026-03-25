@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <CMissionSyncState.h>
 #include "CTaskSequenceSync.h"
 #include <game_sa/CTaskSequences.h>
 #include <COpCodeSync.h>
@@ -263,7 +264,7 @@ void CTaskSequenceSync::HandlePacket(void* data, int size)
 		uint8_t len = *(uint8_t*)((int)data + ptr);
 		ptr++;
 
-		COpCodeSync::ms_bProcessingTaskSequence = true;
+		CMissionSyncState::SetProcessingTaskSequence(true);
 		COpCodeSync::HandlePacket((uint8_t*)((int)data + ptr), len);
 
 		if (CTaskSequenceSync::ms_bFailedToProcessSequence == true)
@@ -274,10 +275,11 @@ void CTaskSequenceSync::HandlePacket(void* data, int size)
 			}
 			Command<Commands::CLOSE_SEQUENCE_TASK>(sequenceId);
 			Command<Commands::CLEAR_SEQUENCE_TASK>(sequenceId);
+			CMissionSyncState::SetProcessingTaskSequence(false);
 			return;
 		}
 
-		COpCodeSync::ms_bProcessingTaskSequence = false;
+		CMissionSyncState::SetProcessingTaskSequence(false);
 
 
 		ptr += len;

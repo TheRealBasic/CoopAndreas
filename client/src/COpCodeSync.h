@@ -61,11 +61,8 @@ class COpCodeSync
 {
 public:
 	static inline bool ms_bSyncingEnabled = true;
-	static inline bool ms_bLoadingCutscene = true;
-	static inline bool ms_abLoadingMissionAudio[4];
 	static inline std::vector<CRunningScript*> ms_vSyncedScripts;
     static inline OpcodeParameter scriptParamsBuffer[NUM_SYNCED_PARAMS];
-    static inline bool ms_bProcessingTaskSequence = false;
     static inline bool bProcessingNetworkOpcode = false;
 
 	static void Init();
