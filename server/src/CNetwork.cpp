@@ -16,6 +16,7 @@
 #include "CPedManager.h"
 #include "CPickupManager.h"
 #include "CFireSyncManager.h"
+#include "ConfigManager.h"
 
 #include "semver.h"
 #include "PlayerDisconnectReason.h"
@@ -24,6 +25,12 @@ std::unordered_map<unsigned short, CPacketListener*> CNetwork::m_packetListeners
 
 bool CNetwork::Init(unsigned short port)
 {
+    if (CConfigManager::ms_pReader == nullptr)
+    {
+        printf("[ERROR] : ConfigManager must be initialized before CNetwork::Init\n");
+        return false;
+    }
+
     // init packet listeners
     CNetwork::InitListeners();
 
@@ -38,8 +45,22 @@ bool CNetwork::Init(unsigned short port)
     address.host = ENET_HOST_ANY; // bind server ip
     address.port = port; // bind server port
 
-    // TODO: `ConfigManager::GetConfigMaxPlayers`
-    ENetHost* server = enet_host_create(&address, MAX_SERVER_PLAYERS, 2, 0, 0); // create enet host
+    constexpr size_t minPlayers = 1;
+    constexpr size_t maxPlayers = MAX_SERVER_PLAYERS;
+
+    const size_t configuredMaxPlayers = static_cast<size_t>(CConfigManager::GetConfigMaxPlayers());
+    const size_t effectiveMaxPlayers = std::clamp(configuredMaxPlayers, minPlayers, maxPlayers);
+
+    if (configuredMaxPlayers != effectiveMaxPlayers)
+    {
+        printf("[WARN] : Config maxplayers=%zu out of bounds, clamped to %zu (allowed range: %zu-%zu)\n",
+            configuredMaxPlayers,
+            effectiveMaxPlayers,
+            minPlayers,
+            maxPlayers);
+    }
+
+    ENetHost* server = enet_host_create(&address, effectiveMaxPlayers, 2, 0, 0); // create enet host
 
     if (server == NULL)
     {
@@ -47,7 +68,7 @@ bool CNetwork::Init(unsigned short port)
         return false;
     }
 
-    printf("[!] : Server started on port %d\n", port);
+    printf("[!] : Server started on port %d (max players: %zu)\n", port, effectiveMaxPlayers);
 
 
     ENetEvent event;
