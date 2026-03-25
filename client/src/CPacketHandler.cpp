@@ -16,6 +16,7 @@
 #include <CAimSync.h>
 #include <game_sa/CTagManager.h>
 #include <CNetworkPickupManager.h>
+#include <CNetworkFireManager.h>
 
 namespace
 {
@@ -1970,6 +1971,30 @@ void CPacketHandler::AddProjectile__Handle(void* data, int size)
 	{
 		CAimSync::ApplyLocalContext();
 	}
+}
+
+// FireCreate
+
+void CPacketHandler::FireCreate__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::FireCreate*)data;
+	CNetworkFireManager::HandleCreate(*packet);
+}
+
+// FireUpdate
+
+void CPacketHandler::FireUpdate__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::FireUpdate*)data;
+	CNetworkFireManager::HandleUpdate(*packet);
+}
+
+// FireRemove
+
+void CPacketHandler::FireRemove__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::FireRemove*)data;
+	CNetworkFireManager::HandleRemove(*packet);
 }
 
 // TagUpdate

@@ -71,6 +71,9 @@ enum CPacketsID : unsigned short
 	PED_TAKE_HOST,
 	PERFORM_TASK_SEQUENCE,
 	ADD_PROJECTILE,
+	FIRE_CREATE,
+	FIRE_UPDATE,
+	FIRE_REMOVE,
 	TAG_UPDATE,
 	UPDATE_ALL_TAGS,
 	TELEPORT_PLAYER_SCRIPTED,
@@ -150,6 +153,9 @@ public:
 			sizeof(PedTakeHost), // PED_TAKE_HOST
 			0, // PERFORM_TASK_SEQUENCE
 			sizeof(AddProjectile), // ADD_PROJECTILE
+			sizeof(FireCreate), // FIRE_CREATE
+			sizeof(FireUpdate), // FIRE_UPDATE
+			sizeof(FireRemove), // FIRE_REMOVE
 			sizeof(TagUpdate), // TAG_UPDATE
 			sizeof(UpdateAllTags), // UPDATE_ALL_TAGS
 			sizeof(TeleportPlayerScripted), // TELEPORT_PLAYER_SCRIPTED
@@ -671,6 +677,35 @@ public:
 		float force;
 		CVector dir;
 		CNetworkEntitySerializer target;
+	};
+
+
+	struct FireCreate
+	{
+		uint32_t fireId;
+		CVector position;
+		float radius;
+		uint8_t fireType;
+		int ownerPlayerId;
+		uint8_t sourceType;
+		uint32_t timestampMs;
+	};
+
+	struct FireUpdate
+	{
+		uint32_t fireId;
+		CVector position;
+		float radius;
+		uint8_t fireType;
+		int ownerPlayerId;
+		uint8_t sourceType;
+		uint32_t timestampMs;
+	};
+
+	struct FireRemove
+	{
+		uint32_t fireId;
+		uint32_t timestampMs;
 	};
 
 	struct TagUpdate

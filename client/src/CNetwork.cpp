@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "CNetworkFireManager.h"
 #include "../shared/semver.h"
 
 ENetHost* CNetwork::m_pClient = nullptr;
@@ -107,6 +108,7 @@ void CNetwork::Disconnect()
 	enet_peer_reset(CNetwork::m_pPeer);*/
 
 	m_bConnected = false;
+	CNetworkFireManager::Reset();
 }
 
 void CNetwork::InitListeners()
@@ -170,6 +172,9 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::PED_RESET_ALL_CLAIMS, CPacketHandler::PedResetAllClaims__Handle);
 	CNetwork::AddListener(CPacketsID::PERFORM_TASK_SEQUENCE, CPacketHandler::PerformTaskSequence__Handle);
 	CNetwork::AddListener(CPacketsID::ADD_PROJECTILE, CPacketHandler::AddProjectile__Handle);
+	CNetwork::AddListener(CPacketsID::FIRE_CREATE, CPacketHandler::FireCreate__Handle);
+	CNetwork::AddListener(CPacketsID::FIRE_UPDATE, CPacketHandler::FireUpdate__Handle);
+	CNetwork::AddListener(CPacketsID::FIRE_REMOVE, CPacketHandler::FireRemove__Handle);
 	CNetwork::AddListener(CPacketsID::TAG_UPDATE, CPacketHandler::TagUpdate__Handle);
 	CNetwork::AddListener(CPacketsID::UPDATE_ALL_TAGS, CPacketHandler::UpdateAllTags__Handle);
 	CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPacketHandler::TeleportPlayerScripted__Handle);

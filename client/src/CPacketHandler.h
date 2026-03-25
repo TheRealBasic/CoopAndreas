@@ -80,6 +80,9 @@ public:
 	static void PedResetAllClaims__Handle(void* data, int size);
 	static void PerformTaskSequence__Handle(void* data, int size);
 	static void AddProjectile__Handle(void* data, int size);
+	static void FireCreate__Handle(void* data, int size);
+	static void FireUpdate__Handle(void* data, int size);
+	static void FireRemove__Handle(void* data, int size);
 	static void TagUpdate__Handle(void* data, int size);
 	static void UpdateAllTags__Handle(void* data, int size);
 	static void UpdateAllTags__Trigger();
