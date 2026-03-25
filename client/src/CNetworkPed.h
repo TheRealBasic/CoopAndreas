@@ -4,6 +4,29 @@ class CNetworkPed
 private:
 	CNetworkPed() {}
 public:
+	enum class eStreamState : unsigned char
+	{
+		NotStreamed,
+		StreamingIn,
+		Streamed,
+		StreamingOut
+	};
+
+	struct CachedState
+	{
+		CVector position{};
+		CVector velocity{};
+		float aimingRotation = 0.0f;
+		float currentRotation = 0.0f;
+		int lookDirection = 0;
+		float health = 100.0f;
+		float armour = 0.0f;
+		unsigned char weapon = 0;
+		unsigned short ammo = 0;
+		unsigned char seat = 255;
+		int occupiedVehicleId = -1;
+	};
+
 	int m_nPedId = -1;
 	CPed* m_pPed = nullptr;
 	bool m_bSyncing = false;
@@ -23,8 +46,19 @@ public:
 	float m_fHealth = 100.0f;
 	int m_nBlipHandle = -1;
 	bool m_bClaimOnRelease = false;
+	bool m_bMissionCritical = false;
+	eStreamState m_eStreamState = eStreamState::NotStreamed;
+	CachedState m_cachedState{};
+	uint32_t m_nLastStreamStateChangeTick = 0;
+	int m_nModelId = 0;
+	char m_szSpecialModelName[8]{};
+	int m_nFailedStreamInAttempts = 0;
 
 	static CNetworkPed* CreateHosted(CPed* ped);
+	bool StreamIn();
+	void StreamOut();
+	void CacheAuthoritativeState();
+	void ApplyCachedStateToEntity();
 	void WarpIntoVehicleDriver(CVehicle* vehicle);
 	void WarpIntoVehiclePassenger(CVehicle* vehicle, int seatid);
 	void RemoveFromVehicle(CVehicle* vehicle);
@@ -33,4 +67,3 @@ public:
 	CNetworkPed(int pedid, int modelId, ePedType pedType, CVector pos, unsigned char createdBy, char specialModelName[]);
 	~CNetworkPed();
 };
-

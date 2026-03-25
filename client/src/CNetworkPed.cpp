@@ -7,12 +7,24 @@
 
 CNetworkPed::CNetworkPed(int pedid, int modelId, ePedType pedType, CVector pos, unsigned char createdBy, char specialModelName[])
 {
+    m_nModelId = modelId;
+    strcpy_s(m_szSpecialModelName, sizeof(m_szSpecialModelName), specialModelName ? specialModelName : "");
+
     if (modelId >= 290 && modelId <= 299)
         CStreaming::RequestSpecialModel(modelId, specialModelName, 0);
     else
         CStreaming::RequestModel(modelId, 0);
 
-    CStreaming::LoadAllRequestedModels(false);
+    const uint32_t startTick = GetTickCount();
+    while (CStreaming::ms_aInfoForModel[modelId].m_nLoadState != LOADSTATE_LOADED)
+    {
+        CStreaming::LoadAllRequestedModels(false);
+        if (GetTickCount() - startTick > 500)
+        {
+            return;
+        }
+        Sleep(10);
+    }
 
     if (pedType == PED_TYPE_COP)
     {
@@ -67,6 +79,119 @@ CNetworkPed::CNetworkPed(int pedid, int modelId, ePedType pedType, CVector pos, 
     m_nPedType = pedType;
     m_bSyncing = false;
     m_nCreatedBy = createdBy;
+    m_cachedState.position = pos;
+    m_cachedState.health = m_pPed ? m_pPed->m_fHealth : 100.0f;
+    m_eStreamState = m_pPed ? eStreamState::Streamed : eStreamState::NotStreamed;
+}
+
+bool CNetworkPed::StreamIn()
+{
+    if (m_pPed)
+    {
+        m_eStreamState = eStreamState::Streamed;
+        return true;
+    }
+
+    m_eStreamState = eStreamState::StreamingIn;
+
+    if (m_nModelId >= 290 && m_nModelId <= 299)
+        CStreaming::RequestSpecialModel(m_nModelId, m_szSpecialModelName, eStreamingFlags::GAME_REQUIRED);
+    else
+        CStreaming::RequestModel(m_nModelId, eStreamingFlags::GAME_REQUIRED);
+
+    CStreaming::LoadAllRequestedModels(false);
+
+    if (CStreaming::ms_aInfoForModel[m_nModelId].m_nLoadState != LOADSTATE_LOADED)
+    {
+        m_nFailedStreamInAttempts++;
+        m_eStreamState = eStreamState::NotStreamed;
+        return false;
+    }
+
+    m_pPed = nullptr;
+    if (m_nPedType == PED_TYPE_COP)
+        m_pPed = new CCopPed((eCopType)m_nModelId);
+    else if (m_nPedType == PED_TYPE_MEDIC || m_nPedType == PED_TYPE_FIREMAN)
+        m_pPed = new CEmergencyPed(m_nPedType, m_nModelId);
+    else
+        m_pPed = new CCivilianPed(m_nPedType, m_nModelId);
+
+    if (!m_pPed)
+    {
+        m_nFailedStreamInAttempts++;
+        m_eStreamState = eStreamState::NotStreamed;
+        return false;
+    }
+
+    m_pPed->m_nCreatedBy = 2;
+    m_pPed->m_pIntelligence->SetPedDecisionMakerType(-1);
+    m_pPed->m_pIntelligence->SetSeeingRange(30.0);
+    m_pPed->m_pIntelligence->SetHearingRange(30.0);
+    m_pPed->m_pIntelligence->m_fDmRadius = 0.0f;
+    m_pPed->m_pIntelligence->m_nDmNumPedsToScan = 0;
+    m_pPed->SetPosn(m_cachedState.position);
+    m_pPed->SetOrientation(0.f, 0.f, 0.f);
+    CWorld::Add(m_pPed);
+
+    ApplyCachedStateToEntity();
+
+    m_eStreamState = eStreamState::Streamed;
+    m_nLastStreamStateChangeTick = GetTickCount();
+    return true;
+}
+
+void CNetworkPed::StreamOut()
+{
+    m_eStreamState = eStreamState::StreamingOut;
+    CacheAuthoritativeState();
+
+    if (m_pPed && m_pPed->m_matrix && m_pPed->m_matrix->m_pOwner)
+    {
+        if (m_nBlipHandle != -1)
+        {
+            CRadar::ClearBlipForEntity(eBlipType::BLIP_CHAR, CPools::GetPedRef(m_pPed));
+            m_nBlipHandle = -1;
+        }
+
+        if (m_pPed->m_nPedFlags.bInVehicle)
+            plugin::Command<Commands::WARP_CHAR_FROM_CAR_TO_COORD>(CPools::GetPedRef(m_pPed), 0.f, 0.f, 0.f);
+
+        CWorld::Remove(m_pPed);
+        m_pPed->Remove();
+        delete m_pPed;
+    }
+
+    m_pPed = nullptr;
+    m_eStreamState = eStreamState::NotStreamed;
+    m_nLastStreamStateChangeTick = GetTickCount();
+}
+
+void CNetworkPed::CacheAuthoritativeState()
+{
+    if (!m_pPed || !m_pPed->m_matrix)
+        return;
+
+    m_cachedState.position = m_pPed->m_matrix->pos;
+    m_cachedState.velocity = m_vecVelocity;
+    m_cachedState.aimingRotation = m_fAimingRotation;
+    m_cachedState.currentRotation = m_fCurrentRotation;
+    m_cachedState.lookDirection = m_fLookDirection;
+    m_cachedState.health = m_pPed->m_fHealth;
+    m_cachedState.armour = m_pPed->m_fArmour;
+}
+
+void CNetworkPed::ApplyCachedStateToEntity()
+{
+    if (!m_pPed || !m_pPed->m_matrix)
+        return;
+
+    m_pPed->m_matrix->pos = m_cachedState.position;
+    m_pPed->m_vecMoveSpeed = m_cachedState.velocity;
+    m_pPed->m_fAimingRotation = m_fAimingRotation = m_cachedState.aimingRotation;
+    m_pPed->m_fCurrentRotation = m_fCurrentRotation = m_cachedState.currentRotation;
+    m_pPed->field_73C = m_fLookDirection = m_cachedState.lookDirection;
+    m_pPed->m_fHealth = m_fHealth = m_cachedState.health;
+    m_pPed->m_fArmour = m_cachedState.armour;
 }
 
 CNetworkPed::~CNetworkPed()
@@ -77,28 +202,10 @@ CNetworkPed::~CNetworkPed()
         packet.pedid = m_nPedId;
         CNetwork::SendPacket(CPacketsID::PED_REMOVE, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
     }
-    else
-    {
-
-        if (m_pPed && m_pPed->m_matrix->m_pOwner)
-        {
-            if (m_nBlipHandle != -1)
-            {
-                CRadar::ClearBlipForEntity(eBlipType::BLIP_CHAR, CPools::GetPedRef(m_pPed));
-                //CChat::AddMessage("REMOVE THE FUCKING BLIP");
-            }
-
-            if (m_pPed->m_nPedFlags.bInVehicle)
-            {
-                plugin::Command<Commands::WARP_CHAR_FROM_CAR_TO_COORD>(CPools::GetPedRef(m_pPed), 0.f, 0.f, 0.f);
-            }
-
-            CWorld::Remove(m_pPed);
-            //CWorld::RemoveReferencesToDeletedObject(m_pPed);
-            m_pPed->Remove();
-            delete m_pPed;
-        }
-    }
+	else
+	{
+		StreamOut();
+	}
 }
 
 CNetworkPed* CNetworkPed::CreateHosted(CPed* ped)

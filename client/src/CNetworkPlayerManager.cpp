@@ -3,6 +3,7 @@
 std::vector<CNetworkPlayer*> CNetworkPlayerManager::m_pPlayers;
 CPad CNetworkPlayerManager::m_pPads[MAX_SERVER_PLAYERS + 2];
 int CNetworkPlayerManager::m_nMyId;
+CNetworkPlayerManager::StreamingOverview CNetworkPlayerManager::m_streamingOverview{};
 
 void CNetworkPlayerManager::Add(CNetworkPlayer* player)
 {
@@ -64,4 +65,23 @@ CNetworkPlayer* CNetworkPlayerManager::GetPlayer(CEntity* entity)
 		}
 	}
 	return nullptr;
+}
+
+void CNetworkPlayerManager::TickStreamingController(uint32_t tickCount)
+{
+	if (tickCount < m_streamingOverview.lastTick + 250)
+		return;
+
+	m_streamingOverview.lastTick = tickCount;
+	CNetworkVehicleManager::TickStreaming(tickCount);
+	CNetworkPedManager::TickStreaming(tickCount);
+
+	const auto& vehicleTelemetry = CNetworkVehicleManager::GetTelemetry();
+	const auto& pedTelemetry = CNetworkPedManager::GetTelemetry();
+
+	m_streamingOverview.totalNetworkEntities = vehicleTelemetry.totalNetworkEntities + pedTelemetry.totalNetworkEntities;
+	m_streamingOverview.streamedEntities = vehicleTelemetry.streamedEntities + pedTelemetry.streamedEntities;
+	m_streamingOverview.pendingModelLoads = vehicleTelemetry.pendingModelLoads + pedTelemetry.pendingModelLoads;
+	m_streamingOverview.failedSpawns = vehicleTelemetry.failedSpawns + pedTelemetry.failedSpawns;
+	m_streamingOverview.streamChurnPerMinute = vehicleTelemetry.streamChurnPerMinute + pedTelemetry.streamChurnPerMinute;
 }
