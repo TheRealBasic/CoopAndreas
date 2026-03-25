@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
+#include <chrono>
 
 #include "CPacketListener.h"
 #include "CPacket.h"
@@ -13,6 +14,7 @@
 #include "CVehicleManager.h"
 #include "CPedManager.h"
 #include "CPickupManager.h"
+#include "CFireSyncManager.h"
 
 #include "semver.h"
 #include "PlayerDisconnectReason.h"
@@ -51,6 +53,7 @@ bool CNetwork::Init(unsigned short port)
     while (true) // waiting for event
     {
         CPickupManager::ProcessRespawns();
+        CFireSyncManager::Process((uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
         enet_host_service(server, &event, 1);
         switch (event.type)
         {
@@ -225,6 +228,7 @@ void CNetwork::HandlePlayerDisconnected(ENetEvent& event)
     CPedManager::RemoveAllHostedAndNotify(player);
     CVehicleManager::RemoveAllHostedAndNotify(player);
     CPlayerPackets::OnPlayerDisconnectedFromCutsceneVote(player->m_iPlayerId);
+    CFireSyncManager::OnPlayerDisconnected(player->m_iPlayerId);
 
     // remove
     CPlayerManager::Remove(player);
@@ -430,6 +434,7 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
     }
 
     CPickupManager::SendSnapshot(peer);
+    CFireSyncManager::SendSnapshotTo(peer, player->m_vecPosition);
 
     CPlayerPackets::PlayerHandshake handshakePacket = { freeId };
     CNetwork::SendPacket(peer, CPacketsID::PLAYER_HANDSHAKE, &handshakePacket, sizeof handshakePacket, ENET_PACKET_FLAG_RELIABLE);

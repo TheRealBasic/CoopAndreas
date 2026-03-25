@@ -18,6 +18,7 @@
 #include "PlayerDisconnectReason.h"
 #include "ConfigManager.h"
 #include "CPickupManager.h"
+#include "CFireSyncManager.h"
 
 class CPlayerManager
 {
@@ -323,8 +324,18 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			CPlayerPackets::AddExplosion* packet = (CPlayerPackets::AddExplosion*)data;
-			CNetwork::SendPacketToAll(CPacketsID::ADD_EXPLOSION, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+			if (auto player = CPlayerManager::GetPlayer(peer))
+			{
+				CPlayerPackets::AddExplosion* packet = (CPlayerPackets::AddExplosion*)data;
+				packet->pos.x = std::clamp(packet->pos.x, -4000.0f, 4000.0f);
+				packet->pos.y = std::clamp(packet->pos.y, -4000.0f, 4000.0f);
+				packet->pos.z = std::clamp(packet->pos.z, -200.0f, 2000.0f);
+				packet->type = std::min<uint8_t>(packet->type, 12);
+				packet->time = std::clamp(packet->time, 0, 15000);
+				packet->cameraShake = std::clamp(packet->cameraShake, 0.0f, 500.0f);
+				CNetwork::SendPacketToAll(CPacketsID::ADD_EXPLOSION, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+				CFireSyncManager::OnExplosion(player, packet->pos, packet->type);
+			}
 		}
 	};
 
@@ -916,9 +927,43 @@ public:
 		{
 			if (auto player = CPlayerManager::GetPlayer(peer))
 			{
+				auto* packet = (AddProjectile*)data;
+				packet->origin.x = std::clamp(packet->origin.x, -4000.0f, 4000.0f);
+				packet->origin.y = std::clamp(packet->origin.y, -4000.0f, 4000.0f);
+				packet->origin.z = std::clamp(packet->origin.z, -200.0f, 2000.0f);
+				packet->force = std::clamp(packet->force, 0.0f, 500.0f);
 				CNetwork::SendPacketToAll(CPacketsID::ADD_PROJECTILE, data, sizeof(AddProjectile), ENET_PACKET_FLAG_RELIABLE, peer);
+				CFireSyncManager::OnProjectile(player, packet->origin, packet->projectileType);
 			}
 		}
+	};
+
+	struct FireCreate
+	{
+		uint32_t fireId;
+		CVector position;
+		float radius;
+		uint8_t fireType;
+		int ownerPlayerId;
+		uint8_t sourceType;
+		uint32_t timestampMs;
+	};
+
+	struct FireUpdate
+	{
+		uint32_t fireId;
+		CVector position;
+		float radius;
+		uint8_t fireType;
+		int ownerPlayerId;
+		uint8_t sourceType;
+		uint32_t timestampMs;
+	};
+
+	struct FireRemove
+	{
+		uint32_t fireId;
+		uint32_t timestampMs;
 	};
 
 	struct TagUpdate
