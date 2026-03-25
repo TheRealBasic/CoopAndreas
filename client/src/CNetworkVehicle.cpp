@@ -177,6 +177,33 @@ void CNetworkVehicle::ApplyCachedStateToEntity()
     }
 }
 
+void CNetworkVehicle::SetPassengerSeatState(uint8_t seatId, const PassengerSeatState& state, bool applyToAudio)
+{
+    if (seatId >= 8)
+        return;
+
+    m_passengerSeatState[seatId] = state;
+
+    if (!applyToAudio || !m_pVehicle || !CUtil::IsValidEntityPtr(m_pVehicle))
+        return;
+
+    // We do not force-write game internals here. Instead we trigger the native vehicle
+    // audio update path with the latest networked passenger radio state cached.
+    const uint32_t now = GetTickCount();
+    if (now - m_passengerSeatState[seatId].lastRadioApplyTick >= 250)
+    {
+        plugin::CallMethod<0x502280, CAEVehicleAudioEntity*>(&m_pVehicle->m_vehicleAudio);
+        m_passengerSeatState[seatId].lastRadioApplyTick = now;
+    }
+}
+
+void CNetworkVehicle::ClearPassengerSeatState(uint8_t seatId)
+{
+    if (seatId >= 8)
+        return;
+    m_passengerSeatState[seatId] = PassengerSeatState{};
+}
+
 CNetworkVehicle::~CNetworkVehicle()
 {
     if (m_bSyncing)

@@ -278,18 +278,34 @@ class CVehiclePackets
 			unsigned short ammo;
 			unsigned char driveby;
 			unsigned char seatid;
+			unsigned char gamepadFlags;
+			signed char radioStation;
+			unsigned char radioState;
 
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
 				if (auto player = CPlayerManager::GetPlayer(peer))
 				{
 					CVehiclePackets::VehiclePassengerUpdate* packet = (CVehiclePackets::VehiclePassengerUpdate*)data;
-					packet->playerid = player->m_iPlayerId;
-					CNetwork::SendPacketToAll(CPacketsID::VEHICLE_PASSENGER_UPDATE, packet, sizeof * packet, (ENetPacketFlag)0, peer);
-
 					if (auto vehicle = CVehicleManager::GetVehicle(packet->vehicleid))
 					{
+						if (packet->seatid > 6)
+							return;
+
+						if (player->m_nVehicleId != packet->vehicleid)
+							return;
+
+						const int expectedSeatId = (int)packet->seatid + 1;
+						if (player->m_nSeatId != expectedSeatId)
+							return;
+
+						packet->playerid = player->m_iPlayerId;
+						CNetwork::SendPacketToAll(CPacketsID::VEHICLE_PASSENGER_UPDATE, packet, sizeof * packet, (ENetPacketFlag)0, peer);
+
 						vehicle->SetOccupant(packet->seatid + 1, player);
+						vehicle->m_passengerSeatState[packet->seatid + 1].gamepadFlags = packet->gamepadFlags;
+						vehicle->m_passengerSeatState[packet->seatid + 1].radioStation = packet->radioStation;
+						vehicle->m_passengerSeatState[packet->seatid + 1].radioState = packet->radioState;
 						if (vehicle->m_nCreatedBy == 2) // MISSION_VEHICLE
 						{
 							return;

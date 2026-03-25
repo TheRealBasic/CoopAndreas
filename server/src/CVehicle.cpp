@@ -37,6 +37,7 @@ void CVehicle::SetOccupant(uint8_t seatid, CPlayer* player)
 
 	if (this->m_pPlayers[seatid])
 	{
+		ClearPassengerSeatState(seatid);
 		this->m_pPlayers[seatid]->m_nVehicleId = -1;
 		this->m_pPlayers[seatid]->m_nSeatId = -1;
 	}
@@ -48,4 +49,11 @@ void CVehicle::SetOccupant(uint8_t seatid, CPlayer* player)
 		player->m_nVehicleId = this->m_nVehicleId;
 		player->m_nSeatId = seatid;
 	}
+}
+
+void CVehicle::ClearPassengerSeatState(uint8_t seatid)
+{
+	if (seatid > 7)
+		return;
+	m_passengerSeatState[seatid] = PassengerSeatState{};
 }

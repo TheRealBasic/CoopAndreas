@@ -12,6 +12,13 @@
 class CVehicle
 {
 	public:
+		struct PassengerSeatState
+		{
+			uint8_t gamepadFlags = 0;
+			int8_t radioStation = -1;
+			uint8_t radioState = 0;
+		};
+
 		CVehicle(int vehicleid, unsigned short model, CVector pos, float rot);
 		
 		int m_nVehicleId;
@@ -27,9 +34,11 @@ class CVehicle
 		std::vector<int> m_pComponents;
 		uint8_t m_nCreatedBy;
 		bool m_bUsedByPed = false;
+		PassengerSeatState m_passengerSeatState[8]{};
 
 		void ReassignSyncer(CPlayer* newSyncer);
 		void SetOccupant(uint8_t seatid, CPlayer* player);
+		void ClearPassengerSeatState(uint8_t seatid);
 
 		~CVehicle() {}
 };

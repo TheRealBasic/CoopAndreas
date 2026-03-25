@@ -597,6 +597,7 @@ void CPacketHandler::VehicleEnter__Handle(void* data, int size)
 	else
 	{
 		player->EnterVehiclePassenger(vehicle->m_pVehicle, packet->seatid);
+		vehicle->ClearPassengerSeatState(packet->seatid + 1);
 	}
 }
 
@@ -624,6 +625,18 @@ void CPacketHandler::VehicleExit__Handle(void* data, int size)
 #ifdef PACKET_DEBUG_MESSAGES
 	CChat::AddMessage("player %d exited from vehicle", packet->playerid);
 #endif
+	if (auto vehicle = CNetworkVehicleManager::GetVehicle(player->m_pPed->m_pVehicle))
+	{
+		for (uint8_t seatId = 1; seatId < 8; seatId++)
+		{
+			if (player->m_pPed->m_pVehicle->m_apPassengers[seatId - 1] == player->m_pPed)
+			{
+				vehicle->ClearPassengerSeatState(seatId);
+				break;
+			}
+		}
+	}
+
 	if (packet->force)
 	{
 		player->m_pPed->m_nPedFlags.CantBeKnockedOffBike = 2; // 2 - normal
@@ -721,6 +734,7 @@ void CPacketHandler::VehicleComponentRemove__Handle(void* data, int size)
 CPackets::VehiclePassengerUpdate* CPacketHandler::VehiclePassengerUpdate__Collect(CNetworkVehicle* vehicle, CPlayerPed* localPlayer)
 {
 	CPackets::VehiclePassengerUpdate* packet = new CPackets::VehiclePassengerUpdate;
+	CPad* pad = localPlayer->GetPadFromPlayer();
 
 	// player data
 	packet->ammo = localPlayer->m_aWeapons[localPlayer->m_nActiveWeaponSlot].m_nAmmoInClip;
@@ -729,6 +743,10 @@ CPackets::VehiclePassengerUpdate* CPacketHandler::VehiclePassengerUpdate__Collec
 	packet->weapon = localPlayer->m_aWeapons[localPlayer->m_nActiveWeaponSlot].m_eWeaponType;
 	packet->vehicleid = vehicle->m_nVehicleId;
 	packet->driveby = CDriveBy::IsPedInDriveby(localPlayer);
+	packet->seatid = 0;
+	packet->gamepadFlags = 0;
+	packet->radioStation = -1;
+	packet->radioState = 0;
 
 	for (int i = 0; i < vehicle->m_pVehicle->m_nMaxPassengers; i++)
 	{
@@ -738,6 +756,42 @@ CPackets::VehiclePassengerUpdate* CPacketHandler::VehiclePassengerUpdate__Collec
 			break;
 		}
 	}
+
+	if (pad)
+	{
+		if (pad->NewState.DPadUp > 0)
+			packet->gamepadFlags |= 1 << 0;
+		if (pad->NewState.DPadDown > 0)
+			packet->gamepadFlags |= 1 << 1;
+		if (pad->NewState.m_bRadioTrackSkip > 0)
+			packet->gamepadFlags |= 1 << 2;
+	}
+
+	static uint32_t s_lastRadioChangeTick = 0;
+	const uint32_t now = GetTickCount();
+	auto& seatState = vehicle->m_passengerSeatState[packet->seatid + 1];
+
+	packet->radioStation = seatState.radioStation;
+	packet->radioState = seatState.radioState;
+	const bool radioPressed = (packet->gamepadFlags & ((1 << 0) | (1 << 1))) != 0;
+	if (radioPressed && now - s_lastRadioChangeTick >= 300)
+	{
+		s_lastRadioChangeTick = now;
+		packet->radioState |= 1 << 0; // has radio change
+		if (packet->radioStation < 0)
+			packet->radioStation = 0;
+		if (packet->gamepadFlags & (1 << 0))
+			packet->radioStation = (packet->radioStation + 1) % 12;
+		if (packet->gamepadFlags & (1 << 1))
+			packet->radioStation = (packet->radioStation + 11) % 12;
+	}
+
+	if (packet->gamepadFlags & (1 << 2))
+		packet->radioState |= 1 << 1; // track skip pressed
+
+	seatState.gamepadFlags = packet->gamepadFlags;
+	seatState.radioStation = packet->radioStation;
+	seatState.radioState = packet->radioState;
 
 	return packet;
 }
@@ -782,6 +836,16 @@ void CPacketHandler::VehiclePassengerUpdate__Handle(void* data, int size)
 	else if (!packet->driveby && CDriveBy::IsPedInDriveby(player->m_pPed))
 	{
 		CDriveBy::StopDriveby(player->m_pPed);
+	}
+
+	const uint8_t seatIndex = packet->seatid + 1;
+	if (seatIndex < 8)
+	{
+		CNetworkVehicle::PassengerSeatState state{};
+		state.gamepadFlags = packet->gamepadFlags;
+		state.radioStation = packet->radioStation;
+		state.radioState = packet->radioState;
+		vehicle->SetPassengerSeatState(seatIndex, state, true);
 	}
 }
 

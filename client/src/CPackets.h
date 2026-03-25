@@ -336,6 +336,9 @@ public:
 		unsigned short ammo;
 		unsigned char driveby;
 		unsigned char seatid;
+		unsigned char gamepadFlags;
+		signed char radioStation;
+		unsigned char radioState;
 	};
 
 	struct PlayerChatMessage
