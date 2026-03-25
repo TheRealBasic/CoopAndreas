@@ -1,7 +1,18 @@
 #pragma once
+#include <deque>
 class CNetworkPlayer
 {
 public:
+	struct InterpSnapshot
+	{
+		CVector position{};
+		CVector velocity{};
+		float currentRotation = 0.0f;
+		float aimingRotation = 0.0f;
+		uint32_t serverSequence = 0;
+		uint32_t arrivalTickMs = 0;
+	};
+
 	CPlayerPed* m_pPed = nullptr;
 	int m_iPlayerId;
 
@@ -24,6 +35,9 @@ public:
 	CNetworkPlayerStats m_stats{};
 	CPedClothesDesc m_pPedClothesDesc{};
 	bool m_bHasBeenConnectedBeforeMe = false;
+	std::deque<InterpSnapshot> m_interpSnapshots{};
+	uint32_t m_nSnapshotSequence = 0;
+	uint32_t m_nInterpCorrectionCount = 0;
 
 	CNetworkPlayer::~CNetworkPlayer();
 	CNetworkPlayer::CNetworkPlayer(int id, CVector position);
@@ -39,5 +53,5 @@ public:
 	void WarpIntoVehiclePassenger(CVehicle* vehicle, int seatid);
 	void EnterVehiclePassenger(CVehicle* vehicle, int seatid);
 	void HandleTask(CPackets::SetPlayerTask& packet);
+	void ResetInterpolation(const CVector& position, float currentRotation, float aimingRotation);
 };
-

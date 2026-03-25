@@ -2,6 +2,13 @@
 class CNetworkPedManager
 {
 public:
+	struct InterpTuning
+	{
+		static constexpr size_t maxSnapshotBuffer = 32;
+		static constexpr uint32_t interpolationDelayMs = 120;
+		static constexpr float hardSnapDistance = 18.0f;
+	};
+
 	struct StreamConfig
 	{
 		float streamInRadius = 140.0f;
@@ -18,11 +25,17 @@ public:
 		size_t failedSpawns = 0;
 		size_t streamChurnPerMinute = 0;
 	};
+	struct InterpStats
+	{
+		size_t correctionCount = 0;
+		size_t bufferedSnapshots = 0;
+	};
 
 	static std::vector<CNetworkPed*> m_pPeds;
 	static CNetworkPed* m_apTempPeds[255];
 	static StreamConfig m_streamConfig;
 	static Telemetry m_telemetry;
+	static InterpStats m_interpStats;
 
 	static CNetworkPed* GetPed(int pedid);
 	static CNetworkPed* GetPed(CPed* ped);
@@ -37,4 +50,5 @@ public:
 	static void TickStreaming(uint32_t tickCount);
 	static void CacheNetworkState(CNetworkPed* ped, const CPackets::PedOnFoot& packet);
 	static const Telemetry& GetTelemetry();
+	static const InterpStats& GetInterpStats();
 };

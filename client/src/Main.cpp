@@ -204,6 +204,8 @@ public:
 					}
 
 					CNetworkPedManager::Process();
+					CNetworkVehicleManager::ProcessRemoteVehicles();
+					CNetworkPlayerManager::ProcessRemotePlayers();
 					CNetworkPickupManager::Process();
 
 					if (GetAsyncKeyState(VK_F7) && GetAsyncKeyState(VK_F10) && GetAsyncKeyState(VK_NUMPAD1))
@@ -268,6 +270,15 @@ public:
 					char buffer[270];
 					sprintf(buffer, "IsHost=%d | Game/Network: Peds %d/%d | Cars %d/%d | Recv %d %.2f KB/S | Sent %d %.2f KB/S | EnEx %d", CLocalPlayer::m_bIsHost, CPools::ms_pPedPool->GetNoOfUsedSpaces(), CNetworkPedManager::m_pPeds.size(), CPools::ms_pVehiclePool->GetNoOfUsedSpaces(), CNetworkVehicleManager::m_pVehicles.size(), CNetwork::m_pClient->totalReceivedPackets, CNetwork::ms_nBytesReceivedThisSecond / 1024.0f, CNetwork::m_pClient->totalSentPackets, CNetwork::ms_nBytesSentThisSecond / 1024.0f, CEntryExitManager::mp_poolEntryExits->GetNoOfUsedSpaces());
 					CDXFont::Draw(100, 10, buffer, D3DCOLOR_ARGB(255, 255, 255, 255));
+					sprintf(buffer, "Interp delay=%ums | Snapshots P:%zu Ped:%zu Veh:%zu | Corrections P:%zu Ped:%zu Veh:%zu",
+						CNetworkPlayerManager::InterpTuning::interpolationDelayMs,
+						CNetworkPlayerManager::m_streamingOverview.playerSnapshotBacklog,
+						CNetworkPlayerManager::m_streamingOverview.pedSnapshotBacklog,
+						CNetworkPlayerManager::m_streamingOverview.vehicleSnapshotBacklog,
+						CNetworkPlayerManager::m_streamingOverview.playerInterpCorrections,
+						CNetworkPlayerManager::m_streamingOverview.pedInterpCorrections,
+						CNetworkPlayerManager::m_streamingOverview.vehicleInterpCorrections);
+					CDXFont::Draw(100, 28, buffer, D3DCOLOR_ARGB(255, 220, 220, 100));
 					/*for (auto enex : CEntryExitManager::mp_poolEntryExits)
 					{
 						CVector posn = CVector(enex->m_recEntrance.left, enex->m_recEntrance.bottom, enex->m_fEntranceZ);

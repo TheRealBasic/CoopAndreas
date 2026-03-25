@@ -175,14 +175,22 @@ void CPacketHandler::PlayerOnFoot__Handle(void* data, int size)
 
 	/*if (CUtil::IsPositionUpdateNeeded(networkPlayer->m_pPed->m_matrix->pos, packet->position))
 	{*/
-	networkPlayer->m_pPed->m_matrix->pos = packet->position;
+	CNetworkPlayer::InterpSnapshot snapshot{};
+	snapshot.position = packet->position;
+	snapshot.velocity = packet->velocity;
+	snapshot.currentRotation = packet->currentRotation;
+	snapshot.aimingRotation = packet->aimingRotation;
+	snapshot.arrivalTickMs = GetTickCount();
+	snapshot.serverSequence = ++networkPlayer->m_nSnapshotSequence;
+	networkPlayer->m_interpSnapshots.push_back(snapshot);
+	while (networkPlayer->m_interpSnapshots.size() > CNetworkPlayerManager::InterpTuning::maxSnapshotBuffer)
+		networkPlayer->m_interpSnapshots.pop_front();
 	//}
 
 	CUtil::GiveWeaponByPacket(networkPlayer, packet->weapon, packet->ammo);
 	networkPlayer->m_pPed->m_aWeapons[networkPlayer->m_pPed->m_nActiveWeaponSlot].m_nState = (eWeaponState)packet->weaponState;
 
-	networkPlayer->m_pPed->m_fCurrentRotation = packet->currentRotation;
-	networkPlayer->m_pPed->m_fAimingRotation = packet->aimingRotation;
+	networkPlayer->m_pPed->m_vecMoveSpeed = packet->velocity;
 
 	CUtil::SetPlayerJetpack(networkPlayer, packet->hasJetpack);
 
@@ -393,14 +401,6 @@ void CPacketHandler::VehicleIdleUpdate__Handle(void* data, int size)
 	if (vehicle->m_pVehicle->m_matrix == nullptr)
 		return;
 
-	vehicle->m_pVehicle->m_matrix->pos = packet->pos;
-
-	if(CUtil::IsPositionUpdateNeeded(vehicle->m_pVehicle->m_matrix->right, packet->roll, 1))
-		vehicle->m_pVehicle->m_matrix->right = packet->roll;
-
-	if (CUtil::IsPositionUpdateNeeded(vehicle->m_pVehicle->m_matrix->up, packet->rot, 1))
-		vehicle->m_pVehicle->m_matrix->up = packet->rot;
-
 	vehicle->m_pVehicle->m_vecMoveSpeed = packet->velocity;
 	vehicle->m_pVehicle->m_vecTurnSpeed = packet->turnSpeed;
 
@@ -502,9 +502,6 @@ void CPacketHandler::VehicleDriverUpdate__Handle(void* data, int size)
 		player->WarpIntoVehicleDriver(vehicle->m_pVehicle);
 	}
 
-	vehicle->m_pVehicle->m_matrix->pos = packet->pos;
-	vehicle->m_pVehicle->m_matrix->right = packet->roll;
-	vehicle->m_pVehicle->m_matrix->up = packet->rot;
 	vehicle->m_pVehicle->m_vecMoveSpeed = packet->velocity;
 	
 	CUtil::GiveWeaponByPacket(player, packet->weapon, packet->ammo);
@@ -953,10 +950,9 @@ void CPacketHandler::PedOnFoot__Handle(void* data, int size)
 
 	CUtil::GiveWeaponByPacket(ped, packet->weapon, packet->ammo);
 
-	ped->m_pPed->m_matrix->pos = packet->pos;
-	ped->m_fCurrentRotation = ped->m_pPed->m_fCurrentRotation = packet->currentRotation;
-	ped->m_fAimingRotation = ped->m_pPed->m_fAimingRotation = packet->aimingRotation;
-	ped->m_fLookDirection = ped->m_pPed->field_73C = packet->lookDirection;
+	ped->m_fCurrentRotation = packet->currentRotation;
+	ped->m_fAimingRotation = packet->aimingRotation;
+	ped->m_fLookDirection = packet->lookDirection;
 	ped->m_pPed->m_fHealth = packet->health;
 	ped->m_fHealth = packet->health;
 	ped->m_pPed->m_fArmour = packet->armour;
@@ -1136,11 +1132,6 @@ void CPacketHandler::PedDriverUpdate__Handle(void* data, int size)
 	if (ped->m_pPed->m_pVehicle != vehicle->m_pVehicle || !ped->m_pPed->m_nPedFlags.bInVehicle)
 		ped->WarpIntoVehicleDriver(vehicle->m_pVehicle);
 
-	if(CUtil::IsPositionUpdateNeeded(packet->pos, vehicle->m_pVehicle->m_matrix->pos))
-		vehicle->m_pVehicle->m_matrix->pos = packet->pos;
-
-	vehicle->m_pVehicle->m_matrix->right = packet->roll;
-	vehicle->m_pVehicle->m_matrix->up = packet->rot;
 	ped->m_vecVelocity = packet->velocity;
 	vehicle->m_pVehicle->m_vecMoveSpeed = packet->velocity;
 	vehicle->m_pVehicle->m_vecTurnSpeed = packet->turnSpeed;
