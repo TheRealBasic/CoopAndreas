@@ -107,6 +107,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::PED_SHOT_SYNC, CPedPackets::PedShotSync::Handle);
     CNetwork::AddListener(CPacketsID::PED_PASSENGER_UPDATE, CPedPackets::PedPassengerSync::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_AIM_SYNC, CPlayerPackets::PlayerAimSync::Handle);
+    CNetwork::AddListener(CPacketsID::PLAYER_WANTED_LEVEL, CPlayerPackets::PlayerWantedLevel::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_STATS, CPlayerPackets::PlayerStats::Handle);
     CNetwork::AddListener(CPacketsID::REBUILD_PLAYER, CPlayerPackets::RebuildPlayer::Handle);
     CNetwork::AddListener(CPacketsID::RESPAWN_PLAYER, CPlayerPackets::RespawnPlayer::Handle);
@@ -336,6 +337,14 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             memcpy(statsPacket.stats, i->m_afStats, sizeof(i->m_afStats));
             statsPacket.money = i->m_nMoney;
             CNetwork::SendPacket(peer, CPacketsID::PLAYER_STATS, &statsPacket, sizeof(statsPacket), ENET_PACKET_FLAG_RELIABLE);
+        }
+
+        if (i->m_ucSyncFlags.bWantedLevelModified)
+        {
+            CPlayerPackets::PlayerWantedLevel wantedPacket{};
+            wantedPacket.playerid = i->m_iPlayerId;
+            wantedPacket.wantedLevel = i->m_nWantedLevel;
+            CNetwork::SendPacket(peer, CPacketsID::PLAYER_WANTED_LEVEL, &wantedPacket, sizeof(wantedPacket), ENET_PACKET_FLAG_RELIABLE);
         }
 
         if (i->m_ucSyncFlags.bClothesModified)

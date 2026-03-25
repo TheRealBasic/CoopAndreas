@@ -10,6 +10,7 @@
 #include <CFireManager.h>
 #include <semver.h>
 #include <COpCodeSync.h>
+#include <CStatsSync.h>
 #include <CNetworkCheckpoint.h>
 #include <CEntryExitManager.h>
 #include <CEntryExitMarkerSync.h>
@@ -125,6 +126,7 @@ public:
 					CPlayerPed* localPlayer = FindPlayerPed(0);
 
 					CDriveBy::Process(localPlayer);
+					CStatsSync::NotifyWantedLevelChanged();
 					
 					int syncRate = 40;
 					CVector velocity{};

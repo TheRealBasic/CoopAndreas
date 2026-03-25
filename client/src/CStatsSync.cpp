@@ -66,6 +66,44 @@ void CStatsSync::NotifyChanged()
     CNetwork::SendPacket(CPacketsID::PLAYER_STATS, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
 }
 
+void CStatsSync::NotifyWantedLevelChanged()
+{
+    if (!CNetwork::m_bConnected)
+    {
+        return;
+    }
+
+    auto* localPlayer = FindPlayerPed(0);
+    if (!localPlayer)
+    {
+        return;
+    }
+
+    const int wantedLevel = std::clamp(localPlayer->GetWantedLevel(), 0, 6);
+    if (wantedLevel == m_nLastWantedLevelSent)
+    {
+        return;
+    }
+
+    CPackets::PlayerWantedLevel packet{};
+    packet.wantedLevel = static_cast<uint8_t>(wantedLevel);
+    CNetwork::SendPacket(CPacketsID::PLAYER_WANTED_LEVEL, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+    m_nLastWantedLevelSent = wantedLevel;
+}
+
+void CStatsSync::TriggerWantedLevelReset()
+{
+    if (!CNetwork::m_bConnected || m_nLastWantedLevelSent == 0)
+    {
+        return;
+    }
+
+    CPackets::PlayerWantedLevel packet{};
+    packet.wantedLevel = 0;
+    CNetwork::SendPacket(CPacketsID::PLAYER_WANTED_LEVEL, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+    m_nLastWantedLevelSent = 0;
+}
+
 int CStatsSync::GetSyncIdByInternal(eStats stat)
 {
     for (int i = 0; i < CStatsSync::SYNCED_STATS_COUNT; i++)

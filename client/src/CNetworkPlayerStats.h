@@ -5,6 +5,7 @@ public:
 	std::array<float, 83> m_aStatsFloat{};
 	std::array<int, 224> m_aStatsInt{};
 	int m_nMoney = 0;
+	uint8_t m_nWantedLevel = 0;
 
 	CNetworkPlayerStats();
 
@@ -26,4 +27,6 @@ public:
     void SetIntStat(size_t index, int value);
 	int GetMoney() const;
 	void SetMoney(int value);
+	uint8_t GetWantedLevel() const;
+	void SetWantedLevel(uint8_t value);
 };

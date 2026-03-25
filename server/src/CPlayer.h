@@ -32,13 +32,15 @@ class CPlayer
 		CVector m_vecPosition{};
 		unsigned char m_ucCurrentWeapon = 0;
 		unsigned short m_usCurrentAmmo = 0;
+		uint8_t m_nWantedLevel = 0;
 		bool m_bHasJetpack = false;
 		CVector m_vecWaypointPos{};
 		struct {
 			uint8_t bStatsModified : 1;
+			uint8_t bWantedLevelModified : 1;
 			uint8_t bClothesModified : 1;
 			uint8_t bWaypointModified : 1;
-		} m_ucSyncFlags;
+		} m_ucSyncFlags{};
 		std::vector<CPed*> m_vPedClaims;
 
 		void RemoveFromVehicle();

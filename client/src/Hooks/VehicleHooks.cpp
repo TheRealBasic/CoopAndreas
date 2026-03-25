@@ -2,6 +2,7 @@
 #include "VehicleHooks.h"
 #include "CKeySync.h"
 #include "CAimSync.h"
+#include "CWantedSync.h"
 #include "CNetworkVehicle.h"
 #include "CNetworkPed.h"
 #include <CCarGenerator.h>
@@ -74,6 +75,7 @@ void __fastcall CVehicle__ProcessControl_Hook()
 
     CKeySync::ApplyNetworkPlayerContext(player);
     CAimSync::ApplyNetworkPlayerContext(player);
+    CWantedSync::ApplyNetworkPlayerContext(player);
     //CStatsSync::ApplyNetworkPlayerContext(player);
 
     player->m_pPed->m_fHealth = player->m_playerOnFoot.health;
@@ -97,6 +99,7 @@ void __fastcall CVehicle__ProcessControl_Hook()
 
     CKeySync::ApplyLocalContext();
     CAimSync::ApplyLocalContext();
+    CWantedSync::ApplyLocalContext();
    // CStatsSync::ApplyLocalContext();
 
     *(bool*)0xB6F1A4 = savedLookingLeft;
