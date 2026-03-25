@@ -1277,6 +1277,21 @@ void CPacketHandler::PlayerAimSync__Handle(void* data, int size)
 	}
 }
 
+void CPacketHandler::PlayerWantedLevel__Handle(void* data, int size)
+{
+	CPackets::PlayerWantedLevel* packet = (CPackets::PlayerWantedLevel*)data;
+
+	if (packet->playerid == CNetworkPlayerManager::m_nMyId)
+	{
+		return;
+	}
+
+	if (auto* networkPlayer = CNetworkPlayerManager::GetPlayer(packet->playerid))
+	{
+		networkPlayer->m_stats.SetWantedLevel(packet->wantedLevel);
+	}
+}
+
 // VehicleConfirm
 
 void CPacketHandler::VehicleConfirm__Handle(void* data, int size)
@@ -1527,6 +1542,7 @@ void CPacketHandler::MassPacketSequence__Handle(void* data, int size)
 void CPacketHandler::StartCutscene__Handle(void* data, int size)
 {
 	CPackets::StartCutscene* packet = (CPackets::StartCutscene*)data;
+	CStatsSync::TriggerWantedLevelReset();
 
 	if (CCutsceneMgr::ms_cutsceneLoadStatus == 2)
 	{
@@ -1547,6 +1563,7 @@ void CPacketHandler::StartCutscene__Handle(void* data, int size)
 void CPacketHandler::SkipCutscene__Handle(void* data, int size)
 {
 	CPackets::SkipCutscene* packet = (CPackets::SkipCutscene*)data;
+	CStatsSync::TriggerWantedLevelReset();
 
 	CHud::m_BigMessage[1][0] = 0;
 	CCutsceneMgr::ms_wasCutsceneSkipped = 1;

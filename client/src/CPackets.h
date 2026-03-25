@@ -38,6 +38,7 @@ enum CPacketsID : unsigned short
 	PED_SHOT_SYNC,
 	PED_PASSENGER_UPDATE,
 	PLAYER_AIM_SYNC,
+	PLAYER_WANTED_LEVEL,
 	VEHICLE_CONFIRM,
 	PED_CONFIRM,
 	PLAYER_STATS,
@@ -116,6 +117,7 @@ public:
 			sizeof(PedShotSync), // PED_SHOT_SYNC
 			sizeof(PedPassengerSync), // PED_PASSENGER_UPDATE
 			sizeof(PlayerAimSync), // PLAYER_AIM_SYNC
+			sizeof(PlayerWantedLevel), // PLAYER_WANTED_LEVEL
 			sizeof(VehicleConfirm), // VEHICLE_CONFIRM
 			sizeof(PedConfirm), // PED_CONFIRM
 			sizeof(PlayerStats), // PLAYER_STATS
@@ -463,6 +465,12 @@ public:
 		CVector	up;
 		float lookPitch;
 		float orientation;
+	};
+
+	struct PlayerWantedLevel
+	{
+		int playerid;
+		uint8_t wantedLevel;
 	};
 
 	struct VehicleConfirm

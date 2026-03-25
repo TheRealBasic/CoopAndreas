@@ -2,6 +2,8 @@
 #include "PlayerHooks.h"
 #include "CKeySync.h"
 #include "CAimSync.h"
+#include "CStatsSync.h"
+#include "CWantedSync.h"
 #include <game_sa/CPedDamageResponseInfo.h>
 
 static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
@@ -36,6 +38,7 @@ static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
 
     CKeySync::ApplyNetworkPlayerContext(player);
     CAimSync::ApplyNetworkPlayerContext(player);
+    CWantedSync::ApplyNetworkPlayerContext(player);
     //CStatsSync::ApplyNetworkPlayerContext(player);
 
     //if (CPad::GetPad(0)->NewState.RightShoulder1) // is aiming
@@ -62,6 +65,7 @@ static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
 
     CKeySync::ApplyLocalContext();
     CAimSync::ApplyLocalContext();
+    CWantedSync::ApplyLocalContext();
     //CStatsSync::ApplyLocalContext();
 }
 
@@ -167,6 +171,8 @@ void CReferences__RemoveReferencesToPlayer_Hook()
     
     if (CNetwork::m_bConnected)
     {
+        CStatsSync::TriggerWantedLevelReset();
+
         CPackets::RespawnPlayer packet{};
         CNetwork::SendPacket(CPacketsID::RESPAWN_PLAYER, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
     }

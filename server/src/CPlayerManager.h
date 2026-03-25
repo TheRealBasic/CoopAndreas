@@ -396,6 +396,31 @@ public:
 		}
 	};
 
+	struct PlayerWantedLevel
+	{
+		int playerid;
+		uint8_t wantedLevel;
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			if (auto player = CPlayerManager::GetPlayer(peer))
+			{
+				auto* packet = (CPlayerPackets::PlayerWantedLevel*)data;
+				const uint8_t clampedWantedLevel = std::min<uint8_t>(packet->wantedLevel, 6);
+				if (player->m_nWantedLevel == clampedWantedLevel)
+				{
+					return;
+				}
+
+				player->m_nWantedLevel = clampedWantedLevel;
+				player->m_ucSyncFlags.bWantedLevelModified = true;
+				packet->playerid = player->m_iPlayerId;
+				packet->wantedLevel = clampedWantedLevel;
+				CNetwork::SendPacketToAll(CPacketsID::PLAYER_WANTED_LEVEL, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
+			}
+		}
+	};
+
 	struct PlayerStats
 	{
 		int playerid;
@@ -461,6 +486,17 @@ public:
 			CPickupManager::CreateDropsForPlayerDeath(player);
 			packet->playerid = player->m_iPlayerId;
 			CNetwork::SendPacketToAll(CPacketsID::RESPAWN_PLAYER, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+
+			if (player->m_nWantedLevel != 0)
+			{
+				player->m_nWantedLevel = 0;
+				player->m_ucSyncFlags.bWantedLevelModified = true;
+
+				CPlayerPackets::PlayerWantedLevel wantedPacket{};
+				wantedPacket.playerid = player->m_iPlayerId;
+				wantedPacket.wantedLevel = 0;
+				CNetwork::SendPacketToAll(CPacketsID::PLAYER_WANTED_LEVEL, &wantedPacket, sizeof(wantedPacket), ENET_PACKET_FLAG_RELIABLE);
+			}
 		}
 	};
 

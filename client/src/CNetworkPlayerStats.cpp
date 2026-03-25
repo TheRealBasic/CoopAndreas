@@ -6,6 +6,7 @@ CNetworkPlayerStats::CNetworkPlayerStats()
     m_aStatsFloat.fill(0);
     m_aStatsInt.fill(0);
     m_nMoney = 0;
+    m_nWantedLevel = 0;
 
     m_aStatsFloat[STAT_MAX_HEALTH] = 569.0f;
     m_aStatsFloat[STAT_STAMINA] = 100.0f;
@@ -43,4 +44,14 @@ int CNetworkPlayerStats::GetMoney() const
 void CNetworkPlayerStats::SetMoney(int value)
 {
     m_nMoney = std::clamp(value, 0, INT_MAX);
+}
+
+uint8_t CNetworkPlayerStats::GetWantedLevel() const
+{
+    return m_nWantedLevel;
+}
+
+void CNetworkPlayerStats::SetWantedLevel(uint8_t value)
+{
+    m_nWantedLevel = std::min<uint8_t>(value, 6);
 }
