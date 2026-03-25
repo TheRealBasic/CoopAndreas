@@ -154,7 +154,7 @@ PayPal `kirilltymoshchenko59@gmail.com`
   - [ ] pickup (related to task above) 
 - [ ] cutscenes
   - [X] cutscenes
-  - [ ] vote to skip
+  - [X] vote to skip
 - [ ] Players map sync
   - [ ] Areas aka GangZones
   - [X] Mission icons
@@ -167,7 +167,7 @@ PayPal `kirilltymoshchenko59@gmail.com`
   - [X] muscle
   - [X] weapon skills
   - [X] fight styles
-  - [ ] sync money
+  - [X] sync money
   - [ ] breath level bar
   - [X] stamina sync
   - [ ] max hp sync
@@ -179,7 +179,7 @@ PayPal `kirilltymoshchenko59@gmail.com`
   - [ ] idle anims
   - [ ] funny TAB+NUM4 (or NUM6) anim sync (did you know about this?)
 - [ ] gang groups sync
-- [ ] stream in/out players, peds, vehicles, etc.
+- [X] stream in/out players, peds, vehicles, etc.
 - [ ] vehicle sync
   - [ ] force hydraulics sync
   - [ ] trailer sync
@@ -192,7 +192,7 @@ PayPal `kirilltymoshchenko59@gmail.com`
   - [X] mouse
   - [ ] widescreen
   - [X] fast load
-- [ ] Fix models loading (green polygon)  --- related to stream it/out
+- [X] Fix models loading (green polygon)  --- related to stream it/out
 - [ ] smooth interpolation
   - [ ] move
   - [ ] rotation
