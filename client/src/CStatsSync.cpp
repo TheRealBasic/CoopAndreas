@@ -55,6 +55,14 @@ void CStatsSync::NotifyChanged()
         packet.stats[i] = CStats::GetStatValue(m_aeSyncedStats[i]);
     }
 
+    if (auto localPlayer = FindPlayerPed(0))
+    {
+        if (auto playerInfo = localPlayer->GetPlayerInfoForThisPlayerPed())
+        {
+            packet.money = std::clamp(playerInfo->m_nMoney, 0, INT_MAX);
+        }
+    }
+
     CNetwork::SendPacket(CPacketsID::PLAYER_STATS, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
 }
 

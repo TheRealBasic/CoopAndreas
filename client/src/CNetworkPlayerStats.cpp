@@ -5,6 +5,7 @@ CNetworkPlayerStats::CNetworkPlayerStats()
 {
     m_aStatsFloat.fill(0);
     m_aStatsInt.fill(0);
+    m_nMoney = 0;
 
     m_aStatsFloat[STAT_MAX_HEALTH] = 569.0f;
     m_aStatsFloat[STAT_STAMINA] = 100.0f;
@@ -32,4 +33,14 @@ void CNetworkPlayerStats::SetIntStat(size_t index, int value)
 {
     assert(index < m_aStatsInt.size());
     m_aStatsInt[index] = value;
+}
+
+int CNetworkPlayerStats::GetMoney() const
+{
+    return m_nMoney;
+}
+
+void CNetworkPlayerStats::SetMoney(int value)
+{
+    m_nMoney = std::clamp(value, 0, INT_MAX);
 }

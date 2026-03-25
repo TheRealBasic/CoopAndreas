@@ -330,6 +330,7 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             CPlayerPackets::PlayerStats statsPacket{};
             statsPacket.playerid = i->m_iPlayerId;
             memcpy(statsPacket.stats, i->m_afStats, sizeof(i->m_afStats));
+            statsPacket.money = i->m_nMoney;
             CNetwork::SendPacket(peer, CPacketsID::PLAYER_STATS, &statsPacket, sizeof(statsPacket), ENET_PACKET_FLAG_RELIABLE);
         }
 
