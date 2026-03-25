@@ -134,7 +134,24 @@ target("server")
         add_defines("_CRT_SECURE_NO_WARNINGS", "WIN32", "_CONSOLE")
 
     elseif is_os("linux") then
-        -- TODO
+        add_defines(
+            "_GNU_SOURCE",
+            "_CONSOLE",
+            "HAS_FCNTL",
+            "HAS_POLL",
+            "HAS_SOCKLEN_T",
+            "HAS_INET_PTON",
+            "HAS_INET_NTOP",
+            "HAS_MSGHDR_FLAGS",
+            "HAS_GETADDRINFO",
+            "HAS_GETNAMEINFO",
+            "HAS_GETHOSTBYNAME_R",
+            "HAS_GETHOSTBYADDR_R"
+        )
+
+        add_includedirs("third_party/enet")
+
+        add_syslinks("pthread")
     end
 
 target("proxy")
