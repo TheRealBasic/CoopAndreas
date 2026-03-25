@@ -330,6 +330,10 @@ class CPedPackets
 
 			static void Handle(ENetPeer* peer, void* data, int size)
 			{
+				static constexpr int kMinVehicleId = 0;
+				static constexpr int kMaxVehicleId = 199;
+				static constexpr unsigned short kFallbackVehicleModel = 400;
+
 				if (size != sizeof(CPedPackets::PedDriverUpdate))
 				{
 					std::cout << "[Warn][PedDriverUpdate] event=invalid_size size=" << size << " expected=" << sizeof(CPedPackets::PedDriverUpdate) << "\n";
@@ -358,12 +362,43 @@ class CPedPackets
 					return;
 				}
 
-				CNetwork::SendPacketToAll(CPacketsID::PED_DRIVER_UPDATE, packet, sizeof * packet, (ENetPacketFlag)0, peer);
+				if (packet->vehicleid < kMinVehicleId || packet->vehicleid > kMaxVehicleId)
+				{
+					std::cout << "[Warn][PedDriverUpdate] event=invalid_vehicle_id pedid=" << packet->pedid
+							  << " vehicleid=" << packet->vehicleid
+							  << " player=" << player->GetName() << "\n";
+					return;
+				}
 
 				CVehicle* vehicle = CVehicleManager::GetVehicle(packet->vehicleid);
 
-				if (vehicle == nullptr) // TODO: create vehicle
-					return;
+				if (vehicle == nullptr)
+				{
+					CVehiclePackets::VehicleSpawn vehicleSpawnPacket{};
+					vehicleSpawnPacket.vehicleid = packet->vehicleid;
+					vehicleSpawnPacket.tempid = 0xFF;
+					vehicleSpawnPacket.modelid = kFallbackVehicleModel;
+					vehicleSpawnPacket.pos = packet->pos;
+					vehicleSpawnPacket.rot = packet->rot.z;
+					vehicleSpawnPacket.color1 = packet->color1;
+					vehicleSpawnPacket.color2 = packet->color2;
+					vehicleSpawnPacket.createdBy = 0;
+
+					vehicle = new CVehicle(vehicleSpawnPacket.vehicleid, vehicleSpawnPacket.modelid, vehicleSpawnPacket.pos, vehicleSpawnPacket.rot);
+					vehicle->m_pSyncer = player;
+					vehicle->m_nPrimaryColor = vehicleSpawnPacket.color1;
+					vehicle->m_nSecondaryColor = vehicleSpawnPacket.color2;
+					vehicle->m_nCreatedBy = vehicleSpawnPacket.createdBy;
+					CVehicleManager::Add(vehicle);
+
+					CNetwork::SendPacketToAll(CPacketsID::VEHICLE_SPAWN, &vehicleSpawnPacket, sizeof(vehicleSpawnPacket), ENET_PACKET_FLAG_RELIABLE, peer);
+					std::cout << "[Warn][PedDriverUpdate] event=vehicle_recovered pedid=" << packet->pedid
+							  << " vehicleid=" << packet->vehicleid
+							  << " model_fallback=" << vehicleSpawnPacket.modelid
+							  << " player=" << player->GetName() << "\n";
+				}
+
+				CNetwork::SendPacketToAll(CPacketsID::PED_DRIVER_UPDATE, packet, sizeof * packet, (ENetPacketFlag)0, peer);
 
 				vehicle->m_bUsedByPed = true;
 				vehicle->m_vecPosition = packet->pos;
