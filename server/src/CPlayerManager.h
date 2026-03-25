@@ -8,11 +8,15 @@
 #include <vector>
 #include <algorithm>
 #include <climits>
+#include <unordered_set>
+#include <cmath>
+#include <chrono>
 
 #include "CControllerState.h"
 #include "CPlayer.h"
 #include "NetworkEntityType.h"
 #include "PlayerDisconnectReason.h"
+#include "ConfigManager.h"
 
 class CPlayerManager
 {
@@ -36,6 +40,138 @@ class CPlayerPackets
 {
 public:
 	CPlayerPackets();
+	struct CutsceneSkipVoteState
+	{
+		bool active = false;
+		bool alreadySkipped = false;
+		char cutsceneName[8]{};
+		uint32_t sessionToken = 0;
+		std::unordered_set<int> eligiblePlayerIds{};
+		std::unordered_set<int> votedPlayerIds{};
+		int voteCount = 0;
+		int requiredVotes = 0;
+		uint64_t voteUnlockTimeMs = 0;
+	};
+
+	struct CutsceneSkipVoteConfig
+	{
+		double thresholdRatio = 0.51;
+		int minimumPlayers = 2;
+		uint32_t lockMs = 0;
+	};
+
+	struct CutsceneSkipVoteUpdate
+	{
+		int voterid;
+		int currentVotes;
+		int requiredVotes;
+		uint32_t sessionToken;
+		bool thresholdReached;
+	};
+
+	static inline CutsceneSkipVoteState ms_cutsceneSkipVoteState{};
+	static inline CutsceneSkipVoteConfig ms_cutsceneSkipVoteConfig{};
+	static inline bool ms_isCutsceneSkipVoteConfigLoaded = false;
+
+	static void EnsureCutsceneSkipVoteConfigLoaded()
+	{
+		if (ms_isCutsceneSkipVoteConfigLoaded)
+		{
+			return;
+		}
+
+		ms_cutsceneSkipVoteConfig.thresholdRatio = CConfigManager::GetCutsceneSkipVoteThresholdRatio();
+		ms_cutsceneSkipVoteConfig.minimumPlayers = CConfigManager::GetCutsceneSkipVoteMinPlayers();
+		ms_cutsceneSkipVoteConfig.lockMs = CConfigManager::GetCutsceneSkipVoteLockMs();
+		ms_isCutsceneSkipVoteConfigLoaded = true;
+	}
+
+	static uint64_t GetServerTimeMs()
+	{
+		const auto now = std::chrono::steady_clock::now();
+		const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
+		return (uint64_t)ms.count();
+	}
+
+	static void RecalculateCutsceneVoteThreshold()
+	{
+		auto& state = ms_cutsceneSkipVoteState;
+		int eligiblePlayers = (int)state.eligiblePlayerIds.size();
+		if (eligiblePlayers <= 0)
+		{
+			state.requiredVotes = 0;
+			return;
+		}
+
+		double configuredRatio = std::clamp(ms_cutsceneSkipVoteConfig.thresholdRatio, 0.0, 1.0);
+		int requiredVotes = (int)std::ceil((double)eligiblePlayers * configuredRatio);
+		if (requiredVotes <= 0)
+		{
+			requiredVotes = (eligiblePlayers / 2) + 1;
+		}
+
+		state.requiredVotes = std::clamp(requiredVotes, 1, eligiblePlayers);
+	}
+
+	static void BroadcastCutsceneVoteUpdate(int voterId)
+	{
+		auto& state = ms_cutsceneSkipVoteState;
+		CutsceneSkipVoteUpdate packet{};
+		packet.voterid = voterId;
+		packet.currentVotes = state.voteCount;
+		packet.requiredVotes = state.requiredVotes;
+		packet.sessionToken = state.sessionToken;
+		packet.thresholdReached = state.alreadySkipped;
+		CNetwork::SendPacketToAll(CPacketsID::CUTSCENE_SKIP_VOTE_UPDATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
+	}
+
+	static void ClearCutsceneVoteState()
+	{
+		ms_cutsceneSkipVoteState = {};
+	}
+
+	static void ResetCutsceneVoteStateForHostMigration()
+	{
+		ClearCutsceneVoteState();
+	}
+
+	static void OnPlayerDisconnectedFromCutsceneVote(int playerId)
+	{
+		auto& state = ms_cutsceneSkipVoteState;
+		if (!state.active)
+		{
+			return;
+		}
+
+		if (state.eligiblePlayerIds.erase(playerId) > 0)
+		{
+			if (state.votedPlayerIds.erase(playerId) > 0)
+			{
+				state.voteCount = std::max(0, state.voteCount - 1);
+			}
+
+			RecalculateCutsceneVoteThreshold();
+			BroadcastCutsceneVoteUpdate(-1);
+
+			if (!state.alreadySkipped
+				&& (int)state.eligiblePlayerIds.size() >= ms_cutsceneSkipVoteConfig.minimumPlayers
+				&& state.voteCount >= state.requiredVotes)
+			{
+				state.alreadySkipped = true;
+				struct RawSkipCutscenePacket
+				{
+					int playerid;
+					int votes;
+					uint32_t sessionToken;
+				} skipPacket{};
+				skipPacket.playerid = -1;
+				skipPacket.votes = state.voteCount;
+				skipPacket.sessionToken = state.sessionToken;
+				CNetwork::SendPacketToAll(CPacketsID::SKIP_CUTSCENE, &skipPacket, sizeof(skipPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
+				ClearCutsceneVoteState();
+			}
+		}
+	}
 #pragma pack(1)
 	struct PlayerConnected
 	{
@@ -319,6 +455,7 @@ public:
 	{
 		char name[8];
 		uint8_t currArea; // AKA interior
+		uint32_t sessionToken;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
@@ -326,8 +463,23 @@ public:
 			{
 				if (player->m_bIsHost)
 				{
+					EnsureCutsceneSkipVoteConfigLoaded();
 					CPlayerPackets::StartCutscene* packet = (CPlayerPackets::StartCutscene*)data;
+					auto& state = ms_cutsceneSkipVoteState;
+					state = {};
+					state.active = true;
+					memcpy(state.cutsceneName, packet->name, sizeof(state.cutsceneName));
+					state.sessionToken = packet->sessionToken;
+					state.voteUnlockTimeMs = GetServerTimeMs() + ms_cutsceneSkipVoteConfig.lockMs;
+
+					for (auto connectedPlayer : CPlayerManager::m_pPlayers)
+					{
+						state.eligiblePlayerIds.insert(connectedPlayer->m_iPlayerId);
+					}
+
+					RecalculateCutsceneVoteThreshold();
 					CNetwork::SendPacketToAll(CPacketsID::START_CUTSCENE, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+					BroadcastCutsceneVoteUpdate(-1);
 				}
 			}
 		}
@@ -350,13 +502,62 @@ public:
 	struct SkipCutscene
 	{
 		int playerid;
-		int votes; // temporary unused
+		int votes;
+		uint32_t sessionToken;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
 			if (auto player = CPlayerManager::GetPlayer(peer))
 			{
-				CNetwork::SendPacketToAll(CPacketsID::SKIP_CUTSCENE, data, size, ENET_PACKET_FLAG_RELIABLE, peer);
+				EnsureCutsceneSkipVoteConfigLoaded();
+				auto& state = ms_cutsceneSkipVoteState;
+				auto* packet = (SkipCutscene*)data;
+
+				if (!state.active || state.alreadySkipped)
+				{
+					return;
+				}
+
+				if (packet->sessionToken != state.sessionToken)
+				{
+					return;
+				}
+
+				if (state.eligiblePlayerIds.find(player->m_iPlayerId) == state.eligiblePlayerIds.end())
+				{
+					return;
+				}
+
+				if (GetServerTimeMs() < state.voteUnlockTimeMs)
+				{
+					return;
+				}
+
+				if (!state.votedPlayerIds.insert(player->m_iPlayerId).second)
+				{
+					return;
+				}
+
+				state.voteCount++;
+				RecalculateCutsceneVoteThreshold();
+
+				if ((int)state.eligiblePlayerIds.size() < ms_cutsceneSkipVoteConfig.minimumPlayers)
+				{
+					return;
+				}
+
+				BroadcastCutsceneVoteUpdate(player->m_iPlayerId);
+
+				if (state.voteCount >= state.requiredVotes)
+				{
+					state.alreadySkipped = true;
+					SkipCutscene skipPacket{};
+					skipPacket.playerid = player->m_iPlayerId;
+					skipPacket.votes = state.voteCount;
+					skipPacket.sessionToken = state.sessionToken;
+					CNetwork::SendPacketToAll(CPacketsID::SKIP_CUTSCENE, &skipPacket, sizeof(skipPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
+					ClearCutsceneVoteState();
+				}
 			}
 		}
 	};

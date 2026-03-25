@@ -30,6 +30,10 @@ void CConfigManager::CreateConfig()
 	{
 		file << key << " = " << value << "\n";
 	}
+
+	file << "cutscene_skip_vote_ratio = 0.51\n";
+	file << "cutscene_skip_vote_min_players = 2\n";
+	file << "cutscene_skip_vote_lock_ms = 0\n";
 }
 
 uint16_t CConfigManager::GetConfigPort()
@@ -40,4 +44,19 @@ uint16_t CConfigManager::GetConfigPort()
 uint16_t CConfigManager::GetConfigMaxPlayers()
 {
 	return (uint16_t)ms_pReader->GetUnsigned("", "maxplayers", ms_umDefaultConfig.at("maxplayers"));
+}
+
+double CConfigManager::GetCutsceneSkipVoteThresholdRatio()
+{
+	return ms_pReader->GetReal("", "cutscene_skip_vote_ratio", 0.51);
+}
+
+uint16_t CConfigManager::GetCutsceneSkipVoteMinPlayers()
+{
+	return (uint16_t)ms_pReader->GetUnsigned("", "cutscene_skip_vote_min_players", 2);
+}
+
+uint16_t CConfigManager::GetCutsceneSkipVoteLockMs()
+{
+	return (uint16_t)ms_pReader->GetUnsigned("", "cutscene_skip_vote_lock_ms", 0);
 }
