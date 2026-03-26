@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cstdint>
 
 #include "CVector.h"
 #include "CPlayerManager.h"
@@ -42,6 +43,12 @@ class CVehicle
 		bool m_bUsedByPed = false;
 		PassengerSeatState m_passengerSeatState[8]{};
 		HydraulicsSyncState m_hydraulicsState{};
+		int m_nLinkedTrailerId = -1;
+		int m_nLinkedTractorId = -1;
+		uint8_t m_nTrailerAttachState = 0;
+		uint8_t m_nTrailerDetachReason = 0;
+		uint64_t m_nTrailerLinkTimestampMs = 0;
+		uint32_t m_nTrailerLinkVersion = 0;
 
 		void ReassignSyncer(CPlayer* newSyncer);
 		void SetOccupant(uint8_t seatid, CPlayer* player);

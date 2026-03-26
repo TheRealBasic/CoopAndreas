@@ -883,6 +883,12 @@ void CPacketHandler::VehiclePassengerUpdate__Handle(void* data, int size)
 	}
 }
 
+void CPacketHandler::VehicleTrailerLinkSync__Handle(void* data, int size)
+{
+	CPackets::VehicleTrailerLinkSync* packet = (CPackets::VehicleTrailerLinkSync*)data;
+	CNetworkVehicleManager::QueueTrailerLinkEvent(*packet);
+}
+
 // PlayerChatMessage
 
 void CPacketHandler::PlayerChatMessage__Handle(void* data, int size)

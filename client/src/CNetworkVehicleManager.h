@@ -51,6 +51,8 @@ public:
     static void TickStreaming(uint32_t tickCount);
     static void CacheNetworkState(CNetworkVehicle* vehicle, const CPackets::VehicleIdleUpdate& packet);
     static void CacheNetworkState(CNetworkVehicle* vehicle, const CPackets::VehicleDriverUpdate& packet);
+    static void QueueTrailerLinkEvent(const CPackets::VehicleTrailerLinkSync& packet);
+    static void ApplyPendingTrailerLinkEvents();
     static void AddModelRef(int modelId);
     static void ReleaseModelRef(int modelId);
     static const Telemetry& GetTelemetry();

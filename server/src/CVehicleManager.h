@@ -11,7 +11,19 @@ public:
 	static void Add(CVehicle* vehicle);
 	static void Remove(CVehicle* vehicle);
 	static CVehicle* GetVehicle(int vehicleid);
+	static bool IsNetworkVehicleActive(CVehicle* vehicle);
 	static int GetFreeID();
+	static uint64_t GetAuthoritativeTimestampMs();
+	static bool ProcessTrailerLinkEvent(
+		CPlayer* sourcePlayer,
+		int tractorVehicleId,
+		int trailerVehicleId,
+		uint8_t attachState,
+		uint8_t detachReason,
+		uint64_t& timestampMs,
+		uint32_t& linkVersion,
+		bool validateAuthority
+	);
 	static void RemoveAllHostedAndNotify(CPlayer* player);
 };
 
@@ -81,6 +93,48 @@ class CVehiclePackets
 
 					if (vehicle->m_pSyncer == player)
 					{
+						CVehiclePackets::VehicleTrailerLinkSync trailerLinkPacket{};
+						uint64_t timestampMs = 0;
+						uint32_t linkVersion = 0;
+						if (vehicle->m_nLinkedTractorId >= 0 &&
+							CVehicleManager::ProcessTrailerLinkEvent(
+								player,
+								vehicle->m_nLinkedTractorId,
+								vehicle->m_nVehicleId,
+								0,
+								CVehiclePackets::VehicleTrailerLinkSync::DETACH_REASON_ENTITY_REMOVED,
+								timestampMs,
+								linkVersion,
+								false))
+						{
+							trailerLinkPacket.tractorVehicleId = vehicle->m_nLinkedTractorId;
+							trailerLinkPacket.trailerVehicleId = vehicle->m_nVehicleId;
+							trailerLinkPacket.attachState = 0;
+							trailerLinkPacket.detachReason = CVehiclePackets::VehicleTrailerLinkSync::DETACH_REASON_ENTITY_REMOVED;
+							trailerLinkPacket.timestampMs = timestampMs;
+							trailerLinkPacket.linkVersion = linkVersion;
+							CNetwork::SendPacketToAll(CPacketsID::VEHICLE_TRAILER_LINK_SYNC, &trailerLinkPacket, sizeof(trailerLinkPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
+						}
+						if (vehicle->m_nLinkedTrailerId >= 0 &&
+							CVehicleManager::ProcessTrailerLinkEvent(
+								player,
+								vehicle->m_nVehicleId,
+								vehicle->m_nLinkedTrailerId,
+								0,
+								CVehiclePackets::VehicleTrailerLinkSync::DETACH_REASON_ENTITY_REMOVED,
+								timestampMs,
+								linkVersion,
+								false))
+						{
+							trailerLinkPacket.tractorVehicleId = vehicle->m_nVehicleId;
+							trailerLinkPacket.trailerVehicleId = vehicle->m_nLinkedTrailerId;
+							trailerLinkPacket.attachState = 0;
+							trailerLinkPacket.detachReason = CVehiclePackets::VehicleTrailerLinkSync::DETACH_REASON_ENTITY_REMOVED;
+							trailerLinkPacket.timestampMs = timestampMs;
+							trailerLinkPacket.linkVersion = linkVersion;
+							CNetwork::SendPacketToAll(CPacketsID::VEHICLE_TRAILER_LINK_SYNC, &trailerLinkPacket, sizeof(trailerLinkPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
+						}
+
 						CNetwork::SendPacketToAll(CPacketsID::VEHICLE_REMOVE, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
 						CVehicleManager::Remove(vehicle);
 					}
@@ -335,6 +389,45 @@ class CVehiclePackets
 						}
 
 					}
+				}
+			}
+		};
+
+		struct VehicleTrailerLinkSync
+		{
+			enum eDetachReason : uint8_t
+			{
+				DETACH_REASON_NONE = 0,
+				DETACH_REASON_MANUAL = 1,
+				DETACH_REASON_FORCE = 2,
+				DETACH_REASON_ENTITY_REMOVED = 3
+			};
+
+			int tractorVehicleId;
+			int trailerVehicleId;
+			uint8_t attachState;
+			uint8_t detachReason;
+			uint64_t timestampMs;
+			uint32_t linkVersion;
+
+			static void Handle(ENetPeer* peer, void* data, int size)
+			{
+				auto player = CPlayerManager::GetPlayer(peer);
+				if (!player)
+					return;
+
+				auto* packet = (CVehiclePackets::VehicleTrailerLinkSync*)data;
+				if (CVehicleManager::ProcessTrailerLinkEvent(
+					player,
+					packet->tractorVehicleId,
+					packet->trailerVehicleId,
+					packet->attachState,
+					packet->detachReason,
+					packet->timestampMs,
+					packet->linkVersion,
+					true))
+				{
+					CNetwork::SendPacketToAll(CPacketsID::VEHICLE_TRAILER_LINK_SYNC, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, nullptr);
 				}
 			}
 		};
