@@ -1330,7 +1330,13 @@ public:
 				return;
 			}
 
-			ms_gangGroupMembershipStates[packet->pedNetworkId] = *packet;
+			GangGroupMembershipState cachedState{};
+			cachedState.sequence = packet->sequence;
+			cachedState.pedNetworkId = packet->pedNetworkId;
+			cachedState.gangGroupId = packet->gangGroupId;
+			cachedState.action = packet->action;
+
+			ms_gangGroupMembershipStates[packet->pedNetworkId] = cachedState;
 			CNetwork::SendPacketToAll(CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
@@ -1367,7 +1373,13 @@ public:
 				return;
 			}
 
-			ms_gangRelationshipStates[relationshipKey] = *packet;
+			GangRelationshipState cachedState{};
+			cachedState.sequence = packet->sequence;
+			cachedState.sourceGangGroupId = packet->sourceGangGroupId;
+			cachedState.targetGangGroupId = packet->targetGangGroupId;
+			cachedState.relationshipFlags = packet->relationshipFlags;
+
+			ms_gangRelationshipStates[relationshipKey] = cachedState;
 			CNetwork::SendPacketToAll(CPacketsID::GANG_RELATIONSHIP_UPDATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
