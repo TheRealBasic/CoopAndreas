@@ -32,6 +32,10 @@ void CNetworkFireManager::HandleCreate(const CPackets::FireCreate& packet)
     auto it = ms_fires.find(packet.fireId);
     if (it != ms_fires.end())
     {
+        if (packet.timestampMs < it->second.state.timestampMs)
+        {
+            return;
+        }
         it->second.state = packet;
         return;
     }
@@ -61,6 +65,11 @@ void CNetworkFireManager::HandleUpdate(const CPackets::FireUpdate& packet)
         createPacket.sourceType = packet.sourceType;
         createPacket.timestampMs = packet.timestampMs;
         HandleCreate(createPacket);
+        return;
+    }
+
+    if (packet.timestampMs < it->second.state.timestampMs)
+    {
         return;
     }
 
@@ -104,6 +113,11 @@ void CNetworkFireManager::HandleRemove(const CPackets::FireRemove& packet)
 {
     auto it = ms_fires.find(packet.fireId);
     if (it == ms_fires.end())
+    {
+        return;
+    }
+
+    if (packet.timestampMs < it->second.state.timestampMs)
     {
         return;
     }
