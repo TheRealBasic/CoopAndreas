@@ -13,7 +13,12 @@ public:
 
     static bool HandleOpCodePreExecute(uint16_t opcode);
     static void ProcessDeferredCutsceneStart();
+    static void ProcessWidescreenPolicy();
+
+    static void HandleMissionFlagSync(bool onMission);
+    static bool HandleNetworkSwitchWidescreen(bool enabled);
 
     static bool HandleEndSceneSkip();
     static bool HandleStartCutscene();
+    static bool HandleClearCutscene();
 };
