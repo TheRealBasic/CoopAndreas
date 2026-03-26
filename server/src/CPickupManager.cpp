@@ -140,6 +140,12 @@ void CPickupManager::BroadcastDropResolve(const Pickup& pickup, uint8_t action, 
 	CNetwork::SendPacketToAll(CPacketsID::PICKUP_DROP_RESOLVE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
 }
 
+void CPickupManager::RejectDropCollectClaim(Pickup& pickup, int resolverPlayerId)
+{
+	UpdateStateMetadata(pickup);
+	BroadcastDropResolve(pickup, CPickupStatePackets::PICKUP_DROP_RESOLVE_ACTION_REJECTED, resolverPlayerId);
+}
+
 void CPickupManager::SendSnapshot(ENetPeer* peer)
 {
 	CPickupStatePackets::PickupSnapshotBegin beginPacket{};
@@ -173,13 +179,22 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, con
 	}
 
 	auto& pickup = it->second;
+	const bool isDroppedPickup = (pickup.flags & PICKUP_FLAG_DROPPED) != 0;
 	if (!pickup.isSpawned || pickup.isCollected)
 	{
+		if (isDroppedPickup)
+		{
+			RejectDropCollectClaim(pickup, player->m_iPlayerId);
+		}
 		return;
 	}
 
 	if (knownStateVersion != 0 && knownStateVersion != pickup.stateVersion)
 	{
+		if (isDroppedPickup)
+		{
+			RejectDropCollectClaim(pickup, player->m_iPlayerId);
+		}
 		return;
 	}
 
@@ -196,22 +211,43 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, con
 
 	if (sqDist > 25.0f || reportedSqDist > 64.0f)
 	{
+		if (isDroppedPickup)
+		{
+			RejectDropCollectClaim(pickup, player->m_iPlayerId);
+		}
 		return;
+	}
+
+	if (isDroppedPickup)
+	{
+		if (pickup.pendingCollectorPlayerId != -1 && pickup.pendingCollectorPlayerId != player->m_iPlayerId)
+		{
+			RejectDropCollectClaim(pickup, player->m_iPlayerId);
+			return;
+		}
+
+		pickup.pendingCollectorPlayerId = player->m_iPlayerId;
+		pickup.pendingClaimAtMs = GetServerTimeMs();
+		UpdateStateMetadata(pickup);
+		BroadcastDropResolve(pickup, CPickupStatePackets::PICKUP_DROP_RESOLVE_ACTION_CLAIM, player->m_iPlayerId);
 	}
 
 	pickup.isCollected = true;
 	pickup.isSpawned = false;
 	pickup.collectorPlayerId = player->m_iPlayerId;
+	pickup.pendingCollectorPlayerId = -1;
+	pickup.pendingClaimAtMs = 0;
 	pickup.collectedAtMs = GetServerTimeMs();
 	UpdateStateMetadata(pickup);
 	PersistCollectibleState(pickup);
 	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT);
 
-	if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
+	if (isDroppedPickup)
 	{
 		pickup.flags &= ~PICKUP_FLAG_DROPPED;
 		UpdateStateMetadata(pickup);
-		BroadcastDropResolve(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT, player->m_iPlayerId);
+		BroadcastDropResolve(pickup, CPickupStatePackets::PICKUP_DROP_RESOLVE_ACTION_ACCEPTED, player->m_iPlayerId);
+		BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_REMOVE);
 		ms_pickups.erase(it);
 		ms_snapshotVersion++;
 	}

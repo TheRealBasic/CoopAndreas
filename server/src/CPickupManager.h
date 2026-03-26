@@ -50,6 +50,8 @@ public:
 		int amount = 0;
 		uint8_t weaponId = 0;
 		uint16_t weaponAmmo = 0;
+		int pendingCollectorPlayerId = -1;
+		uint64_t pendingClaimAtMs = 0;
 	};
 
 	static uint32_t CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs = 0, int amount = 0, uint8_t weaponId = 0, uint16_t weaponAmmo = 0, uint8_t origin = CPickupStatePackets::PICKUP_ORIGIN_COLLECTIBLE, uint8_t flags = PICKUP_FLAG_PERSISTENT | PICKUP_FLAG_RESPAWNABLE, uint32_t worldCollectibleId = 0);
@@ -73,6 +75,7 @@ private:
 	static void BroadcastDelta(const Pickup& pickup, uint8_t action);
 	static void BroadcastDropCreate(const Pickup& pickup);
 	static void BroadcastDropResolve(const Pickup& pickup, uint8_t action, int resolverPlayerId);
+	static void RejectDropCollectClaim(Pickup& pickup, int resolverPlayerId);
 };
 
 class CPickupPackets

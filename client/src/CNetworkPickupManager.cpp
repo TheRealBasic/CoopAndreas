@@ -10,9 +10,21 @@ namespace
 		PICKUP_ACTION_REMOVE = 2
 	};
 
+	enum ePickupDropResolveAction : uint8_t
+	{
+		PICKUP_DROP_RESOLVE_ACTION_CLAIM = 0,
+		PICKUP_DROP_RESOLVE_ACTION_ACCEPTED = 1,
+		PICKUP_DROP_RESOLVE_ACTION_REJECTED = 2
+	};
+
 	enum ePickupOrigin : uint8_t
 	{
 		PICKUP_ORIGIN_COLLECTIBLE = 0
+	};
+
+	enum ePickupFlags : uint8_t
+	{
+		PICKUP_FLAG_DROPPED = 1 << 2
 	};
 }
 
@@ -139,10 +151,29 @@ void CNetworkPickupManager::HandleDropResolve(const CPackets::PickupDropResolve&
 		return;
 	}
 
-	if (packet.action == PICKUP_ACTION_REMOVE || packet.action == PICKUP_ACTION_COLLECT)
+	it->second.stateVersion = packet.stateVersion;
+	it->second.stateTimestampMs = packet.stateTimestampMs;
+
+	if (packet.action == PICKUP_DROP_RESOLVE_ACTION_CLAIM)
+	{
+		it->second.isSpawned = false;
+		it->second.isCollected = true;
+		it->second.collectorPlayerId = packet.resolverPlayerId;
+		return;
+	}
+
+	if (packet.action == PICKUP_DROP_RESOLVE_ACTION_ACCEPTED || packet.action == PICKUP_ACTION_REMOVE || packet.action == PICKUP_ACTION_COLLECT)
 	{
 		ms_pickups.erase(it);
 		return;
+	}
+
+	if (packet.action == PICKUP_DROP_RESOLVE_ACTION_REJECTED)
+	{
+		it->second.isSpawned = true;
+		it->second.isCollected = false;
+		it->second.collectorPlayerId = -1;
+		it->second.lastCollectAttemptTick = 0;
 	}
 }
 
@@ -189,6 +220,15 @@ void CNetworkPickupManager::Process()
 		request.knownStateVersion = pickup.stateVersion;
 		CNetwork::SendPacket(CPacketsID::PICKUP_COLLECT_REQUEST, &request, sizeof(request), ENET_PACKET_FLAG_RELIABLE);
 		pickup.lastCollectAttemptTick = now;
+
+		if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
+		{
+			pickup.isSpawned = false;
+			pickup.isCollected = true;
+			pickup.collectorPlayerId = CNetworkPlayerManager::m_nMyId;
+			pickup.stateVersion++;
+			pickup.stateTimestampMs = static_cast<uint64_t>(now);
+		}
 	}
 }
 
