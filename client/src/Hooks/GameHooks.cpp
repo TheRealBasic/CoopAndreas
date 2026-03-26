@@ -2,6 +2,7 @@
 #include "GameHooks.h"
 #include "CKeySync.h"
 #include "../CStatsSync.h"
+#include <CMissionSyncState.h>
 #include <CCutsceneMgr.h>
 
 static uint32_t g_cutsceneSessionToken = 0;
@@ -297,6 +298,7 @@ void CCutsceneMgr__StartCutscene_Hook()
         strncpy_s(packet.name, CCutsceneMgr::ms_cutsceneName, 8);
         packet.sessionToken = ++g_cutsceneSessionToken;
         CNetwork::SendPacket(CPacketsID::START_CUTSCENE, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
+        CMissionSyncState::EmitMissionFlowCutsceneTrigger(packet.name, packet.currArea);
         CPacketHandler::CutsceneSkipVote__OnSessionStart(packet.sessionToken);
     }
 }

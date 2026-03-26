@@ -101,6 +101,23 @@ public:
 	static inline std::unordered_map<int, GangGroupMembershipState> ms_gangGroupMembershipStates{};
 	static inline std::unordered_map<uint16_t, GangRelationshipState> ms_gangRelationshipStates{};
 	static inline std::vector<MapPinState> ms_activeMapPins{};
+	static inline uint8_t ms_lastOnMissionFlag = 0;
+
+	struct MissionFlowSyncState
+	{
+		uint8_t eventType = 0;
+		uint8_t messageType = 0;
+		uint32_t time = 0;
+		uint8_t flag = 0;
+		uint8_t currArea = 0;
+		uint8_t onMission = 0;
+		uint8_t replay = 0;
+		uint32_t sequence = 0;
+		char gxt[8]{};
+		char cutsceneName[8]{};
+	};
+
+	static inline MissionFlowSyncState ms_lastMissionFlowSync{};
 
 	static void RefreshActiveMapPinsSnapshot()
 	{
@@ -148,6 +165,30 @@ public:
 		{
 			CNetwork::SendPacket(peer, CPacketsID::PLAYER_PLACE_WAYPOINT, &waypointPacket, sizeof(waypointPacket), ENET_PACKET_FLAG_RELIABLE);
 		}
+	}
+
+	static void SendMissionStateSnapshot(ENetPeer* peer)
+	{
+		if (!peer)
+		{
+			return;
+		}
+
+		struct OnMissionFlagSnapshotPacket
+		{
+			uint8_t bOnMission : 1;
+		} onMissionPacket{};
+		onMissionPacket.bOnMission = ms_lastOnMissionFlag != 0;
+		CNetwork::SendPacket(peer, CPacketsID::ON_MISSION_FLAG_SYNC, &onMissionPacket, sizeof(onMissionPacket), ENET_PACKET_FLAG_RELIABLE);
+
+		if (ms_lastMissionFlowSync.sequence == 0)
+		{
+			return;
+		}
+
+		MissionFlowSyncState replayPacket = ms_lastMissionFlowSync;
+		replayPacket.replay = 1;
+		CNetwork::SendPacket(peer, CPacketsID::MISSION_FLOW_SYNC, &replayPacket, sizeof(replayPacket), ENET_PACKET_FLAG_RELIABLE);
 	}
 	struct CutsceneSkipVoteState
 	{
@@ -962,8 +1003,54 @@ public:
 			{
 				if (player->m_bIsHost)
 				{
+					ms_lastOnMissionFlag = ((OnMissionFlagSync*)data)->bOnMission ? 1 : 0;
 					CNetwork::SendPacketToAll(CPacketsID::ON_MISSION_FLAG_SYNC, data, sizeof(OnMissionFlagSync), ENET_PACKET_FLAG_RELIABLE, peer);
 				}
+			}
+		}
+	};
+
+	struct MissionFlowSync
+	{
+		uint8_t eventType;
+		uint8_t messageType;
+		uint32_t time;
+		uint8_t flag;
+		uint8_t currArea;
+		uint8_t onMission;
+		uint8_t replay;
+		uint32_t sequence;
+		char gxt[8];
+		char cutsceneName[8];
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			if (size < (int)sizeof(MissionFlowSync))
+			{
+				return;
+			}
+
+			if (auto player = CPlayerManager::GetPlayer(peer))
+			{
+				if (!player->m_bIsHost)
+				{
+					return;
+				}
+
+				MissionFlowSync* packet = (MissionFlowSync*)data;
+				packet->replay = 0;
+				ms_lastOnMissionFlag = packet->onMission ? 1 : 0;
+				ms_lastMissionFlowSync.eventType = packet->eventType;
+				ms_lastMissionFlowSync.messageType = packet->messageType;
+				ms_lastMissionFlowSync.time = packet->time;
+				ms_lastMissionFlowSync.flag = packet->flag;
+				ms_lastMissionFlowSync.currArea = packet->currArea;
+				ms_lastMissionFlowSync.onMission = packet->onMission;
+				ms_lastMissionFlowSync.replay = 0;
+				ms_lastMissionFlowSync.sequence = packet->sequence;
+				memcpy(ms_lastMissionFlowSync.gxt, packet->gxt, sizeof(packet->gxt));
+				memcpy(ms_lastMissionFlowSync.cutsceneName, packet->cutsceneName, sizeof(packet->cutsceneName));
+				CNetwork::SendPacketToAll(CPacketsID::MISSION_FLOW_SYNC, packet, sizeof(MissionFlowSync), ENET_PACKET_FLAG_RELIABLE, peer);
 			}
 		}
 	};

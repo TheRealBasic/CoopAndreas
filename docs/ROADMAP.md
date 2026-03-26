@@ -54,8 +54,8 @@ Legend:
 
 | Mission | Script | Status | Blocking dependencies (opcodes/commands) | Quick acceptance criteria |
 | --- | --- | --- | --- | --- |
-| Cleaning The Hood | `scm/scripts/SWEET.txt` | `not started` | `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| Drive-Thru | `scm/scripts/SWEET.txt` | `not started` | `create_car`, `task_drive_by`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+| Cleaning The Hood | `scm/scripts/SWEET.txt` | `in progress` | `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+| Drive-Thru | `scm/scripts/SWEET.txt` | `in progress` | `create_car`, `task_drive_by`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Nines And AK's | `scm/scripts/SWEET.txt` | `not started` | `create_pickup`, `task_go_to_coord_any_means`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Drive-By | `scm/scripts/SWEET.txt` | `not started` | `task_drive_by`, `set_char_obj_destroy_car`, `set_mission_audio_position` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Sweet's Girl | `scm/scripts/SWEET.txt` | `not started` | `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, `task_enter_car_as_driver` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
@@ -142,6 +142,25 @@ Legend:
 | End Of The Line (1) | `scm/scripts/RIOT.txt` | `not started` | `task_go_to_coord_any_means`, `task_kill_char_on_foot`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | End Of The Line (2) | `scm/scripts/RIOT.txt` | `not started` | `create_car`, `task_car_chase`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | End Of The Line (3) | `scm/scripts/RIOT.txt` | `not started` | `start_cutscene`, `task_kill_char_on_foot`, `Mission.LoadAndLaunchInternal` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+
+#### SWEET mission wave 1 implementation notes (selected from first two `not started` rows)
+
+- **Cleaning The Hood** (`Mission.LoadAndLaunchInternal(14)` in `SWEET.txt`)
+  - Blocking opcodes: `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means`.
+  - Mission state transitions covered in sync flow:
+    - **start:** mission launch + cutscene start trigger propagation.
+    - **active objectives:** objective/help text propagation (`print_big`, `print_now`, `print_help`).
+    - **fail:** `fail_current_mission` propagation.
+    - **pass:** `register_mission_passed` propagation.
+    - **reconnect resume:** server snapshot replay of mission flag + latest mission flow event.
+- **Drive-Thru** (`Mission.LoadAndLaunchInternal(15)` in `SWEET.txt`)
+  - Blocking opcodes: `create_car`, `task_drive_by`, `set_char_obj_destroy_car`.
+  - Mission state transitions covered in sync flow:
+    - **start:** mission launch + cutscene start trigger propagation.
+    - **active objectives:** objective/help text propagation (`print_big`, `print_now`, `print_help`).
+    - **fail:** `fail_current_mission` propagation.
+    - **pass:** `register_mission_passed` propagation.
+    - **reconnect resume:** server snapshot replay of mission flag + latest mission flow event.
 
 ## Milestone: Launcher UX
 
