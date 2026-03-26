@@ -118,6 +118,7 @@ public:
 		uint32_t networkId;
 		uint8_t type;
 		uint8_t category;
+		uint32_t worldCollectibleId;
 		uint8_t origin;
 		uint8_t flags;
 		CVector position;
