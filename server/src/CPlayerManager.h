@@ -75,6 +75,17 @@ public:
 		}
 	}
 
+	static void BroadcastSubmissionMissionStateResync()
+	{
+		for (auto* player : CPlayerManager::m_pPlayers)
+		{
+			if (player && player->m_pPeer)
+			{
+				SendSubmissionMissionStateSnapshot(player->m_pPeer);
+			}
+		}
+	}
+
 	struct GangZoneState
 	{
 		uint16_t zoneId;
@@ -134,6 +145,19 @@ public:
 		uint32_t stateVersion = 0;
 	};
 
+	struct SubmissionMissionState
+	{
+		uint8_t submissionType = 0;
+		uint8_t active = 0;
+		uint8_t stage = 0;
+		uint16_t progress = 0;
+		int32_t timerMs = 0;
+		int32_t rewardCash = 0;
+		uint8_t currArea = 0;
+		uint64_t stateTimestampMs = 0;
+		uint32_t stateVersion = 0;
+	};
+
 	static inline std::unordered_map<uint16_t, GangZoneState> ms_gangZoneStates{};
 	static inline std::unordered_map<int, GangGroupMembershipState> ms_gangGroupMembershipStates{};
 	static inline std::unordered_map<uint16_t, GangRelationshipState> ms_gangRelationshipStates{};
@@ -141,6 +165,8 @@ public:
 	static inline std::vector<MapPinState> ms_activeMapPins{};
 	static inline std::unordered_map<uint16_t, PropertyState> ms_propertyStates{};
 	static inline uint32_t ms_propertySnapshotVersion = 0;
+	static inline std::unordered_map<uint8_t, SubmissionMissionState> ms_submissionMissionStates{};
+	static inline uint32_t ms_submissionMissionSnapshotVersion = 0;
 	static inline uint8_t ms_lastOnMissionFlag = 0;
 
 	struct MissionFlowSyncState
@@ -265,6 +291,38 @@ public:
 		CPropertyStatePackets::PropertyStateSnapshotEnd endPacket{};
 		endPacket.snapshotVersion = ms_propertySnapshotVersion;
 		CNetwork::SendPacket(peer, CPacketsID::PROPERTY_STATE_SNAPSHOT_END, &endPacket, sizeof(endPacket), ENET_PACKET_FLAG_RELIABLE);
+	}
+
+	static void SendSubmissionMissionStateSnapshot(ENetPeer* peer)
+	{
+		if (!peer)
+		{
+			return;
+		}
+
+		CSubmissionMissionPackets::SubmissionMissionSnapshotBegin beginPacket{};
+		beginPacket.snapshotVersion = ms_submissionMissionSnapshotVersion;
+		beginPacket.submissionCount = static_cast<uint8_t>(std::min<size_t>(ms_submissionMissionStates.size(), UINT8_MAX));
+		CNetwork::SendPacket(peer, CPacketsID::SUBMISSION_MISSION_SNAPSHOT_BEGIN, &beginPacket, sizeof(beginPacket), ENET_PACKET_FLAG_RELIABLE);
+
+		for (const auto& [submissionType, state] : ms_submissionMissionStates)
+		{
+			CSubmissionMissionPackets::SubmissionMissionSnapshotEntry entry{};
+			entry.submissionType = submissionType;
+			entry.active = state.active ? 1 : 0;
+			entry.stage = state.stage;
+			entry.progress = state.progress;
+			entry.timerMs = state.timerMs;
+			entry.rewardCash = state.rewardCash;
+			entry.currArea = state.currArea;
+			entry.stateTimestampMs = state.stateTimestampMs;
+			entry.stateVersion = state.stateVersion;
+			CNetwork::SendPacket(peer, CPacketsID::SUBMISSION_MISSION_SNAPSHOT_ENTRY, &entry, sizeof(entry), ENET_PACKET_FLAG_RELIABLE);
+		}
+
+		CSubmissionMissionPackets::SubmissionMissionSnapshotEnd endPacket{};
+		endPacket.snapshotVersion = ms_submissionMissionSnapshotVersion;
+		CNetwork::SendPacket(peer, CPacketsID::SUBMISSION_MISSION_SNAPSHOT_END, &endPacket, sizeof(endPacket), ENET_PACKET_FLAG_RELIABLE);
 	}
 	struct CutsceneSkipVoteState
 	{
@@ -540,6 +598,51 @@ public:
 
 			ms_propertySnapshotVersion++;
 			CNetwork::SendPacketToAll(CPacketsID::PROPERTY_STATE_DELTA, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
+		}
+	};
+
+	struct SubmissionMissionStateDelta : public CSubmissionMissionPackets::SubmissionMissionStateDelta
+	{
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost || size < (int)sizeof(CSubmissionMissionPackets::SubmissionMissionStateDelta))
+			{
+				return;
+			}
+
+			auto* packet = (CSubmissionMissionPackets::SubmissionMissionStateDelta*)data;
+			packet->submissionType = std::min<uint8_t>(packet->submissionType, CSubmissionMissionPackets::SUBMISSION_MISSION_TYPE_MAX - 1);
+			packet->action = std::min<uint8_t>(packet->action, CSubmissionMissionPackets::SUBMISSION_MISSION_ACTION_CLEAR);
+
+			if (packet->action == CSubmissionMissionPackets::SUBMISSION_MISSION_ACTION_CLEAR)
+			{
+				ms_submissionMissionStates.erase(packet->submissionType);
+			}
+			else
+			{
+				SubmissionMissionState state{};
+				state.submissionType = packet->submissionType;
+				state.active = packet->active ? 1 : 0;
+				state.stage = packet->stage;
+				state.progress = packet->progress;
+				state.timerMs = packet->timerMs;
+				state.rewardCash = packet->rewardCash;
+				state.currArea = packet->currArea;
+				state.stateTimestampMs = packet->stateTimestampMs;
+				state.stateVersion = packet->stateVersion;
+
+				auto it = ms_submissionMissionStates.find(packet->submissionType);
+				if (it != ms_submissionMissionStates.end() && state.stateVersion < it->second.stateVersion)
+				{
+					return;
+				}
+
+				ms_submissionMissionStates[packet->submissionType] = state;
+			}
+
+			ms_submissionMissionSnapshotVersion++;
+			CNetwork::SendPacketToAll(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
 

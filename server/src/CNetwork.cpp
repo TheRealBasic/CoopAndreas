@@ -171,6 +171,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_REQUEST, CPlayerPackets::PickupSnapshotRequest::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);
     CNetwork::AddListener(CPacketsID::PROPERTY_STATE_DELTA, CPlayerPackets::PropertyStateDelta::Handle);
+    CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, CPlayerPackets::SubmissionMissionStateDelta::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPlayerPackets::PlayerJetpackTransition::Handle);
     CNetwork::AddListener(CPacketsID::CHEAT_EFFECT_TRIGGER, CPlayerPackets::CheatEffectTriggerPacket::Handle);
 }
@@ -475,6 +476,7 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
     CPlayerPackets::SendMapStateSnapshot(peer);
     CPlayerPackets::SendMissionStateSnapshot(peer);
     CPlayerPackets::SendPropertyStateSnapshot(peer);
+    CPlayerPackets::SendSubmissionMissionStateSnapshot(peer);
 
     CFireSyncManager::SendSnapshotTo(peer, player->m_vecPosition);
 

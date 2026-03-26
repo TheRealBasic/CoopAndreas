@@ -95,6 +95,10 @@ enum CPacketsID : unsigned short
 	PROPERTY_STATE_SNAPSHOT_ENTRY,
 	PROPERTY_STATE_SNAPSHOT_END,
 	PROPERTY_STATE_DELTA,
+	SUBMISSION_MISSION_SNAPSHOT_BEGIN,
+	SUBMISSION_MISSION_SNAPSHOT_ENTRY,
+	SUBMISSION_MISSION_SNAPSHOT_END,
+	SUBMISSION_MISSION_STATE_DELTA,
 	PLAYER_JETPACK_TRANSITION,
 	CHEAT_EFFECT_TRIGGER,
 	PACKET_ID_MAX
@@ -196,6 +200,10 @@ public:
 			sizeof(PropertyStateSnapshotEntry), // PROPERTY_STATE_SNAPSHOT_ENTRY
 			sizeof(PropertyStateSnapshotEnd), // PROPERTY_STATE_SNAPSHOT_END
 			sizeof(PropertyStateDelta), // PROPERTY_STATE_DELTA
+			sizeof(SubmissionMissionSnapshotBegin), // SUBMISSION_MISSION_SNAPSHOT_BEGIN
+			sizeof(SubmissionMissionSnapshotEntry), // SUBMISSION_MISSION_SNAPSHOT_ENTRY
+			sizeof(SubmissionMissionSnapshotEnd), // SUBMISSION_MISSION_SNAPSHOT_END
+			sizeof(SubmissionMissionStateDelta), // SUBMISSION_MISSION_STATE_DELTA
 			sizeof(PlayerJetpackTransition), // PLAYER_JETPACK_TRANSITION
 			sizeof(CheatEffectTrigger), // CHEAT_EFFECT_TRIGGER
 		};
@@ -990,5 +998,45 @@ public:
 	struct PropertyStateDelta : public PropertyStateSnapshotEntry
 	{
 		uint8_t action; // 0 upsert, 1 remove/reset
+	};
+
+	enum eSubmissionMissionType : uint8_t
+	{
+		SUBMISSION_MISSION_TAXI = 0,
+		SUBMISSION_MISSION_FIREFIGHTER = 1,
+		SUBMISSION_MISSION_VIGILANTE = 2,
+		SUBMISSION_MISSION_PARAMEDIC = 3,
+		SUBMISSION_MISSION_PIMP = 4,
+		SUBMISSION_MISSION_FREIGHT_TRAIN = 5,
+		SUBMISSION_MISSION_TYPE_MAX = 6
+	};
+
+	struct SubmissionMissionSnapshotBegin
+	{
+		uint32_t snapshotVersion;
+		uint8_t submissionCount;
+	};
+
+	struct SubmissionMissionSnapshotEntry
+	{
+		uint8_t submissionType;
+		uint8_t active;
+		uint8_t stage;
+		uint16_t progress;
+		int32_t timerMs;
+		int32_t rewardCash;
+		uint8_t currArea;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct SubmissionMissionSnapshotEnd
+	{
+		uint32_t snapshotVersion;
+	};
+
+	struct SubmissionMissionStateDelta : public SubmissionMissionSnapshotEntry
+	{
+		uint8_t action; // 0 upsert, 1 clear
 	};
 };

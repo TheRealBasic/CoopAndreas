@@ -91,6 +91,7 @@ public:
 					CMissionSyncState::ProcessDeferredCutsceneStart();
 					CMissionSyncState::ProcessMissionAudioLoading();
 					CMissionSyncState::ProcessWidescreenPolicy();
+					CMissionSyncState::ProcessSubmissionMissionSync();
 
 					if (CLocalPlayer::m_bIsHost
 						&& CTheScripts::OnAMissionFlag

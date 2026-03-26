@@ -2592,3 +2592,27 @@ void CPacketHandler::PropertyStateDelta__Trigger(uint16_t propertyId, int ownerP
 	packet.action = action;
 	CNetwork::SendPacket(CPacketsID::PROPERTY_STATE_DELTA, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
+
+void CPacketHandler::SubmissionMissionSnapshotBegin__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::SubmissionMissionSnapshotBegin*)data;
+	CMissionSyncState::HandleSubmissionMissionSnapshotBegin(*packet);
+}
+
+void CPacketHandler::SubmissionMissionSnapshotEntry__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::SubmissionMissionSnapshotEntry*)data;
+	CMissionSyncState::HandleSubmissionMissionSnapshotEntry(*packet);
+}
+
+void CPacketHandler::SubmissionMissionSnapshotEnd__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::SubmissionMissionSnapshotEnd*)data;
+	CMissionSyncState::HandleSubmissionMissionSnapshotEnd(*packet);
+}
+
+void CPacketHandler::SubmissionMissionStateDelta__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::SubmissionMissionStateDelta*)data;
+	CMissionSyncState::HandleSubmissionMissionStateDelta(*packet);
+}

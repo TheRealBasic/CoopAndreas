@@ -444,6 +444,11 @@ void BuildAndSendOpcode()
         CMissionSyncState::EmitMissionFlowText((uint16_t)lastOpCodeProcessed, message);
     }
 
+    if (lastOpCodeProcessed == COMMAND_ADD_SCORE && scriptParamCount >= 2)
+    {
+        CMissionSyncState::TriggerSubmissionMissionRewardDelta(scriptParamsBuffer[1].value);
+    }
+
     memset(textParamBuffer, 0, sizeof textParamBuffer);
     memset(textLengthBuffer, 0, sizeof textLengthBuffer);
     scriptParamCount = 0;
