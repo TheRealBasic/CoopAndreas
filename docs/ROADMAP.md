@@ -146,7 +146,7 @@ Legend:
 ## Milestone: Launcher UX
 
 ### P1
-- [ ] Start/control server directly from launcher. **[P1][M]**
+- [x] Start/control server directly from launcher. **[P1][M]** ✅ Completed (2026-03-26).
 
 ## Milestone: Optional Content
 

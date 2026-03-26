@@ -108,6 +108,21 @@ xmake --build proxy
    - If the server is running on the same machine, use `127.0.0.1`
    - Default port: `6767`
 
+### Minimal launcher (first-time setup helper)
+
+Windows users can use a basic launcher UI that stores settings and helps start/stop local server + game:
+
+```bash
+python .\tools\launcher.py
+```
+
+Quick guide:
+- Fill in **Nickname**, **Host/IP** (`127.0.0.1` by default), **Port** (`6767` by default), and **GTA:SA path**.
+- Click **Start Local Server** to launch `server.exe` and view logs in the launcher.
+- Click **Stop Server** to terminate the local server process.
+- Click **Launch Game** to start `gta_sa.exe` (the launcher verifies `CoopAndreasSA.dll`, `eax.dll`, and compiled script output in `CoopAndreas/` first).
+- Settings are persisted to `tools/launcher_config.json` and auto-restored on next launch.
+
 
 ## Building (GNU/Linux)
 
