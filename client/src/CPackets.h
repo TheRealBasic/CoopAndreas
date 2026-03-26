@@ -26,6 +26,7 @@ enum CPacketsID : unsigned short
 	VEHICLE_COMPONENT_ADD,
 	VEHICLE_COMPONENT_REMOVE,
 	VEHICLE_PASSENGER_UPDATE,
+	VEHICLE_TRAILER_LINK_SYNC,
 	PLAYER_CHAT_MESSAGE,
 	PED_SPAWN,
 	PED_REMOVE,
@@ -113,6 +114,7 @@ public:
 			sizeof(VehicleComponentAdd), // VEHICLE_COMPONENT_ADD
 			sizeof(VehicleComponentRemove), // VEHICLE_COMPONENT_REMOVE
 			sizeof(VehiclePassengerUpdate), // VEHICLE_PASSENGER_UPDATE
+			sizeof(VehicleTrailerLinkSync), // VEHICLE_TRAILER_LINK_SYNC
 			sizeof(PlayerChatMessage), // PLAYER_CHAT_MESSAGE
 			sizeof(PedSpawn), // PED_SPAWN
 			sizeof(PedRemove), // PED_REMOVE
@@ -355,6 +357,24 @@ public:
 		unsigned char gamepadFlags;
 		signed char radioStation;
 		unsigned char radioState;
+	};
+
+	struct VehicleTrailerLinkSync
+	{
+		enum eDetachReason : uint8_t
+		{
+			DETACH_REASON_NONE = 0,
+			DETACH_REASON_MANUAL = 1,
+			DETACH_REASON_FORCE = 2,
+			DETACH_REASON_ENTITY_REMOVED = 3
+		};
+
+		int tractorVehicleId;
+		int trailerVehicleId;
+		uint8_t attachState;
+		uint8_t detachReason;
+		uint64_t timestampMs;
+		uint32_t linkVersion;
 	};
 
 	struct PlayerChatMessage

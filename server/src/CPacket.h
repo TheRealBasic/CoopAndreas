@@ -26,6 +26,7 @@ enum CPacketsID : unsigned short
 	VEHICLE_COMPONENT_ADD,
 	VEHICLE_COMPONENT_REMOVE,
 	VEHICLE_PASSENGER_UPDATE,
+	VEHICLE_TRAILER_LINK_SYNC,
 	PLAYER_CHAT_MESSAGE,
 	PED_SPAWN,
 	PED_REMOVE,
@@ -184,6 +185,30 @@ public:
 		int resolverPlayerId;
 		uint64_t stateTimestampMs;
 		uint32_t stateVersion;
+	};
+	#pragma pack()
+};
+
+class CTrailerLinkPackets
+{
+public:
+	#pragma pack(1)
+	enum eTrailerDetachReason : uint8_t
+	{
+		TRAILER_DETACH_REASON_NONE = 0,
+		TRAILER_DETACH_REASON_MANUAL = 1,
+		TRAILER_DETACH_REASON_FORCE = 2,
+		TRAILER_DETACH_REASON_ENTITY_REMOVED = 3
+	};
+
+	struct VehicleTrailerLinkSync
+	{
+		int tractorVehicleId;
+		int trailerVehicleId;
+		uint8_t attachState;
+		uint8_t detachReason;
+		uint64_t timestampMs;
+		uint32_t linkVersion;
 	};
 	#pragma pack()
 };

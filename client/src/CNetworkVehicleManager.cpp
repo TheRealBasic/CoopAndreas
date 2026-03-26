@@ -14,6 +14,7 @@ static std::unordered_map<int, size_t> s_vehicleModelRefs;
 static uint32_t s_lastVehicleStreamTick = 0;
 static uint32_t s_streamChurnWindowStart = 0;
 static size_t s_streamChurnCounter = 0;
+static std::vector<CPackets::VehicleTrailerLinkSync> s_pendingTrailerLinkEvents;
 
 namespace
 {
@@ -135,6 +136,8 @@ void CNetworkVehicleManager::UpdateIdle()
 
 void CNetworkVehicleManager::ProcessRemoteVehicles()
 {
+	ApplyPendingTrailerLinkEvents();
+
 	m_interpStats.bufferedSnapshots = 0;
 	m_interpStats.correctionCount = 0;
 	const uint32_t now = GetTickCount();
@@ -192,6 +195,56 @@ void CNetworkVehicleManager::ProcessRemoteVehicles()
 		const uint16_t interpHydraulicsTransitionSequence = (t < 0.5f) ? from.hydraulicsTransitionSequence : to.hydraulicsTransitionSequence;
 		vehicle->ApplyHydraulicsPacketState(interpHydraulicsControlState, 0, interpHydraulicsTransitionSequence, false);
 	}
+}
+
+void CNetworkVehicleManager::QueueTrailerLinkEvent(const CPackets::VehicleTrailerLinkSync& packet)
+{
+	s_pendingTrailerLinkEvents.push_back(packet);
+}
+
+void CNetworkVehicleManager::ApplyPendingTrailerLinkEvents()
+{
+	if (s_pendingTrailerLinkEvents.empty())
+		return;
+
+	std::stable_sort(s_pendingTrailerLinkEvents.begin(), s_pendingTrailerLinkEvents.end(),
+		[](const CPackets::VehicleTrailerLinkSync& a, const CPackets::VehicleTrailerLinkSync& b)
+		{
+			if (a.linkVersion != b.linkVersion)
+				return a.linkVersion < b.linkVersion;
+			if (a.timestampMs != b.timestampMs)
+				return a.timestampMs < b.timestampMs;
+			if (a.tractorVehicleId != b.tractorVehicleId)
+				return a.tractorVehicleId < b.tractorVehicleId;
+			return a.trailerVehicleId < b.trailerVehicleId;
+		});
+
+	for (const auto& packet : s_pendingTrailerLinkEvents)
+	{
+		CNetworkVehicle* tractor = CNetworkVehicleManager::GetVehicle(packet.tractorVehicleId);
+		CNetworkVehicle* trailer = CNetworkVehicleManager::GetVehicle(packet.trailerVehicleId);
+		if (!tractor || !trailer || !tractor->m_pVehicle || !trailer->m_pVehicle)
+			continue;
+		if (!CUtil::IsValidEntityPtr(tractor->m_pVehicle) || !CUtil::IsValidEntityPtr(trailer->m_pVehicle))
+			continue;
+
+		CVehicle* tractorEntity = tractor->m_pVehicle;
+		CVehicle* trailerEntity = trailer->m_pVehicle;
+		if (packet.attachState)
+		{
+			tractorEntity->m_pTrailer = trailerEntity;
+			trailerEntity->m_pTractor = tractorEntity;
+		}
+		else
+		{
+			if (tractorEntity->m_pTrailer == trailerEntity)
+				tractorEntity->m_pTrailer = nullptr;
+			if (trailerEntity->m_pTractor == tractorEntity)
+				trailerEntity->m_pTractor = nullptr;
+		}
+	}
+
+	s_pendingTrailerLinkEvents.clear();
 }
 
 void CNetworkVehicleManager::TickStreaming(uint32_t tickCount)
