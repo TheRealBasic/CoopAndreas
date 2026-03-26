@@ -1,40 +1,123 @@
 #include "stdafx.h"
 #include "CNetworkPickupManager.h"
 
-void CNetworkPickupManager::HandleCreate(const CPackets::PickupCreate& packet)
+namespace
 {
-	Pickup pickup{};
-	pickup.id = packet.pickupid;
-	pickup.type = packet.type;
-	pickup.category = packet.category;
-	pickup.position = packet.position;
-	pickup.modelId = packet.modelid;
-	pickup.collected = packet.collected;
-	pickup.respawnMs = packet.respawnMs;
-	pickup.amount = packet.amount;
-	pickup.weaponId = packet.weaponid;
-	pickup.ammo = packet.ammo;
-	ms_pickups[pickup.id] = pickup;
+	enum ePickupAction : uint8_t
+	{
+		PICKUP_ACTION_SPAWN = 0,
+		PICKUP_ACTION_COLLECT = 1,
+		PICKUP_ACTION_REMOVE = 2
+	};
 }
 
-void CNetworkPickupManager::HandleState(const CPackets::PickupStateChange& packet)
+void CNetworkPickupManager::UpsertFromSnapshotEntry(const CPackets::PickupSnapshotEntry& packet)
 {
-	auto it = ms_pickups.find(packet.pickupid);
+	Pickup pickup{};
+	pickup.networkId = packet.networkId;
+	pickup.type = packet.type;
+	pickup.category = packet.category;
+	pickup.origin = packet.origin;
+	pickup.flags = packet.flags;
+	pickup.position = packet.position;
+	pickup.modelId = packet.modelId;
+	pickup.isSpawned = packet.isSpawned;
+	pickup.isCollected = packet.isCollected;
+	pickup.collectorPlayerId = packet.collectorPlayerId;
+	pickup.stateTimestampMs = packet.stateTimestampMs;
+	pickup.stateVersion = packet.stateVersion;
+	pickup.respawnMs = packet.respawnMs;
+	pickup.amount = packet.amount;
+	pickup.weaponId = packet.weaponId;
+	pickup.ammo = packet.weaponAmmo;
+	ms_pickups[pickup.networkId] = pickup;
+}
+
+void CNetworkPickupManager::HandleSnapshotBegin(const CPackets::PickupSnapshotBegin& packet)
+{
+	ms_snapshotInProgress = true;
+	ms_pickups.clear();
+}
+
+void CNetworkPickupManager::HandleSnapshotEntry(const CPackets::PickupSnapshotEntry& packet)
+{
+	UpsertFromSnapshotEntry(packet);
+}
+
+void CNetworkPickupManager::HandleSnapshotEnd(const CPackets::PickupSnapshotEnd& packet)
+{
+	ms_snapshotInProgress = false;
+}
+
+void CNetworkPickupManager::HandleStateDelta(const CPackets::PickupStateDelta& packet)
+{
+	auto it = ms_pickups.find(packet.networkId);
 	if (it == ms_pickups.end())
+	{
+		if (packet.action != PICKUP_ACTION_REMOVE)
+		{
+			Pickup pickup{};
+			pickup.networkId = packet.networkId;
+			pickup.stateVersion = packet.stateVersion;
+			pickup.stateTimestampMs = packet.stateTimestampMs;
+			pickup.isSpawned = packet.isSpawned;
+			pickup.isCollected = packet.isCollected;
+			pickup.collectorPlayerId = packet.collectorPlayerId;
+			ms_pickups[pickup.networkId] = pickup;
+		}
+		return;
+	}
+
+	if (packet.stateVersion < it->second.stateVersion)
 	{
 		return;
 	}
 
-	it->second.collected = packet.collected;
-	if (!packet.collected)
+	if (packet.action == PICKUP_ACTION_REMOVE)
+	{
+		ms_pickups.erase(it);
+		return;
+	}
+
+	it->second.isSpawned = packet.isSpawned;
+	it->second.isCollected = packet.isCollected;
+	it->second.collectorPlayerId = packet.collectorPlayerId;
+	it->second.stateTimestampMs = packet.stateTimestampMs;
+	it->second.stateVersion = packet.stateVersion;
+	if (!packet.isCollected)
 	{
 		it->second.lastCollectAttemptTick = 0;
 	}
 }
 
+void CNetworkPickupManager::HandleDropCreate(const CPackets::PickupDropCreate& packet)
+{
+	UpsertFromSnapshotEntry(packet.pickup);
+}
+
+void CNetworkPickupManager::HandleDropResolve(const CPackets::PickupDropResolve& packet)
+{
+	auto it = ms_pickups.find(packet.networkId);
+	if (it == ms_pickups.end())
+	{
+		return;
+	}
+
+	if (packet.stateVersion < it->second.stateVersion)
+	{
+		return;
+	}
+
+	if (packet.action == PICKUP_ACTION_REMOVE || packet.action == PICKUP_ACTION_COLLECT)
+	{
+		ms_pickups.erase(it);
+		return;
+	}
+}
+
 void CNetworkPickupManager::Process()
 {
-	if (!CNetwork::m_bConnected)
+	if (!CNetwork::m_bConnected || ms_snapshotInProgress)
 	{
 		return;
 	}
@@ -49,7 +132,7 @@ void CNetworkPickupManager::Process()
 
 	for (auto& [id, pickup] : ms_pickups)
 	{
-		if (pickup.collected)
+		if (!pickup.isSpawned || pickup.isCollected)
 		{
 			continue;
 		}
@@ -69,9 +152,10 @@ void CNetworkPickupManager::Process()
 		}
 
 		CPackets::PickupCollectRequest request{};
-		request.pickupid = pickup.id;
-		request.playerid = CNetworkPlayerManager::m_nMyId;
+		request.networkId = pickup.networkId;
+		request.playerId = CNetworkPlayerManager::m_nMyId;
 		request.playerPosition = player->GetPosition();
+		request.knownStateVersion = pickup.stateVersion;
 		CNetwork::SendPacket(CPacketsID::PICKUP_COLLECT_REQUEST, &request, sizeof(request), ENET_PACKET_FLAG_RELIABLE);
 		pickup.lastCollectAttemptTick = now;
 	}
@@ -80,4 +164,5 @@ void CNetworkPickupManager::Process()
 void CNetworkPickupManager::Reset()
 {
 	ms_pickups.clear();
+	ms_snapshotInProgress = false;
 }

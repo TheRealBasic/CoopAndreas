@@ -23,14 +23,27 @@ public:
 		PICKUP_TYPE_CUSTOM = 3
 	};
 
+	enum ePickupFlags : uint8_t
+	{
+		PICKUP_FLAG_PERSISTENT = 1 << 0,
+		PICKUP_FLAG_RESPAWNABLE = 1 << 1,
+		PICKUP_FLAG_DROPPED = 1 << 2
+	};
+
 	struct Pickup
 	{
-		int id = -1;
+		uint32_t networkId = 0;
 		uint8_t type = PICKUP_TYPE_CUSTOM;
 		uint8_t category = 0;
+		uint8_t origin = CPickupStatePackets::PICKUP_ORIGIN_COLLECTIBLE;
+		uint8_t flags = 0;
 		CVector position{};
 		int modelId = 0;
-		bool collected = false;
+		bool isSpawned = true;
+		bool isCollected = false;
+		int collectorPlayerId = -1;
+		uint64_t stateTimestampMs = 0;
+		uint32_t stateVersion = 0;
 		uint32_t respawnMs = 0;
 		uint64_t collectedAtMs = 0;
 		int amount = 0;
@@ -38,59 +51,36 @@ public:
 		uint16_t weaponAmmo = 0;
 	};
 
-	static int CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs = 0, int amount = 0, uint8_t weaponId = 0, uint16_t weaponAmmo = 0);
+	static uint32_t CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs = 0, int amount = 0, uint8_t weaponId = 0, uint16_t weaponAmmo = 0, uint8_t origin = CPickupStatePackets::PICKUP_ORIGIN_COLLECTIBLE, uint8_t flags = PICKUP_FLAG_PERSISTENT | PICKUP_FLAG_RESPAWNABLE);
 	static void SendSnapshot(ENetPeer* peer);
-	static void HandleCollectRequest(ENetPeer* peer, int pickupId, const CVector& reportedPosition);
+	static void HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, const CVector& reportedPosition, uint32_t knownStateVersion);
 	static void ProcessRespawns();
 	static void CreateDropsForPlayerDeath(CPlayer* player);
 
 private:
-	static inline std::unordered_map<int, Pickup> ms_pickups{};
-	static inline int ms_nextPickupId = 1;
+	static inline std::unordered_map<uint32_t, Pickup> ms_pickups{};
+	static inline uint32_t ms_nextPickupId = 1;
+	static inline uint32_t ms_snapshotVersion = 1;
 
 	static uint64_t GetServerTimeMs();
-	static void BroadcastCreate(const Pickup& pickup);
-	static void BroadcastState(const Pickup& pickup, int collectorPlayerId);
+	static void UpdateStateMetadata(Pickup& pickup);
+	static CPickupStatePackets::PickupSnapshotEntry BuildSnapshotEntry(const Pickup& pickup);
+	static void BroadcastDelta(const Pickup& pickup, uint8_t action);
+	static void BroadcastDropCreate(const Pickup& pickup);
+	static void BroadcastDropResolve(const Pickup& pickup, uint8_t action, int resolverPlayerId);
 };
 
 class CPickupPackets
 {
 public:
-#pragma pack(1)
-	struct PickupCreate
+	struct PickupCollectRequest : public CPickupStatePackets::PickupCollectRequest
 	{
-		int pickupid;
-		uint8_t type;
-		uint8_t category;
-		CVector position;
-		int modelid;
-		bool collected;
-		uint32_t respawnMs;
-		int amount;
-		uint8_t weaponid;
-		uint16_t ammo;
-	};
-
-	struct PickupCollectRequest
-	{
-		int pickupid;
-		int playerid;
-		CVector playerPosition;
-
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			auto* packet = (PickupCollectRequest*)data;
-			CPickupManager::HandleCollectRequest(peer, packet->pickupid, packet->playerPosition);
+			auto* packet = (CPickupStatePackets::PickupCollectRequest*)data;
+			CPickupManager::HandleCollectRequest(peer, packet->networkId, packet->playerPosition, packet->knownStateVersion);
 		}
 	};
-
-	struct PickupStateChange
-	{
-		int pickupid;
-		bool collected;
-		int collectorPlayerId;
-	};
-#pragma pack()
 };
 
 #endif

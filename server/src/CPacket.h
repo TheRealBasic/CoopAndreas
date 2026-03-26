@@ -3,6 +3,9 @@
 #ifndef _CPACKET_H_
 	#define _CPACKET_H_
 
+#include "CVector.h"
+#include <cstdint>
+
 enum CPacketsID : unsigned short
 {
 	PLAYER_CONNECTED,
@@ -74,11 +77,99 @@ enum CPacketsID : unsigned short
 	TAG_UPDATE,
 	UPDATE_ALL_TAGS,
 	TELEPORT_PLAYER_SCRIPTED,
-	PICKUP_CREATE,
+	PICKUP_SNAPSHOT_BEGIN,
+	PICKUP_SNAPSHOT_ENTRY,
+	PICKUP_SNAPSHOT_END,
 	PICKUP_COLLECT_REQUEST,
-	PICKUP_STATE_CHANGE,
+	PICKUP_STATE_DELTA,
+	PICKUP_DROP_CREATE,
+	PICKUP_DROP_RESOLVE,
 	PACKET_ID_MAX
 };
 
+
+class CPickupStatePackets
+{
+public:
+	#pragma pack(1)
+	enum ePickupAction : uint8_t
+	{
+		PICKUP_ACTION_SPAWN = 0,
+		PICKUP_ACTION_COLLECT = 1,
+		PICKUP_ACTION_REMOVE = 2
+	};
+
+	enum ePickupOrigin : uint8_t
+	{
+		PICKUP_ORIGIN_COLLECTIBLE = 0,
+		PICKUP_ORIGIN_STATIC = 1,
+		PICKUP_ORIGIN_DROPPED = 2
+	};
+
+	struct PickupSnapshotBegin
+	{
+		uint32_t snapshotVersion;
+		uint32_t pickupCount;
+	};
+
+	struct PickupSnapshotEntry
+	{
+		uint32_t networkId;
+		uint8_t type;
+		uint8_t category;
+		uint8_t origin;
+		uint8_t flags;
+		CVector position;
+		int modelId;
+		int amount;
+		uint8_t weaponId;
+		uint16_t weaponAmmo;
+		uint32_t respawnMs;
+		bool isSpawned;
+		bool isCollected;
+		int collectorPlayerId;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct PickupSnapshotEnd
+	{
+		uint32_t snapshotVersion;
+	};
+
+	struct PickupCollectRequest
+	{
+		uint32_t networkId;
+		int playerId;
+		CVector playerPosition;
+		uint32_t knownStateVersion;
+	};
+
+	struct PickupStateDelta
+	{
+		uint32_t networkId;
+		uint8_t action;
+		bool isSpawned;
+		bool isCollected;
+		int collectorPlayerId;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct PickupDropCreate
+	{
+		PickupSnapshotEntry pickup;
+	};
+
+	struct PickupDropResolve
+	{
+		uint32_t networkId;
+		uint8_t action;
+		int resolverPlayerId;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+	#pragma pack()
+};
 
 #endif

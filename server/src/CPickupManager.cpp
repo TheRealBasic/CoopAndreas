@@ -13,69 +13,115 @@ uint64_t CPickupManager::GetServerTimeMs()
 	return (uint64_t)ms.count();
 }
 
-int CPickupManager::CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs, int amount, uint8_t weaponId, uint16_t weaponAmmo)
+void CPickupManager::UpdateStateMetadata(Pickup& pickup)
+{
+	pickup.stateTimestampMs = GetServerTimeMs();
+	pickup.stateVersion++;
+}
+
+CPickupStatePackets::PickupSnapshotEntry CPickupManager::BuildSnapshotEntry(const Pickup& pickup)
+{
+	CPickupStatePackets::PickupSnapshotEntry packet{};
+	packet.networkId = pickup.networkId;
+	packet.type = pickup.type;
+	packet.category = pickup.category;
+	packet.origin = pickup.origin;
+	packet.flags = pickup.flags;
+	packet.position = pickup.position;
+	packet.modelId = pickup.modelId;
+	packet.amount = pickup.amount;
+	packet.weaponId = pickup.weaponId;
+	packet.weaponAmmo = pickup.weaponAmmo;
+	packet.respawnMs = pickup.respawnMs;
+	packet.isSpawned = pickup.isSpawned;
+	packet.isCollected = pickup.isCollected;
+	packet.collectorPlayerId = pickup.collectorPlayerId;
+	packet.stateTimestampMs = pickup.stateTimestampMs;
+	packet.stateVersion = pickup.stateVersion;
+	return packet;
+}
+
+uint32_t CPickupManager::CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs, int amount, uint8_t weaponId, uint16_t weaponAmmo, uint8_t origin, uint8_t flags)
 {
 	Pickup pickup{};
-	pickup.id = ms_nextPickupId++;
+	pickup.networkId = ms_nextPickupId++;
 	pickup.type = type;
 	pickup.category = category;
+	pickup.origin = origin;
+	pickup.flags = flags;
 	pickup.position = position;
 	pickup.modelId = modelId;
 	pickup.respawnMs = respawnMs;
 	pickup.amount = std::max(0, amount);
 	pickup.weaponId = weaponId;
 	pickup.weaponAmmo = weaponAmmo;
+	pickup.isSpawned = true;
+	pickup.isCollected = false;
+	pickup.collectorPlayerId = -1;
+	UpdateStateMetadata(pickup);
 
-	ms_pickups[pickup.id] = pickup;
-	BroadcastCreate(pickup);
-	return pickup.id;
+	ms_pickups[pickup.networkId] = pickup;
+	ms_snapshotVersion++;
+	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_SPAWN);
+
+	if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
+	{
+		BroadcastDropCreate(pickup);
+	}
+
+	return pickup.networkId;
 }
 
-void CPickupManager::BroadcastCreate(const Pickup& pickup)
+void CPickupManager::BroadcastDelta(const Pickup& pickup, uint8_t action)
 {
-	CPickupPackets::PickupCreate packet{};
-	packet.pickupid = pickup.id;
-	packet.type = pickup.type;
-	packet.category = pickup.category;
-	packet.position = pickup.position;
-	packet.modelid = pickup.modelId;
-	packet.collected = pickup.collected;
-	packet.respawnMs = pickup.respawnMs;
-	packet.amount = pickup.amount;
-	packet.weaponid = pickup.weaponId;
-	packet.ammo = pickup.weaponAmmo;
-	CNetwork::SendPacketToAll(CPacketsID::PICKUP_CREATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
+	CPickupStatePackets::PickupStateDelta packet{};
+	packet.networkId = pickup.networkId;
+	packet.action = action;
+	packet.isSpawned = pickup.isSpawned;
+	packet.isCollected = pickup.isCollected;
+	packet.collectorPlayerId = pickup.collectorPlayerId;
+	packet.stateTimestampMs = pickup.stateTimestampMs;
+	packet.stateVersion = pickup.stateVersion;
+	CNetwork::SendPacketToAll(CPacketsID::PICKUP_STATE_DELTA, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
 }
 
-void CPickupManager::BroadcastState(const Pickup& pickup, int collectorPlayerId)
+void CPickupManager::BroadcastDropCreate(const Pickup& pickup)
 {
-	CPickupPackets::PickupStateChange packet{};
-	packet.pickupid = pickup.id;
-	packet.collected = pickup.collected;
-	packet.collectorPlayerId = collectorPlayerId;
-	CNetwork::SendPacketToAll(CPacketsID::PICKUP_STATE_CHANGE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
+	CPickupStatePackets::PickupDropCreate packet{};
+	packet.pickup = BuildSnapshotEntry(pickup);
+	CNetwork::SendPacketToAll(CPacketsID::PICKUP_DROP_CREATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
+}
+
+void CPickupManager::BroadcastDropResolve(const Pickup& pickup, uint8_t action, int resolverPlayerId)
+{
+	CPickupStatePackets::PickupDropResolve packet{};
+	packet.networkId = pickup.networkId;
+	packet.action = action;
+	packet.resolverPlayerId = resolverPlayerId;
+	packet.stateTimestampMs = pickup.stateTimestampMs;
+	packet.stateVersion = pickup.stateVersion;
+	CNetwork::SendPacketToAll(CPacketsID::PICKUP_DROP_RESOLVE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
 }
 
 void CPickupManager::SendSnapshot(ENetPeer* peer)
 {
+	CPickupStatePackets::PickupSnapshotBegin beginPacket{};
+	beginPacket.snapshotVersion = ms_snapshotVersion;
+	beginPacket.pickupCount = (uint32_t)ms_pickups.size();
+	CNetwork::SendPacket(peer, CPacketsID::PICKUP_SNAPSHOT_BEGIN, &beginPacket, sizeof(beginPacket), ENET_PACKET_FLAG_RELIABLE);
+
 	for (const auto& [id, pickup] : ms_pickups)
 	{
-		CPickupPackets::PickupCreate createPacket{};
-		createPacket.pickupid = id;
-		createPacket.type = pickup.type;
-		createPacket.category = pickup.category;
-		createPacket.position = pickup.position;
-		createPacket.modelid = pickup.modelId;
-		createPacket.collected = pickup.collected;
-		createPacket.respawnMs = pickup.respawnMs;
-		createPacket.amount = pickup.amount;
-		createPacket.weaponid = pickup.weaponId;
-		createPacket.ammo = pickup.weaponAmmo;
-		CNetwork::SendPacket(peer, CPacketsID::PICKUP_CREATE, &createPacket, sizeof(createPacket), ENET_PACKET_FLAG_RELIABLE);
+		auto entryPacket = BuildSnapshotEntry(pickup);
+		CNetwork::SendPacket(peer, CPacketsID::PICKUP_SNAPSHOT_ENTRY, &entryPacket, sizeof(entryPacket), ENET_PACKET_FLAG_RELIABLE);
 	}
+
+	CPickupStatePackets::PickupSnapshotEnd endPacket{};
+	endPacket.snapshotVersion = ms_snapshotVersion;
+	CNetwork::SendPacket(peer, CPacketsID::PICKUP_SNAPSHOT_END, &endPacket, sizeof(endPacket), ENET_PACKET_FLAG_RELIABLE);
 }
 
-void CPickupManager::HandleCollectRequest(ENetPeer* peer, int pickupId, const CVector& reportedPosition)
+void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, const CVector& reportedPosition, uint32_t knownStateVersion)
 {
 	auto* player = CPlayerManager::GetPlayer(peer);
 	if (!player)
@@ -90,7 +136,12 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, int pickupId, const CV
 	}
 
 	auto& pickup = it->second;
-	if (pickup.collected)
+	if (!pickup.isSpawned || pickup.isCollected)
+	{
+		return;
+	}
+
+	if (knownStateVersion != 0 && knownStateVersion != pickup.stateVersion)
 	{
 		return;
 	}
@@ -111,9 +162,21 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, int pickupId, const CV
 		return;
 	}
 
-	pickup.collected = true;
+	pickup.isCollected = true;
+	pickup.isSpawned = false;
+	pickup.collectorPlayerId = player->m_iPlayerId;
 	pickup.collectedAtMs = GetServerTimeMs();
-	BroadcastState(pickup, player->m_iPlayerId);
+	UpdateStateMetadata(pickup);
+	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT);
+
+	if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
+	{
+		pickup.flags &= ~PICKUP_FLAG_DROPPED;
+		UpdateStateMetadata(pickup);
+		BroadcastDropResolve(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT, player->m_iPlayerId);
+		ms_pickups.erase(it);
+		ms_snapshotVersion++;
+	}
 }
 
 void CPickupManager::ProcessRespawns()
@@ -121,7 +184,8 @@ void CPickupManager::ProcessRespawns()
 	const uint64_t nowMs = GetServerTimeMs();
 	for (auto& [id, pickup] : ms_pickups)
 	{
-		if (!pickup.collected || pickup.respawnMs == 0)
+		const bool isRespawnable = (pickup.flags & PICKUP_FLAG_RESPAWNABLE) != 0;
+		if (!pickup.isCollected || !isRespawnable || pickup.respawnMs == 0)
 		{
 			continue;
 		}
@@ -131,9 +195,12 @@ void CPickupManager::ProcessRespawns()
 			continue;
 		}
 
-		pickup.collected = false;
+		pickup.isSpawned = true;
+		pickup.isCollected = false;
+		pickup.collectorPlayerId = -1;
 		pickup.collectedAtMs = 0;
-		BroadcastState(pickup, -1);
+		UpdateStateMetadata(pickup);
+		BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_SPAWN);
 	}
 }
 
@@ -145,21 +212,22 @@ void CPickupManager::CreateDropsForPlayerDeath(CPlayer* player)
 	}
 
 	const CVector dropPos = player->m_vecPosition;
+	constexpr uint8_t droppedFlags = PICKUP_FLAG_DROPPED;
 
 	if (player->m_nMoney > 0)
 	{
 		int dropMoney = std::clamp(player->m_nMoney / 4, 50, 5000);
-		CreatePickup(PICKUP_TYPE_MONEY, 0, dropPos, 1212, 60000, dropMoney);
+		CreatePickup(PICKUP_TYPE_MONEY, 0, dropPos, 1212, 60000, dropMoney, 0, 0, CPickupStatePackets::PICKUP_ORIGIN_DROPPED, droppedFlags);
 	}
 
 	const bool isValidWeapon = (player->m_ucCurrentWeapon >= 22 && player->m_ucCurrentWeapon <= 46);
 	if (isValidWeapon && player->m_usCurrentAmmo > 0)
 	{
-		CreatePickup(PICKUP_TYPE_WEAPON, 0, dropPos, player->m_ucCurrentWeapon, 45000, 0, player->m_ucCurrentWeapon, player->m_usCurrentAmmo);
+		CreatePickup(PICKUP_TYPE_WEAPON, 0, dropPos, player->m_ucCurrentWeapon, 45000, 0, player->m_ucCurrentWeapon, player->m_usCurrentAmmo, CPickupStatePackets::PICKUP_ORIGIN_DROPPED, droppedFlags);
 	}
 
 	if (player->m_bHasJetpack)
 	{
-		CreatePickup(PICKUP_TYPE_JETPACK, 0, dropPos, 370, 90000);
+		CreatePickup(PICKUP_TYPE_JETPACK, 0, dropPos, 370, 90000, 0, 0, 0, CPickupStatePackets::PICKUP_ORIGIN_DROPPED, droppedFlags);
 	}
 }
