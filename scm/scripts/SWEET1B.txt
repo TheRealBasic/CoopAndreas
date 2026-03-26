@@ -5,6 +5,30 @@
 script_name 'SWEET1B'
 Coop.EnableSyncingThisScript()
 
+// CoopAndreas mission bootstrap reference scaffold for scm/scripts/*.txt:
+// 1) Keep Coop.EnableSyncingThisScript() at mission script start.
+// 2) Cache mission participants:
+//    $NETWORK_PLAYER[0], $NETWORK_PLAYER[1], $NETWORK_PLAYER[2] = Coop.CollectNetworkPlayersForTheMission()
+// 3) Guard remote actor operations with:
+//    for $temp_int = 0 to 2
+//        if
+//            Coop.IsNetworkPlayerActorValid($NETWORK_PLAYER[$temp_int])
+//        then
+//            // Coop.*ForNetworkPlayer(..., $NETWORK_PLAYER[$temp_int])
+//        end
+//    end
+// 4) After creating mission-critical peds/vehicles, wait until each has a network ID:
+//    $temp_int = Coop.GetPedNetworkId($ped_handle)
+//    while $temp_int == -1
+//        wait 0
+//        $temp_int = Coop.GetPedNetworkId($ped_handle)
+//    end
+//    $temp_int = Coop.GetVehicleNetworkId($vehicle_handle)
+//    while $temp_int == -1
+//        wait 0
+//        $temp_int = Coop.GetVehicleNetworkId($vehicle_handle)
+//    end
+
 gosub @SWEET1B_1079
 if 
   has_deatharrest_been_executed 
@@ -2978,4 +3002,3 @@ goto_if_false @SWEET1B_18385
 
 :SWEET1B_18385
 return 
-
