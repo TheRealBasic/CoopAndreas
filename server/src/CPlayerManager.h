@@ -574,7 +574,7 @@ public:
 	struct PlayerStats
 	{
 		int playerid;
-		float stats[14];
+		float stats[CPlayer::PLAYER_STATS_SYNCED_COUNT];
 		int money;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
@@ -593,6 +593,7 @@ public:
 		}
 	};
 	static_assert(sizeof(PlayerStats) == 64, "CPlayerPackets::PlayerStats layout mismatch");
+	static_assert(sizeof(PlayerStats::stats) == sizeof(CPlayer::m_afStats), "Player stats forwarding size mismatch");
 
 	struct RebuildPlayer
 	{

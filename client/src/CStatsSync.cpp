@@ -5,6 +5,7 @@ float m_afStoredFloatStats[83];
 
 constexpr int MAX_INT_STATS = sizeof(m_anStoredIntStats) / sizeof(int);
 constexpr int MAX_FLOAT_STATS = sizeof(m_afStoredFloatStats) / sizeof(float);
+static_assert(CStatsSync::SYNCED_STATS_COUNT == CPackets::PLAYER_STATS_SYNCED_COUNT, "Stats sync count must match packet payload capacity");
 
 std::array<eStats, CStatsSync::SYNCED_STATS_COUNT> CStatsSync::m_aeSyncedStats =
 {
@@ -18,11 +19,16 @@ std::array<eStats, CStatsSync::SYNCED_STATS_COUNT> CStatsSync::m_aeSyncedStats =
     STAT_SMG_SKILL,
     STAT_AK_47_SKILL,
     STAT_M4_SKILL,
-    STAT_RIFLE_SKILL
+    STAT_RIFLE_SKILL,
+    STAT_MAX_HEALTH,
+    STAT_STAMINA,
+    STAT_LUNG_CAPACITY
 };
 
 void CStatsSync::ApplyNetworkPlayerContext(CNetworkPlayer* player)
 {
+    m_nRemoteContextDepth++;
+
     for (int i = 0; i < MAX_INT_STATS; ++i)
         m_anStoredIntStats[i] = CStats::StatTypesInt[i];
 
@@ -43,11 +49,21 @@ void CStatsSync::ApplyLocalContext()
 
     for (int i = 0; i < MAX_FLOAT_STATS; ++i)
         CStats::StatTypesFloat[i] = m_afStoredFloatStats[i];
+
+    if (m_nRemoteContextDepth > 0)
+    {
+        m_nRemoteContextDepth--;
+    }
 }
 
 
 void CStatsSync::NotifyChanged()
 {
+    if (m_nRemoteContextDepth > 0)
+    {
+        return;
+    }
+
     CPackets::PlayerStats packet{};
     
     for (uint8_t i = 0; i < CStatsSync::SYNCED_STATS_COUNT; i++)
@@ -68,6 +84,11 @@ void CStatsSync::NotifyChanged()
 
 void CStatsSync::NotifyWantedLevelChanged()
 {
+    if (m_nRemoteContextDepth > 0)
+    {
+        return;
+    }
+
     if (!CNetwork::m_bConnected)
     {
         return;
@@ -93,6 +114,11 @@ void CStatsSync::NotifyWantedLevelChanged()
 
 void CStatsSync::TriggerWantedLevelReset()
 {
+    if (m_nRemoteContextDepth > 0)
+    {
+        return;
+    }
+
     if (!CNetwork::m_bConnected || m_nLastWantedLevelSent == 0)
     {
         return;

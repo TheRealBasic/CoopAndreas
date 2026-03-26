@@ -39,7 +39,7 @@ static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
     CKeySync::ApplyNetworkPlayerContext(player);
     CAimSync::ApplyNetworkPlayerContext(player);
     CWantedSync::ApplyNetworkPlayerContext(player);
-    //CStatsSync::ApplyNetworkPlayerContext(player);
+    CStatsSync::ApplyNetworkPlayerContext(player);
 
     //if (CPad::GetPad(0)->NewState.RightShoulder1) // is aiming
     //{
@@ -66,7 +66,7 @@ static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
     CKeySync::ApplyLocalContext();
     CAimSync::ApplyLocalContext();
     CWantedSync::ApplyLocalContext();
-    //CStatsSync::ApplyLocalContext();
+    CStatsSync::ApplyLocalContext();
 }
 
 static void __fastcall CWeapon__DoBulletImpact_Hook(CWeapon* weapon, SKIP_EDX, CEntity* owner, CEntity* victim, CVector* startPoint, CVector* endPoint, CColPoint* colPoint, int incrementalHit)

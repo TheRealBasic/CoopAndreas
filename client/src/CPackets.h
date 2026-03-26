@@ -94,6 +94,8 @@ enum CPacketsID : unsigned short
 class CPackets
 {
 public:
+	static constexpr uint8_t PLAYER_STATS_SYNCED_COUNT = 14;
+
 	static int GetPacketSize(CPacketsID id)
 	{
 		static std::array<int, PACKET_ID_MAX> m_nPacketSize =
@@ -553,7 +555,7 @@ public:
 	struct PlayerStats
 	{
 		int playerid;
-		float stats[14];
+		float stats[PLAYER_STATS_SYNCED_COUNT];
 		int money;
 	};
 	static_assert(sizeof(PlayerStats) == 64, "CPackets::PlayerStats layout mismatch");

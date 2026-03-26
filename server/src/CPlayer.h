@@ -7,11 +7,13 @@
 #include "CVector.h"
 #include "CNetwork.h"
 #include "CPacket.h"
+#include <cstddef>
 #include <string>
 class CPed;
 class CPlayer
 {
 	public:
+		static constexpr size_t PLAYER_STATS_SYNCED_COUNT = 14;
 		CPlayer(ENetPeer* peer, int playerid);
 
 		std::string GetName();
@@ -23,7 +25,7 @@ class CPlayer
 		unsigned char m_nSeatId = -1;
 		int m_nVehicleId = -1;
 		bool m_bCorrectVersion = false;
-		float m_afStats[14]{};
+		float m_afStats[PLAYER_STATS_SYNCED_COUNT]{};
 		int m_nMoney = 0;
 		unsigned int m_anModelKeys[10]{};
 		unsigned int m_anTextureKeys[18]{};
