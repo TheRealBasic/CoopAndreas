@@ -69,3 +69,31 @@ forn=Iterate network players (CoopAndreas)
 =        |
 =    end
 =end
+
+missionboot=Mission bootstrap scaffold (CoopAndreas)
+=script_name '{MISSION_NAME}'
+=Coop.EnableSyncingThisScript()
+=
+=$NETWORK_PLAYER[0], $NETWORK_PLAYER[1], $NETWORK_PLAYER[2] = Coop.CollectNetworkPlayersForTheMission()
+=
+=// Canonical guarded remote actor operations pattern
+=for $temp_int = 0 to 2
+=    if
+=        Coop.IsNetworkPlayerActorValid($NETWORK_PLAYER[$temp_int])
+=    then
+=        | // Coop.PrintNowForNetworkPlayer(..., $NETWORK_PLAYER[$temp_int])
+=    end
+=end
+=
+=// Wait until mission-critical entities get valid network IDs (-1 means not ready yet)
+=$temp_int = Coop.GetPedNetworkId({MISSION_PED})
+=while $temp_int == -1
+=    wait 0
+=    $temp_int = Coop.GetPedNetworkId({MISSION_PED})
+=end
+=
+=$temp_int = Coop.GetVehicleNetworkId({MISSION_VEHICLE})
+=while $temp_int == -1
+=    wait 0
+=    $temp_int = Coop.GetVehicleNetworkId({MISSION_VEHICLE})
+=end
