@@ -46,6 +46,7 @@ const SSyncedOpCode syncedOpcodes[] =
 {
     // Messages 
     {0x00BA}, // print_big {key} [gxt_key] {time} [int] {style} [TextStyle]
+    {0x00BC}, // print_now {key} [gxt_key] {time} [int] {drawImmediately} [bool]
     {0x00BE}, // clear_prints
     {0x01E3}, // print_with_number_big {key} [gxt_key] {num} [int] {duration} [int] {style}[TextStyle]
     {0x0318}, // register_mission_passed {key} [gxt_key]
@@ -82,6 +83,8 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x02EA}, // clear_cutscene
     
     // World
+    {0x00BF}, // get_time_of_day [var int] [var int]
+    {0x0417}, // start_mission {missionNumber} [int]
     {COMMAND_SET_TAG_STATUS_IN_AREA},
     {0x06F0, true, {eSyncedParamType::PED}}, // remove_char_from_group [Char]
     {0x06F5, true, {eSyncedParamType::PED}}, // add_char_to_group [Char] [Group]
@@ -127,6 +130,9 @@ const SSyncedOpCode syncedOpcodes[] =
 
     // Actors
     {0x00A1, true, {eSyncedParamType::PED}}, // set_char_coordinates [Char] {x} [float] {y} [float] {z} [float]
+    {0x00DF, true, {eSyncedParamType::PED}}, // is_char_in_any_car [Char]
+    {0x00FE, true, {eSyncedParamType::PED}}, // is_char_near_point_any_means_3d [Char] ...
+    {0x00FF, true, {eSyncedParamType::PED}}, // is_char_near_point_on_foot_3d [Char] ...
     {0x0173, true, {eSyncedParamType::PED}}, // set_char_heading [Char] {heading} [float]
     {0x0350, true, {eSyncedParamType::PED}}, // set_char_stay_in_same_place [Char] {state} [bool]
     {0x07A1}, // set_next_desired_move_state {moveState} [MoveState]
@@ -155,6 +161,8 @@ const SSyncedOpCode syncedOpcodes[] =
     
     // Controls
     {0x01B4, true, {eSyncedParamType::PLAYER}}, // set_player_control[Player] {state}[bool]
+    {0x0256, true, {eSyncedParamType::PLAYER}}, // is_player_playing [Player]
+    {0x03EE, true, {eSyncedParamType::PLAYER}}, // can_player_start_mission [Player]
     {COMMAND_ADD_SCORE, true, {eSyncedParamType::PLAYER}}
 };
 
