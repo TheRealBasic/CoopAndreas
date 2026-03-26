@@ -156,6 +156,8 @@ void CNetworkVehicle::CacheAuthoritativeState()
     m_cachedState.color2 = m_pVehicle->m_nSecondaryColor;
     m_cachedState.paintjob = m_nPaintJob;
     m_cachedState.locked = m_pVehicle->m_eDoorLock;
+    m_cachedState.hydraulicsControlState = m_hydraulicsState.controlState;
+    m_cachedState.hydraulicsTransitionSequence = m_hydraulicsState.transitionSequence;
 }
 
 void CNetworkVehicle::ApplyCachedStateToEntity()
@@ -178,6 +180,8 @@ void CNetworkVehicle::ApplyCachedStateToEntity()
     m_pVehicle->m_nPrimaryColor = m_cachedState.color1;
     m_pVehicle->m_nSecondaryColor = m_cachedState.color2;
     m_pVehicle->m_eDoorLock = m_cachedState.locked;
+    m_hydraulicsState.controlState = m_cachedState.hydraulicsControlState;
+    m_hydraulicsState.transitionSequence = m_cachedState.hydraulicsTransitionSequence;
     if (m_nPaintJob != m_cachedState.paintjob)
     {
         m_nPaintJob = m_cachedState.paintjob;
@@ -195,9 +199,56 @@ void CNetworkVehicle::ResetInterpolationFromCached()
     snapshot.velocity = m_cachedState.velocity;
     snapshot.turnSpeed = m_cachedState.turnSpeed;
     snapshot.health = m_cachedState.health;
+    snapshot.hydraulicsControlState = m_cachedState.hydraulicsControlState;
+    snapshot.hydraulicsTransitionSequence = m_cachedState.hydraulicsTransitionSequence;
     snapshot.arrivalTickMs = GetTickCount();
     snapshot.serverSequence = ++m_nSnapshotSequence;
     m_interpSnapshots.push_back(snapshot);
+}
+
+void CNetworkVehicle::BuildHydraulicsPacketState(CPad* pad, uint8_t& outControlState, uint8_t& outTransitionMask, uint16_t& outTransitionSequence)
+{
+    outControlState = 0;
+    if (pad)
+    {
+        if (pad->NewState.DPadUp > 0)
+            outControlState |= 1 << 0;
+        if (pad->NewState.DPadDown > 0)
+            outControlState |= 1 << 1;
+        if (pad->NewState.DPadLeft > 0)
+            outControlState |= 1 << 2;
+        if (pad->NewState.DPadRight > 0)
+            outControlState |= 1 << 3;
+        if (pad->NewState.ButtonSquare > 0)
+            outControlState |= 1 << 4;
+    }
+
+    outTransitionMask = m_lastSentHydraulicsControlState ^ outControlState;
+    if (outTransitionMask != 0)
+        ++m_lastSentHydraulicsTransitionSequence;
+    outTransitionSequence = m_lastSentHydraulicsTransitionSequence;
+    m_lastSentHydraulicsControlState = outControlState;
+}
+
+bool CNetworkVehicle::ApplyHydraulicsPacketState(uint8_t controlState, uint8_t transitionMask, uint16_t transitionSequence, bool forceApply)
+{
+    const uint32_t now = GetTickCount();
+    const bool staleTransition = transitionSequence < m_hydraulicsState.transitionSequence;
+    const bool sameControl = m_hydraulicsState.controlState == controlState;
+    const bool sameTransition = m_hydraulicsState.transitionSequence == transitionSequence;
+    const bool duplicatePulse = sameControl && sameTransition && transitionMask == 0;
+    const bool tooSoonDuplicate = sameControl && transitionMask == 0 && (now - m_hydraulicsState.lastAppliedTick) < 100;
+
+    if (!forceApply && (staleTransition || duplicatePulse || tooSoonDuplicate))
+        return false;
+
+    m_hydraulicsState.controlState = controlState;
+    m_hydraulicsState.transitionMask = transitionMask;
+    m_hydraulicsState.transitionSequence = transitionSequence;
+    m_hydraulicsState.lastAppliedTick = now;
+    m_cachedState.hydraulicsControlState = controlState;
+    m_cachedState.hydraulicsTransitionSequence = transitionSequence;
+    return true;
 }
 
 void CNetworkVehicle::SetPassengerSeatState(uint8_t seatId, const PassengerSeatState& state, bool applyToAudio)

@@ -26,6 +26,8 @@ public:
 		char paintjob = -1;
 		eDoorLock locked = DOORLOCK_UNLOCKED;
 		unsigned char driverPlayerId = 255;
+		uint8_t hydraulicsControlState = 0;
+		uint16_t hydraulicsTransitionSequence = 0;
 	};
 	struct InterpSnapshot
 	{
@@ -37,6 +39,15 @@ public:
 		float health = 1000.0f;
 		uint32_t serverSequence = 0;
 		uint32_t arrivalTickMs = 0;
+		uint8_t hydraulicsControlState = 0;
+		uint16_t hydraulicsTransitionSequence = 0;
+	};
+	struct HydraulicsState
+	{
+		uint8_t controlState = 0;
+		uint8_t transitionMask = 0;
+		uint16_t transitionSequence = 0;
+		uint32_t lastAppliedTick = 0;
 	};
 
 	struct PassengerSeatState
@@ -65,6 +76,9 @@ public:
 	std::deque<InterpSnapshot> m_interpSnapshots{};
 	uint32_t m_nSnapshotSequence = 0;
 	uint32_t m_nInterpCorrectionCount = 0;
+	HydraulicsState m_hydraulicsState{};
+	uint8_t m_lastSentHydraulicsControlState = 0;
+	uint16_t m_lastSentHydraulicsTransitionSequence = 0;
 
 	~CNetworkVehicle();
 	CNetworkVehicle(int vehicleid, int modelid, CVector pos, float rotation, unsigned char color1, unsigned char color2, unsigned char createdBy);
@@ -74,6 +88,8 @@ public:
 	void CacheAuthoritativeState();
 	void ApplyCachedStateToEntity();
 	void ResetInterpolationFromCached();
+	void BuildHydraulicsPacketState(CPad* pad, uint8_t& outControlState, uint8_t& outTransitionMask, uint16_t& outTransitionSequence);
+	bool ApplyHydraulicsPacketState(uint8_t controlState, uint8_t transitionMask, uint16_t transitionSequence, bool forceApply);
 	void SetPassengerSeatState(uint8_t seatId, const PassengerSeatState& state, bool applyToAudio);
 	void ClearPassengerSeatState(uint8_t seatId);
 	bool HasDriver();

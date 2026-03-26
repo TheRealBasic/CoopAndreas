@@ -389,6 +389,9 @@ CPackets::VehicleIdleUpdate* CPacketHandler::VehicleIdleUpdate__Collect(CNetwork
 	packet->color1 = vehicle->m_pVehicle->m_nPrimaryColor;
 	packet->color2 = vehicle->m_pVehicle->m_nSecondaryColor;
 	packet->health = vehicle->m_pVehicle->m_fHealth;
+	packet->hydraulicsControlState = vehicle->m_hydraulicsState.controlState;
+	packet->hydraulicsTransitionMask = 0;
+	packet->hydraulicsTransitionSequence = vehicle->m_hydraulicsState.transitionSequence;
 
 	if (CUtil::GetVehicleType(vehicle->m_pVehicle) == eVehicleType::VEHICLE_PLANE)
 	{
@@ -431,6 +434,8 @@ void CPacketHandler::VehicleIdleUpdate__Handle(void* data, int size)
 		plane->m_fLandingGearStatus = packet->planeGearState;
 	}
 
+	vehicle->ApplyHydraulicsPacketState(packet->hydraulicsControlState, packet->hydraulicsTransitionMask, packet->hydraulicsTransitionSequence, false);
+
 	vehicle->m_pVehicle->m_eDoorLock = (eDoorLock)packet->locked;
 }
 
@@ -440,6 +445,7 @@ CPackets::VehicleDriverUpdate* CPacketHandler::VehicleDriverUpdate__Collect(CNet
 {
 	CPackets::VehicleDriverUpdate* packet = new CPackets::VehicleDriverUpdate;
 	CPlayerPed* player = FindPlayerPed(0);
+	CPad* pad = player ? player->GetPadFromPlayer() : nullptr;
 
 	// vehicle data
 	packet->vehicleid =			vehicle->m_nVehicleId;
@@ -480,6 +486,9 @@ CPackets::VehicleDriverUpdate* CPacketHandler::VehicleDriverUpdate__Collect(CNet
 		CPlane* plane = (CPlane*)vehicle->m_pVehicle;
 		packet->planeGearState = plane->m_fLandingGearStatus;
 	}
+
+	vehicle->BuildHydraulicsPacketState(pad, packet->hydraulicsControlState, packet->hydraulicsTransitionMask, packet->hydraulicsTransitionSequence);
+	vehicle->ApplyHydraulicsPacketState(packet->hydraulicsControlState, packet->hydraulicsTransitionMask, packet->hydraulicsTransitionSequence, true);
 
 	packet->locked = vehicle->m_pVehicle->m_eDoorLock;
 
@@ -553,6 +562,8 @@ void CPacketHandler::VehicleDriverUpdate__Handle(void* data, int size)
 
 		plane->m_fLandingGearStatus = packet->planeGearState;
 	}
+
+	vehicle->ApplyHydraulicsPacketState(packet->hydraulicsControlState, packet->hydraulicsTransitionMask, packet->hydraulicsTransitionSequence, false);
 
 	vehicle->m_pVehicle->m_eDoorLock = (eDoorLock)packet->locked;
 }

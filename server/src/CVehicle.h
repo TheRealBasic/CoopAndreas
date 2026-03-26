@@ -18,6 +18,12 @@ class CVehicle
 			int8_t radioStation = -1;
 			uint8_t radioState = 0;
 		};
+		struct HydraulicsSyncState
+		{
+			uint8_t controlState = 0;
+			uint8_t transitionMask = 0;
+			uint16_t transitionSequence = 0;
+		};
 
 		CVehicle(int vehicleid, unsigned short model, CVector pos, float rot);
 		
@@ -35,6 +41,7 @@ class CVehicle
 		uint8_t m_nCreatedBy;
 		bool m_bUsedByPed = false;
 		PassengerSeatState m_passengerSeatState[8]{};
+		HydraulicsSyncState m_hydraulicsState{};
 
 		void ReassignSyncer(CPlayer* newSyncer);
 		void SetOccupant(uint8_t seatid, CPlayer* player);
