@@ -184,13 +184,14 @@ Legend:
 - [~] Property purchase sync. **[P2][M]** 🚧 In progress (2026-03-26).
   - **Status update (2026-03-26):** added server-authoritative property state cache + delta replication channel (`PROPERTY_STATE_*`) with late-join snapshot replay and host-migration resync broadcast; added QA checklist coverage for purchase/rejoin/late-join/post-migration parity.
 - [~] Submissions sync framework (`Taxi`, `Firefighter`, `Vigilante`, `Paramedic`, `Pimp`, `Freight Train`). **[P2][L]** 🚧 In progress (2026-03-26).
-  - **Shared sync layer:** ✅ host-authoritative generic submission mission state delta path (start/stop, stage/progress, timer, reward) with deterministic replication and late-join snapshot bootstrap.
-  - **Taxi:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
-  - **Firefighter:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
-  - **Vigilante:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
-  - **Paramedic:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
-  - **Pimp:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
-  - **Freight Train:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
+  - **Shared sync layer:** ✅ host-authoritative generic submission state module now tracks mode, level/stage, timer, progress, score/reward, pass/fail outcome, and participant count; supports reconnect/late-join snapshot hydration.
+  - **Taxi (pilot):** [~] validated as first integration path for start/stop, progression ticks, payout deltas, and pass/fail emission; awaiting QA matrix sign-off.
+  - **Firefighter:** [~] wired through generic adapter table (vehicle-role + shared progression/reward path); awaiting QA matrix sign-off.
+  - **Vigilante:** [~] wired through generic adapter table (vehicle-role + shared progression/reward path); awaiting QA matrix sign-off.
+  - **Paramedic:** [~] wired through generic adapter table (vehicle-role + shared progression/reward path); awaiting QA matrix sign-off.
+  - **Pimp:** [~] wired through generic adapter table (vehicle-role + shared progression/reward path); awaiting QA matrix sign-off.
+  - **Freight Train:** [~] wired through generic adapter table (vehicle-role + shared progression/reward path); awaiting QA matrix sign-off.
+  - **QA matrix:** ✅ added consolidated validation matrix at `docs/qa/submissions-sync-matrix.md` covering simultaneous start, fail/pass, reconnect, host migration, and anti-duplication checks.
 - [ ] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]**
 - [ ] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]**
 - [ ] Ammu-Nation challenge. **[P2][S]**

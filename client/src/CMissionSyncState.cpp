@@ -37,13 +37,19 @@ namespace
     {
         uint8_t submissionType = 0;
         uint8_t active = 0;
+        uint8_t level = 0;
         uint8_t stage = 0;
         uint16_t progress = 0;
         int32_t timerMs = 0;
+        int32_t score = 0;
         int32_t rewardCash = 0;
+        uint8_t outcome = 0;
+        uint8_t participantCount = 0;
         uint8_t currArea = 0;
         uint64_t stateTimestampMs = 0;
         uint32_t stateVersion = 0;
+        uint64_t startedAtMs = 0;
+        int32_t lastBroadcastSecond = -1;
     };
 
     std::unordered_map<uint8_t, SubmissionState> ms_submissionStates{};
@@ -88,45 +94,69 @@ namespace
         return ms_bMissionActive || ms_bCutsceneActive;
     }
 
+    struct SubmissionModeAdapter
+    {
+        uint8_t submissionType;
+        std::initializer_list<int> vehicleModels;
+    };
+
+    constexpr SubmissionModeAdapter kSubmissionAdapters[] = {
+        { CPackets::SUBMISSION_MISSION_TAXI, { MODEL_TAXI, MODEL_CABBIE } },
+        { CPackets::SUBMISSION_MISSION_FIREFIGHTER, { MODEL_FIRETRUK } },
+        { CPackets::SUBMISSION_MISSION_VIGILANTE, { MODEL_COPCARLA, MODEL_COPCARRU, MODEL_COPCARSF, MODEL_COPBIKE, MODEL_FBIRANCH, MODEL_ENFORCER, MODEL_RHINO } },
+        { CPackets::SUBMISSION_MISSION_PARAMEDIC, { MODEL_AMBULAN } },
+        { CPackets::SUBMISSION_MISSION_PIMP, { MODEL_BROADWAY } },
+        { CPackets::SUBMISSION_MISSION_FREIGHT_TRAIN, { MODEL_FREIGHT, MODEL_STREAK } }
+    };
+
     uint8_t ResolveSubmissionMissionTypeByVehicleModel(int modelId)
     {
-        switch (modelId)
+        for (const auto& adapter : kSubmissionAdapters)
         {
-        case MODEL_TAXI:
-        case MODEL_CABBIE:
-            return CPackets::SUBMISSION_MISSION_TAXI;
-        case MODEL_FIRETRUK:
-            return CPackets::SUBMISSION_MISSION_FIREFIGHTER;
-        case MODEL_AMBULAN:
-            return CPackets::SUBMISSION_MISSION_PARAMEDIC;
-        case MODEL_BROADWAY:
-            return CPackets::SUBMISSION_MISSION_PIMP;
-        case MODEL_FREIGHT:
-        case MODEL_STREAK:
-            return CPackets::SUBMISSION_MISSION_FREIGHT_TRAIN;
-        case MODEL_COPCARLA:
-        case MODEL_COPCARRU:
-        case MODEL_COPCARSF:
-        case MODEL_COPBIKE:
-        case MODEL_FBIRANCH:
-        case MODEL_ENFORCER:
-        case MODEL_RHINO:
-            return CPackets::SUBMISSION_MISSION_VIGILANTE;
-        default:
-            return CPackets::SUBMISSION_MISSION_TYPE_MAX;
+            for (int allowedModel : adapter.vehicleModels)
+            {
+                if (allowedModel == modelId)
+                {
+                    return adapter.submissionType;
+                }
+            }
         }
+
+        return CPackets::SUBMISSION_MISSION_TYPE_MAX;
     }
 
-    void EmitSubmissionMissionDelta(uint8_t submissionType, uint8_t action, uint8_t active, uint8_t stage, uint16_t progress, int32_t timerMs, int32_t rewardCash)
+    uint8_t CountVehicleParticipants(CVehicle* vehicle)
+    {
+        if (!vehicle)
+        {
+            return 0;
+        }
+
+        uint8_t participants = vehicle->m_pDriver ? 1 : 0;
+        for (int i = 0; i < vehicle->m_nMaxPassengers; ++i)
+        {
+            if (vehicle->m_apPassengers[i])
+            {
+                participants++;
+            }
+        }
+        return participants;
+    }
+
+    void EmitSubmissionMissionDelta(uint8_t submissionType, uint8_t action, const SubmissionState& state)
     {
         CPackets::SubmissionMissionStateDelta packet{};
         packet.submissionType = submissionType;
         packet.action = action;
-        packet.active = active;
-        packet.stage = stage;
-        packet.progress = progress;
-        packet.timerMs = timerMs;
-        packet.rewardCash = rewardCash;
+        packet.active = state.active;
+        packet.level = state.level;
+        packet.stage = state.stage;
+        packet.progress = state.progress;
+        packet.timerMs = state.timerMs;
+        packet.score = state.score;
+        packet.rewardCash = state.rewardCash;
+        packet.outcome = state.outcome;
+        packet.participantCount = state.participantCount;
         packet.currArea = static_cast<uint8_t>(CGame::currArea);
         packet.stateTimestampMs = GetTickCount64();
         packet.stateVersion = ++ms_submissionStateVersion;
@@ -353,21 +383,44 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
             if (it != ms_submissionStates.end() && it->second.active)
             {
                 it->second.active = 0;
-                EmitSubmissionMissionDelta(mode, 0, 0, it->second.stage, it->second.progress, 0, it->second.rewardCash);
+                it->second.timerMs = 0;
+                EmitSubmissionMissionDelta(mode, 0, it->second);
             }
             continue;
         }
 
         SubmissionState& state = ms_submissionStates[mode];
+        state.participantCount = CountVehicleParticipants(localPlayer->m_pVehicle);
+
         if (!state.active)
         {
             state.submissionType = mode;
             state.active = 1;
+            state.level = 1;
             state.stage = 1;
             state.progress = 0;
             state.timerMs = 0;
+            state.score = 0;
             state.rewardCash = 0;
-            EmitSubmissionMissionDelta(mode, 0, state.active, state.stage, state.progress, state.timerMs, state.rewardCash);
+            state.outcome = 0;
+            state.startedAtMs = GetTickCount64();
+            state.lastBroadcastSecond = -1;
+            EmitSubmissionMissionDelta(mode, 0, state);
+            continue;
+        }
+
+        if (state.startedAtMs == 0)
+        {
+            state.startedAtMs = GetTickCount64();
+        }
+
+        const int32_t elapsedMs = static_cast<int32_t>(GetTickCount64() - state.startedAtMs);
+        const int32_t elapsedSeconds = elapsedMs / 1000;
+        state.timerMs = std::max<int32_t>(0, elapsedMs);
+        if (elapsedSeconds != state.lastBroadcastSecond)
+        {
+            state.lastBroadcastSecond = elapsedSeconds;
+            EmitSubmissionMissionDelta(mode, 0, state);
         }
     }
 }
@@ -384,10 +437,14 @@ void CMissionSyncState::HandleSubmissionMissionSnapshotEntry(const CPackets::Sub
     SubmissionState state{};
     state.submissionType = packet.submissionType;
     state.active = packet.active;
+    state.level = packet.level;
     state.stage = packet.stage;
     state.progress = packet.progress;
     state.timerMs = packet.timerMs;
+    state.score = packet.score;
     state.rewardCash = packet.rewardCash;
+    state.outcome = packet.outcome;
+    state.participantCount = packet.participantCount;
     state.currArea = packet.currArea;
     state.stateTimestampMs = packet.stateTimestampMs;
     state.stateVersion = packet.stateVersion;
@@ -439,11 +496,36 @@ void CMissionSyncState::TriggerSubmissionMissionRewardDelta(int rewardDelta)
     SubmissionState& state = ms_submissionStates[submissionType];
     state.submissionType = submissionType;
     state.active = 1;
+    state.level = std::max<uint8_t>(state.level, 1);
     state.stage = std::max<uint8_t>(state.stage, 1);
     state.progress = static_cast<uint16_t>(std::min<int>(UINT16_MAX, static_cast<int>(state.progress) + 1));
+    state.score = std::max<int32_t>(0, state.score + rewardDelta);
     state.rewardCash += rewardDelta;
+    state.outcome = 0;
+    state.participantCount = CountVehicleParticipants(localPlayer->m_pVehicle);
     state.timerMs = std::max<int32_t>(0, state.timerMs);
-    EmitSubmissionMissionDelta(submissionType, 0, state.active, state.stage, state.progress, state.timerMs, state.rewardCash);
+    EmitSubmissionMissionDelta(submissionType, 0, state);
+}
+
+void CMissionSyncState::HandleSubmissionMissionOutcome(bool passed)
+{
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        return;
+    }
+
+    for (auto& [submissionType, state] : ms_submissionStates)
+    {
+        if (!state.active)
+        {
+            continue;
+        }
+
+        state.active = 0;
+        state.outcome = passed ? 1 : 2;
+        EmitSubmissionMissionDelta(submissionType, 0, state);
+        break;
+    }
 }
 
 bool CMissionSyncState::HandleNetworkSwitchWidescreen(bool enabled)
