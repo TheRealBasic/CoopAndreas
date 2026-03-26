@@ -167,6 +167,29 @@ const SSyncedOpCode syncedOpcodes[] =
 };
 
 
+
+static int FindSyncedOpcodeIndex(uint16_t opcode)
+{
+    for (int idx = 0; idx < ARRAY_SIZE(syncedOpcodes); idx++)
+    {
+        if (syncedOpcodes[idx].m_wOpCode == opcode)
+        {
+            return idx;
+        }
+    }
+
+    return -1;
+}
+
+static void VerifyStorylineParityOpcodeCoverage()
+{
+    const uint16_t requiredOpcodes[] = {0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0256, 0x03EE, 0x0417};
+    for (const auto opcode : requiredOpcodes)
+    {
+        assert(FindSyncedOpcodeIndex(opcode) != -1 && "Storyline parity opcode removed from synced opcode list");
+    }
+}
+
 static uint8_t textLengthBuffer[NUM_SYNCED_PARAMS];
 static char textParamBuffer[NUM_SYNCED_PARAMS][256];
 
@@ -246,10 +269,10 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
     {
         for (int i = 0; i < scriptParamCount; i++)
         {
-            if (syncedOpcodes[idx].m_bHasComplexParams && i < 4)
+            if (syncedOpcodes[syncedOpcodeIdx].m_bHasComplexParams && i < 4)
             {
                 //CChat::AddMessage("Parsing complex opcode %04x parameter %d...", header.opcode, i);
-                switch (syncedOpcodes[idx].m_aParamTypes[i])
+                switch (syncedOpcodes[syncedOpcodeIdx].m_aParamTypes[i])
                 {
                 case eSyncedParamType::PED:
                 {
@@ -482,26 +505,18 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
     textParamCount = header.stringParamCount;
     if (textParamCount > NUM_SYNCED_PARAMS) textParamCount = NUM_SYNCED_PARAMS;
 
+    const int syncedOpcodeIdx = FindSyncedOpcodeIndex(header.opcode);
+    if (syncedOpcodeIdx == -1)
+    {
+        return;
+    }
+
     if (scriptParamCount)
     {
         memcpy(scriptParamsBuffer, current, scriptParamCount * sizeof(int));
         current += scriptParamCount * sizeof(int);
 
-        int idx = 0;
-        bool found = false;
-        for (; idx < ARRAY_SIZE(syncedOpcodes); idx++)
-        {
-            if (syncedOpcodes[idx].m_wOpCode == header.opcode)
-            {
-                found = true;
-                break;
-            }
-        }
-
-        if(!found)
-            return;
-
-        if (syncedOpcodes[idx].m_bHasComplexParams)
+        if (syncedOpcodes[syncedOpcodeIdx].m_bHasComplexParams)
         {
             /*if (header.opcode == 0x0605)
                 CChat::AddMessage("Parsing complex opcode %04x...", header.opcode);*/
@@ -509,7 +524,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
             int max = min(scriptParamCount, 4);
             for (int i = 0; i < max; i++)
             {
-                switch (syncedOpcodes[idx].m_aParamTypes[i])
+                switch (syncedOpcodes[syncedOpcodeIdx].m_aParamTypes[i])
                 {
                 case eSyncedParamType::PED:
                 {
@@ -929,6 +944,7 @@ void __fastcall CRunningScript__ShutdownThisScript_Hook(CRunningScript* This, SK
 void COpCodeSync::Init()
 {
     CMissionSyncState::Init();
+    VerifyStorylineParityOpcodeCoverage();
     DWORD temp;
     injector::UnprotectMemory(0x464080, 5, temp);
     injector::UnprotectMemory(0x463D50, 6, temp);
