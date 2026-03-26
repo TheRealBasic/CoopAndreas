@@ -199,3 +199,56 @@ Legend:
 - [ ] Courier sets: LS/SF/LV routes. **[P2][M]**
 - [ ] Street Racing set (22 races). **[P2][L]**
 - [ ] Import / Export. **[P2][M]**
+
+
+## Optional Content Phased Rollout Plan
+
+Execution rule: implement **one phase at a time**. A phase is only marked `done` once all included modes pass the fixed acceptance criteria:
+- objective parity
+- fail/pass parity
+- reconnect parity
+- late-join parity
+
+### Phase grouping (open content)
+
+| Phase | Modes in scope | Required opcode/command focus | Required state transitions | QA checklist |
+| --- | --- | --- | --- | --- |
+| Schools | Driving, Flight, Bike, Boat | `Mission.LoadAndLaunchInternal`, `set_player_control`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-schools-checklist.md` |
+| Stadium events | 8-Track, Blood Bowl, Dirt Track, Kick Start | `Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-stadium-events-checklist.md` |
+| Hidden races | BMX, NRG-500, Chiliad Challenge | `Mission.LoadAndLaunchInternal`, `start_checkpoint_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-hidden-races-checklist.md` |
+| Courier routes | LS, SF, LV routes | `Mission.LoadAndLaunchInternal`, `create_pickup`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-courier-routes-checklist.md` |
+| Street races | Street Racing set (22 races) | `Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `task_car_drive_to_coord`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-street-races-checklist.md` |
+| Import/Export | Import/Export list sets and turn-ins | `Mission.LoadAndLaunchInternal`, `create_car`, `set_objective`, `set_player_money`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-import-export-checklist.md` |
+
+### Progress tracking (per-mode)
+
+Allowed status values: `not started`, `in progress`, `done`.
+
+| Phase | Mode | Status |
+| --- | --- | --- |
+| Schools | Driving school | not started |
+| Schools | Flight school | not started |
+| Schools | Bike school | not started |
+| Schools | Boat school | not started |
+| Stadium events | 8-Track | not started |
+| Stadium events | Blood Bowl | not started |
+| Stadium events | Dirt Track | not started |
+| Stadium events | Kick Start | not started |
+| Hidden races | BMX | not started |
+| Hidden races | NRG-500 | not started |
+| Hidden races | Chiliad Challenge | not started |
+| Courier routes | Los Santos courier | not started |
+| Courier routes | San Fierro courier | not started |
+| Courier routes | Las Venturas courier | not started |
+| Street races | Street Racing set (22 races) | not started |
+| Import/Export | Import/Export | not started |
+
+### Phase release-note cadence (for community testing)
+After completing each phase, publish a short release-note style update with:
+1. **What shipped:** mode list and notable sync behaviors.
+2. **Parity result:** objective/fail-pass/reconnect/late-join outcome.
+3. **Known issues:** top regressions or edge cases.
+4. **How to test:** one quick reproduction path + QA checklist link.
+
+Release-note log:
+- _No phase release notes published yet._
