@@ -26,3 +26,18 @@ jobs:
         
       - name: Build proxy
         run: xmake build proxy
+
+  opcode-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run opcode audit
+        run: python3 tools/opcode_audit.py --output artifacts/storyline-opcode-backlog.md --max-missing 9
+
+      - name: Upload opcode audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: opcode-audit-report
+          path: artifacts/storyline-opcode-backlog.md
