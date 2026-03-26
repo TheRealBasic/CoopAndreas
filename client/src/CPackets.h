@@ -80,6 +80,7 @@ enum CPacketsID : unsigned short
 	PICKUP_SNAPSHOT_BEGIN,
 	PICKUP_SNAPSHOT_ENTRY,
 	PICKUP_SNAPSHOT_END,
+	PICKUP_SNAPSHOT_REQUEST,
 	PICKUP_COLLECT_REQUEST,
 	PICKUP_STATE_DELTA,
 	PICKUP_DROP_CREATE,
@@ -166,6 +167,7 @@ public:
 			sizeof(PickupSnapshotBegin), // PICKUP_SNAPSHOT_BEGIN
 			sizeof(PickupSnapshotEntry), // PICKUP_SNAPSHOT_ENTRY
 			sizeof(PickupSnapshotEnd), // PICKUP_SNAPSHOT_END
+			sizeof(PickupSnapshotRequest), // PICKUP_SNAPSHOT_REQUEST
 			sizeof(PickupCollectRequest), // PICKUP_COLLECT_REQUEST
 			sizeof(PickupStateDelta), // PICKUP_STATE_DELTA
 			sizeof(PickupDropCreate), // PICKUP_DROP_CREATE
@@ -768,6 +770,13 @@ public:
 	struct PickupSnapshotEnd
 	{
 		uint32_t snapshotVersion;
+	};
+
+	struct PickupSnapshotRequest
+	{
+		int requesterPlayerId;
+		uint32_t clientSnapshotVersion;
+		uint8_t reason;
 	};
 
 	struct PickupCollectRequest

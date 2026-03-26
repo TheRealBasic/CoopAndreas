@@ -42,6 +42,26 @@ class CPlayerPackets
 {
 public:
 	CPlayerPackets();
+	static void SendPickupBootstrap(ENetPeer* peer)
+	{
+		if (!peer)
+		{
+			return;
+		}
+
+		CPickupManager::SendSnapshot(peer);
+	}
+
+	static void BroadcastPickupBootstrapResync()
+	{
+		for (auto* player : CPlayerManager::m_pPlayers)
+		{
+			if (player && player->m_pPeer)
+			{
+				SendPickupBootstrap(player->m_pPeer);
+			}
+		}
+	}
 	struct CutsceneSkipVoteState
 	{
 		bool active = false;
@@ -198,6 +218,19 @@ public:
 		int id;
 		ePlayerDisconnectReason reason;
 		uint32_t version;
+	};
+
+	struct PickupSnapshotRequest : public CPickupStatePackets::PickupSnapshotRequest
+	{
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			if (!CPlayerManager::GetPlayer(peer))
+			{
+				return;
+			}
+
+			SendPickupBootstrap(peer);
+		}
 	};
 
 #pragma pack(1)

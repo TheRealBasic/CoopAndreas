@@ -36,6 +36,7 @@ void CNetworkPickupManager::UpsertFromSnapshotEntry(const CPackets::PickupSnapsh
 void CNetworkPickupManager::HandleSnapshotBegin(const CPackets::PickupSnapshotBegin& packet)
 {
 	ms_snapshotInProgress = true;
+	ms_snapshotReadyForInteraction = false;
 	ms_pickups.clear();
 }
 
@@ -47,6 +48,7 @@ void CNetworkPickupManager::HandleSnapshotEntry(const CPackets::PickupSnapshotEn
 void CNetworkPickupManager::HandleSnapshotEnd(const CPackets::PickupSnapshotEnd& packet)
 {
 	ms_snapshotInProgress = false;
+	ms_snapshotReadyForInteraction = true;
 }
 
 void CNetworkPickupManager::HandleStateDelta(const CPackets::PickupStateDelta& packet)
@@ -117,7 +119,7 @@ void CNetworkPickupManager::HandleDropResolve(const CPackets::PickupDropResolve&
 
 void CNetworkPickupManager::Process()
 {
-	if (!CNetwork::m_bConnected || ms_snapshotInProgress)
+	if (!CNetwork::m_bConnected || ms_snapshotInProgress || !ms_snapshotReadyForInteraction)
 	{
 		return;
 	}
@@ -165,4 +167,17 @@ void CNetworkPickupManager::Reset()
 {
 	ms_pickups.clear();
 	ms_snapshotInProgress = false;
+	ms_snapshotReadyForInteraction = false;
+}
+
+void CNetworkPickupManager::BeginResync()
+{
+	ms_snapshotInProgress = true;
+	ms_snapshotReadyForInteraction = false;
+	ms_pickups.clear();
+}
+
+bool CNetworkPickupManager::IsReadyForInteraction()
+{
+	return ms_snapshotReadyForInteraction && !ms_snapshotInProgress;
 }

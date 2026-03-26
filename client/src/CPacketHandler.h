@@ -93,4 +93,5 @@ public:
 	static void PickupStateDelta__Handle(void* data, int size);
 	static void PickupDropCreate__Handle(void* data, int size);
 	static void PickupDropResolve__Handle(void* data, int size);
+	static void PickupSnapshotResync__Trigger(uint8_t reason);
 };
