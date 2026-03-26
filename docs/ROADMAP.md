@@ -9,7 +9,7 @@ Legend:
 ## Milestone: Core Sync Stability
 
 ### P0 (must-have)
-- [ ] **Pickups sync** — collectibles, static pickups, and dropped pickups (`money`, `weapons`). **[P0][L]**
+- [x] **Pickups sync** — collectibles, static pickups, and dropped pickups (`money`, `weapons`). **[P0][L]** ✅ Completed (2026-03-26).
   - **Acceptance criteria:** pickup state changes persist across reconnects for all connected peers and late joiners.
   - **Acceptance criteria:** collectible categories (graffiti/horseshoes/snapshots/oysters) do not duplicate or respawn incorrectly after host migration/rejoin.
   - **Acceptance criteria:** dropped money/weapons appear, can be collected once, and are removed consistently across at least 2 peers.
@@ -19,7 +19,7 @@ Legend:
 - [x] **Passenger sync completion** (`gamepad support`, `radio sync`). **[P0][M]** ✅ Completed (2026-03-25).
   - **Acceptance criteria:** controller inputs map correctly for non-driver passenger actions on all clients.
   - **Acceptance criteria:** radio station selection/state stays consistent for driver + passengers across 2+ peers.
-- [ ] **Vehicle sync completion** (`force hydraulics sync`, `trailer sync`). **[P0][L]**
+- [x] **Vehicle sync completion** (`force hydraulics sync`, `trailer sync`). **[P0][L]** ✅ Completed (2026-03-26).
   - **Acceptance criteria:** hydraulic state transitions replicate reliably without visual divergence.
   - **Acceptance criteria:** trailer attach/detach and trailer physics state remain consistent across 2+ peers over 5+ minutes.
 - [x] **NPC sync completion** (`in vehicle: horn/siren`, `aim`, `shots`, `task sync`). **[P0][L]** ✅ Completed (2026-03-25).
