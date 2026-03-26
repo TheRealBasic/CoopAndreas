@@ -1109,15 +1109,6 @@ public:
 		}
 	};
 
-	#pragma pack(push, 1)
-	struct OpCodeSyncHeader
-	{
-		uint16_t opcode;
-		uint16_t intParamCount;
-		uint16_t stringParamCount;
-	};
-	#pragma pack(pop)
-
 	static bool IsHostAuthoritativeOpcode(uint16_t opcode)
 	{
 		switch (opcode)
@@ -1127,9 +1118,18 @@ public:
 		case 0x00DF: // Char.IsInAnyCar
 		case 0x00FE: // Char.LocateAnyMeans3D
 		case 0x00FF: // Char.LocateOnFoot3D
+		case 0x0164: // Blip.Remove
 		case 0x0256: // Player.IsPlaying
+		case 0x02A7: // Blip.AddSpriteForContactPoint
+		case 0x03C0: // Char.StoreCarIsInNoSave
 		case 0x03EE: // Player.CanStartMission
 		case 0x0417: // Mission.LoadAndLaunchInternal
+		case 0x0629: // Stat.SetInt
+		case 0x0652: // Stat.GetInt
+		case 0x0811: // Char.GetCarIsUsing
+		case 0x08EC: // Car.GetClass
+		case 0x0956: // Game.FindMaxNumberOfGroupMembers
+		case 0x096E: // Car.IsLowRider
 			return true;
 		default:
 			return false;
@@ -1141,16 +1141,33 @@ public:
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
 			auto* player = CPlayerManager::GetPlayer(peer);
-			if (!player || !data || size < (int)sizeof(OpCodeSyncHeader))
+			if (!player || !data || size < (int)sizeof(COpCodePackets::OpCodeSyncHeader))
 			{
 				return;
 			}
 
-			auto* packet = (OpCodeSyncHeader*)data;
-			const int expectedMinSize = (int)sizeof(OpCodeSyncHeader)
+			auto* packet = (COpCodePackets::OpCodeSyncHeader*)data;
+			const int expectedMinSize = (int)sizeof(COpCodePackets::OpCodeSyncHeader)
 				+ (int)packet->intParamCount * (int)sizeof(int)
 				+ (int)packet->stringParamCount * (int)sizeof(uint8_t);
 			if (expectedMinSize > size)
+			{
+				return;
+			}
+
+			const int stringMetaOffset = (int)sizeof(COpCodePackets::OpCodeSyncHeader) + (int)packet->intParamCount * (int)sizeof(int);
+			const uint8_t* stringLengths = (const uint8_t*)((const uint8_t*)data + stringMetaOffset);
+			int expectedSize = expectedMinSize;
+			for (uint16_t i = 0; i < packet->stringParamCount; i++)
+			{
+				expectedSize += (int)stringLengths[i];
+				if (expectedSize > size)
+				{
+					return;
+				}
+			}
+
+			if (expectedSize != size)
 			{
 				return;
 			}
