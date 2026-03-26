@@ -1825,6 +1825,18 @@ void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 
 }
 
+void CPacketHandler::MissionFlowSync__Handle(void* data, int size)
+{
+	if (CLocalPlayer::m_bIsHost)
+		return;
+
+	if (size < (int)sizeof(CPackets::MissionFlowSync))
+		return;
+
+	CPackets::MissionFlowSync* packet = (CPackets::MissionFlowSync*)data;
+	CMissionSyncState::HandleMissionFlowSync(*packet);
+}
+
 void CPacketHandler::OnMissionFlagSync__Trigger()
 {
 	if (!CLocalPlayer::m_bIsHost)

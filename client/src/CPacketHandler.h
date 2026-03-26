@@ -66,6 +66,7 @@ public:
 	static void OpCodeSync__Handle(void* data, int size);
 	static void OnMissionFlagSync__Handle(void* data, int size);
 	static void OnMissionFlagSync__Trigger();
+	static void MissionFlowSync__Handle(void* data, int size);
 	static void UpdateEntityBlip__Handle(void* data, int size);
 	static void RemoveEntityBlip__Handle(void* data, int size);
 	static void AddMessageGXT__Handle(void* data, int size);

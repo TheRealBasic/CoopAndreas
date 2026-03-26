@@ -53,6 +53,7 @@ enum CPacketsID : unsigned short
 	CUTSCENE_SKIP_VOTE_UPDATE,
 	OPCODE_SYNC,
 	ON_MISSION_FLAG_SYNC,
+	MISSION_FLOW_SYNC,
 	UPDATE_ENTITY_BLIP,
 	REMOVE_ENTITY_BLIP,
 	ADD_MESSAGE_GXT,
@@ -148,6 +149,7 @@ public:
 			sizeof(CutsceneSkipVoteUpdate), // CUTSCENE_SKIP_VOTE_UPDATE,
 			0, // OPCODE_SYNC,
 			sizeof(OnMissionFlagSync), // ON_MISSION_FLAG_SYNC,
+			sizeof(MissionFlowSync), // MISSION_FLOW_SYNC,
 			sizeof(UpdateEntityBlip), // UPDATE_ENTITY_BLIP,
 			sizeof(RemoveEntityBlip), // REMOVE_ENTITY_BLIP,
 			sizeof(AddMessageGXT), // ADD_MESSAGE_GXT,
@@ -636,6 +638,29 @@ public:
 	struct OnMissionFlagSync 
 	{
 		uint8_t bOnMission : 1;
+	};
+
+	enum eMissionFlowEventType : uint8_t
+	{
+		MISSION_FLOW_EVENT_NONE = 0,
+		MISSION_FLOW_EVENT_CUTSCENE_TRIGGER = 1,
+		MISSION_FLOW_EVENT_OBJECTIVE = 2,
+		MISSION_FLOW_EVENT_FAIL = 3,
+		MISSION_FLOW_EVENT_PASS = 4
+	};
+
+	struct MissionFlowSync
+	{
+		uint8_t eventType = MISSION_FLOW_EVENT_NONE;
+		uint8_t messageType = 0; // mirrors AddMessageGXT::type
+		uint32_t time = 0;
+		uint8_t flag = 0;
+		uint8_t currArea = 0;
+		uint8_t onMission = 0;
+		uint8_t replay = 0; // server-generated replay for reconnecting peers
+		uint32_t sequence = 0;
+		char gxt[8]{};
+		char cutsceneName[8]{};
 	};
 
 	struct UpdateEntityBlip

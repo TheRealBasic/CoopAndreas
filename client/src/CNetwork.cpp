@@ -159,6 +159,7 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::CUTSCENE_SKIP_VOTE_UPDATE, CPacketHandler::CutsceneSkipVoteUpdate__Handle);
 	CNetwork::AddListener(CPacketsID::OPCODE_SYNC, CPacketHandler::OpCodeSync__Handle);
 	CNetwork::AddListener(CPacketsID::ON_MISSION_FLAG_SYNC, CPacketHandler::OnMissionFlagSync__Handle);
+	CNetwork::AddListener(CPacketsID::MISSION_FLOW_SYNC, CPacketHandler::MissionFlowSync__Handle);
 	CNetwork::AddListener(CPacketsID::UPDATE_ENTITY_BLIP, CPacketHandler::UpdateEntityBlip__Handle);
 	CNetwork::AddListener(CPacketsID::REMOVE_ENTITY_BLIP, CPacketHandler::RemoveEntityBlip__Handle);
 	CNetwork::AddListener(CPacketsID::ADD_MESSAGE_GXT, CPacketHandler::AddMessageGXT__Handle);

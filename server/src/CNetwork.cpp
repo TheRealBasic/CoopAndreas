@@ -141,6 +141,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::SKIP_CUTSCENE, CPlayerPackets::SkipCutscene::Handle);
     CNetwork::AddListener(CPacketsID::OPCODE_SYNC, CPlayerPackets::OpCodeSync::Handle);
     CNetwork::AddListener(CPacketsID::ON_MISSION_FLAG_SYNC, CPlayerPackets::OnMissionFlagSync::Handle);
+    CNetwork::AddListener(CPacketsID::MISSION_FLOW_SYNC, CPlayerPackets::MissionFlowSync::Handle);
     CNetwork::AddListener(CPacketsID::UPDATE_ENTITY_BLIP, CPlayerPackets::UpdateEntityBlip::Handle);
     CNetwork::AddListener(CPacketsID::REMOVE_ENTITY_BLIP, CPlayerPackets::RemoveEntityBlip::Handle);
     CNetwork::AddListener(CPacketsID::ADD_MESSAGE_GXT, CPlayerPackets::AddMessageGXT::Handle);
@@ -470,6 +471,7 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
     }
 
     CPlayerPackets::SendMapStateSnapshot(peer);
+    CPlayerPackets::SendMissionStateSnapshot(peer);
 
     CFireSyncManager::SendSnapshotTo(peer, player->m_vecPosition);
 

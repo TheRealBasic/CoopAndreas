@@ -1,8 +1,17 @@
 #pragma once
+#include "CPackets.h"
 
 class CMissionSyncState
 {
 public:
+    struct HostTextMessage
+    {
+        uint8_t messageType;
+        uint32_t time;
+        uint8_t flag;
+        const char* gxt;
+    };
+
     static void Init();
 
     static bool IsProcessingTaskSequence();
@@ -16,6 +25,9 @@ public:
     static void ProcessWidescreenPolicy();
 
     static void HandleMissionFlagSync(bool onMission);
+    static void EmitMissionFlowCutsceneTrigger(const char* cutsceneName, uint8_t currArea);
+    static void EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message);
+    static void HandleMissionFlowSync(const CPackets::MissionFlowSync& packet);
     static bool HandleNetworkSwitchWidescreen(bool enabled);
 
     static bool HandleEndSceneSkip();

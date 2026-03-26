@@ -50,6 +50,7 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x00BE}, // clear_prints
     {0x01E3}, // print_with_number_big {key} [gxt_key] {num} [int] {duration} [int] {style}[TextStyle]
     {0x0318}, // register_mission_passed {key} [gxt_key]
+    {0x045C}, // fail_current_mission
     {0x03E5}, // print_help {key} [gxt_key]
     {0x054C}, // load_mission_text {tableName} [string]
     {0x0998}, // award_player_mission_respect {value} [int]
@@ -183,7 +184,7 @@ static int FindSyncedOpcodeIndex(uint16_t opcode)
 
 static void VerifyStorylineParityOpcodeCoverage()
 {
-    const uint16_t requiredOpcodes[] = {0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0256, 0x03EE, 0x0417};
+    const uint16_t requiredOpcodes[] = {0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0256, 0x03EE, 0x0417, 0x045C};
     for (const auto opcode : requiredOpcodes)
     {
         assert(FindSyncedOpcodeIndex(opcode) != -1 && "Storyline parity opcode removed from synced opcode list");
@@ -420,6 +421,28 @@ void BuildAndSendOpcode()
     std::vector<uint8_t> buffer = COpCodeSync::SerializeOpcode(idx, dataSize);
 
     CNetwork::SendPacket(CPacketsID::OPCODE_SYNC, buffer.data(), dataSize, ENET_PACKET_FLAG_RELIABLE);
+
+    if (textParamCount > 0)
+    {
+        if (lastOpCodeProcessed == 0x00BA || lastOpCodeProcessed == 0x00BC || lastOpCodeProcessed == 0x0318 || lastOpCodeProcessed == 0x03E5)
+        {
+            CMissionSyncState::HostTextMessage message{};
+            message.gxt = textParamBuffer[0];
+            message.time = (scriptParamCount > 0) ? (uint32_t)scriptParamsBuffer[0].value : 0;
+            message.flag = (scriptParamCount > 1) ? (uint8_t)scriptParamsBuffer[1].value : 0;
+            message.messageType = (lastOpCodeProcessed == 0x00BA) ? 1 : (lastOpCodeProcessed == 0x00BC ? 2 : (lastOpCodeProcessed == 0x03E5 ? 3 : 0));
+            CMissionSyncState::EmitMissionFlowText((uint16_t)lastOpCodeProcessed, message);
+        }
+    }
+    else if (lastOpCodeProcessed == 0x045C)
+    {
+        CMissionSyncState::HostTextMessage message{};
+        message.gxt = "";
+        message.messageType = 2;
+        message.time = 4000;
+        message.flag = 1;
+        CMissionSyncState::EmitMissionFlowText((uint16_t)lastOpCodeProcessed, message);
+    }
 
     memset(textParamBuffer, 0, sizeof textParamBuffer);
     memset(textLengthBuffer, 0, sizeof textLengthBuffer);

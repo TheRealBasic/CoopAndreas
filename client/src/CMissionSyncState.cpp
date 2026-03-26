@@ -2,6 +2,7 @@
 #include "CMissionSyncState.h"
 
 #include "CCutsceneMgr.h"
+#include "CNetwork.h"
 
 namespace
 {
@@ -27,6 +28,7 @@ namespace
     uint32_t ms_nWidescreenEventId = 1;
     uint32_t ms_nLastAppliedWidescreenEventId = 0;
     bool ms_bLastAppliedWidescreenValue = false;
+    uint32_t ms_nMissionFlowSequence = 0;
 
     constexpr uint16_t OP_END_SCENE_SKIP = 0x0701;
     constexpr uint16_t OP_START_CUTSCENE = 0x02E7;
@@ -85,6 +87,7 @@ void CMissionSyncState::Init()
     ms_nWidescreenEventId = 1;
     ms_nLastAppliedWidescreenEventId = 0;
     ms_bLastAppliedWidescreenValue = false;
+    ms_nMissionFlowSequence = 0;
 }
 
 bool CMissionSyncState::IsProcessingTaskSequence()
@@ -172,6 +175,85 @@ void CMissionSyncState::HandleMissionFlagSync(bool onMission)
     if (!onMission)
     {
         ResetScriptWideScreenOverride();
+    }
+}
+
+void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName, uint8_t currArea)
+{
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        return;
+    }
+
+    CPackets::MissionFlowSync packet{};
+    packet.eventType = CPackets::MISSION_FLOW_EVENT_CUTSCENE_TRIGGER;
+    packet.currArea = currArea;
+    packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
+    packet.sequence = ++ms_nMissionFlowSequence;
+    strncpy_s(packet.cutsceneName, cutsceneName ? cutsceneName : "", sizeof(packet.cutsceneName));
+    CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+}
+
+void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message)
+{
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        return;
+    }
+
+    CPackets::MissionFlowSync packet{};
+    if (opcode == 0x0318)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_PASS;
+    }
+    else if (opcode == 0x045C)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_FAIL;
+    }
+    else
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_OBJECTIVE;
+    }
+
+    packet.messageType = message.messageType;
+    packet.time = message.time;
+    packet.flag = message.flag;
+    packet.currArea = (uint8_t)CGame::currArea;
+    packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
+    packet.sequence = ++ms_nMissionFlowSequence;
+    strncpy_s(packet.gxt, message.gxt ? message.gxt : "", sizeof(packet.gxt));
+    CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+}
+
+void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& packet)
+{
+    if (CLocalPlayer::m_bIsHost)
+    {
+        return;
+    }
+
+    HandleMissionFlagSync(packet.onMission != 0);
+
+    if (!packet.replay)
+    {
+        return;
+    }
+
+    if (packet.eventType == CPackets::MISSION_FLOW_EVENT_OBJECTIVE
+        || packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL
+        || packet.eventType == CPackets::MISSION_FLOW_EVENT_PASS)
+    {
+        char gxt[9];
+        strncpy_s(gxt, packet.gxt, 8);
+        gxt[8] = '\0';
+
+        switch (packet.messageType)
+        {
+        case 1: Command<Commands::PRINT_BIG>(gxt, packet.time, packet.flag); break;
+        case 2: Command<Commands::PRINT_NOW>(gxt, packet.time, packet.flag); break;
+        case 3: Command<Commands::PRINT_HELP>(gxt); break;
+        default: Command<Commands::PRINT>(gxt, packet.time, packet.flag); break;
+        }
     }
 }
 
