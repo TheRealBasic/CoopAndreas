@@ -196,6 +196,10 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_SNAPSHOT_ENTRY, CPacketHandler::PropertyStateSnapshotEntry__Handle);
 	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_SNAPSHOT_END, CPacketHandler::PropertyStateSnapshotEnd__Handle);
 	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_DELTA, CPacketHandler::PropertyStateDelta__Handle);
+	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_SNAPSHOT_BEGIN, CPacketHandler::SubmissionMissionSnapshotBegin__Handle);
+	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_SNAPSHOT_ENTRY, CPacketHandler::SubmissionMissionSnapshotEntry__Handle);
+	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_SNAPSHOT_END, CPacketHandler::SubmissionMissionSnapshotEnd__Handle);
+	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, CPacketHandler::SubmissionMissionStateDelta__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPacketHandler::PlayerJetpackTransition__Handle);
 }
 

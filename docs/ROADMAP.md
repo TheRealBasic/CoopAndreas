@@ -176,7 +176,14 @@ Legend:
 ### P2
 - [~] Property purchase sync. **[P2][M]** 🚧 In progress (2026-03-26).
   - **Status update (2026-03-26):** added server-authoritative property state cache + delta replication channel (`PROPERTY_STATE_*`) with late-join snapshot replay and host-migration resync broadcast; added QA checklist coverage for purchase/rejoin/late-join/post-migration parity.
-- [ ] Submissions: `Taxi`, `Firefighter`, `Vigilante`, `Paramedic`, `Pimp`, `Freight Train`. **[P2][L]**
+- [~] Submissions sync framework (`Taxi`, `Firefighter`, `Vigilante`, `Paramedic`, `Pimp`, `Freight Train`). **[P2][L]** 🚧 In progress (2026-03-26).
+  - **Shared sync layer:** ✅ host-authoritative generic submission mission state delta path (start/stop, stage/progress, timer, reward) with deterministic replication and late-join snapshot bootstrap.
+  - **Taxi:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
+  - **Firefighter:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
+  - **Vigilante:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
+  - **Paramedic:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
+  - **Pimp:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
+  - **Freight Train:** [~] integrated into generic layer (vehicle-role detection + reward delta integration); awaiting multiplayer QA sign-off.
 - [ ] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]**
 - [ ] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]**
 - [ ] Ammu-Nation challenge. **[P2][S]**

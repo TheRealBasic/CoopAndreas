@@ -109,4 +109,8 @@ public:
 	static void PropertyStateSnapshotEnd__Handle(void* data, int size);
 	static void PropertyStateDelta__Handle(void* data, int size);
 	static void PropertyStateDelta__Trigger(uint16_t propertyId, int ownerPlayerId, uint8_t unlocked, uint8_t linkedPickupActive, uint8_t linkedInteriorUnlocked, uint8_t currArea, uint8_t action);
+	static void SubmissionMissionSnapshotBegin__Handle(void* data, int size);
+	static void SubmissionMissionSnapshotEntry__Handle(void* data, int size);
+	static void SubmissionMissionSnapshotEnd__Handle(void* data, int size);
+	static void SubmissionMissionStateDelta__Handle(void* data, int size);
 };

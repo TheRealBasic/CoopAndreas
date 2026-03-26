@@ -95,6 +95,10 @@ enum CPacketsID : unsigned short
 	PROPERTY_STATE_SNAPSHOT_ENTRY,
 	PROPERTY_STATE_SNAPSHOT_END,
 	PROPERTY_STATE_DELTA,
+	SUBMISSION_MISSION_SNAPSHOT_BEGIN,
+	SUBMISSION_MISSION_SNAPSHOT_ENTRY,
+	SUBMISSION_MISSION_SNAPSHOT_END,
+	SUBMISSION_MISSION_STATE_DELTA,
 	PLAYER_JETPACK_TRANSITION,
 	CHEAT_EFFECT_TRIGGER,
 	PACKET_ID_MAX
@@ -258,6 +262,58 @@ public:
 	};
 
 	struct PropertyStateDelta : public PropertyStateSnapshotEntry
+	{
+		uint8_t action;
+	};
+	#pragma pack()
+};
+
+class CSubmissionMissionPackets
+{
+public:
+	#pragma pack(1)
+	enum eSubmissionMissionAction : uint8_t
+	{
+		SUBMISSION_MISSION_ACTION_UPSERT = 0,
+		SUBMISSION_MISSION_ACTION_CLEAR = 1
+	};
+
+	enum eSubmissionMissionType : uint8_t
+	{
+		SUBMISSION_MISSION_TAXI = 0,
+		SUBMISSION_MISSION_FIREFIGHTER = 1,
+		SUBMISSION_MISSION_VIGILANTE = 2,
+		SUBMISSION_MISSION_PARAMEDIC = 3,
+		SUBMISSION_MISSION_PIMP = 4,
+		SUBMISSION_MISSION_FREIGHT_TRAIN = 5,
+		SUBMISSION_MISSION_TYPE_MAX = 6
+	};
+
+	struct SubmissionMissionSnapshotBegin
+	{
+		uint32_t snapshotVersion;
+		uint8_t submissionCount;
+	};
+
+	struct SubmissionMissionSnapshotEntry
+	{
+		uint8_t submissionType;
+		uint8_t active;
+		uint8_t stage;
+		uint16_t progress;
+		int32_t timerMs;
+		int32_t rewardCash;
+		uint8_t currArea;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct SubmissionMissionSnapshotEnd
+	{
+		uint32_t snapshotVersion;
+	};
+
+	struct SubmissionMissionStateDelta : public SubmissionMissionSnapshotEntry
 	{
 		uint8_t action;
 	};
