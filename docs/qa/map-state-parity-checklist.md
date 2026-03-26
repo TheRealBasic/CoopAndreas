@@ -11,6 +11,12 @@
 3. Have a late-join client connect and verify it receives the same zone owner/color/state snapshot immediately.
 4. Repeat after one host interior transition to confirm zone state updates continue while `currArea` changes.
 
+## Gang-war lifecycle parity (host authoritative)
+1. Trigger a gang war on host and verify all peers observe the same start transition.
+2. Advance at least two wave changes and verify progression ordering is identical across peers.
+3. Finish one war (win/loss) and verify all peers converge on the same outcome event.
+4. Have a late-join client connect after finish and verify it receives latest lifecycle snapshot immediately.
+
 ## Map-pin placement parity
 1. Place at least three map pins (far west edge, far east edge, central city).
 2. Verify all peers render the same pin world position (no edge drift on ultrawide).
@@ -20,6 +26,7 @@
 
 ## Pass criteria
 - Gang-zone owner/color/state values match across all peers.
+- Gang-war lifecycle start/wave/outcome events stay host-authoritative and ordered.
 - Late joiners get current zones and active map pins without manual refresh.
 - Aspect ratio differences do not change pin placement.
 - Interior transitions do not pause/suppress map-state updates.

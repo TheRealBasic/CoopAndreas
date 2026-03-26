@@ -166,6 +166,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::GANG_ZONE_STATE, CPlayerPackets::GangZoneStatePacket::Handle);
     CNetwork::AddListener(CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, CPlayerPackets::GangGroupMembershipUpdatePacket::Handle);
     CNetwork::AddListener(CPacketsID::GANG_RELATIONSHIP_UPDATE, CPlayerPackets::GangRelationshipUpdatePacket::Handle);
+    CNetwork::AddListener(CPacketsID::GANG_WAR_LIFECYCLE_EVENT, CPlayerPackets::GangWarLifecycleEventPacket::Handle);
     CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPlayerPackets::TeleportPlayerScripted::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_REQUEST, CPlayerPackets::PickupSnapshotRequest::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);

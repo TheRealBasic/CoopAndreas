@@ -81,6 +81,7 @@ enum CPacketsID : unsigned short
 	GANG_ZONE_STATE,
 	GANG_GROUP_MEMBERSHIP_UPDATE,
 	GANG_RELATIONSHIP_UPDATE,
+	GANG_WAR_LIFECYCLE_EVENT,
 	TELEPORT_PLAYER_SCRIPTED,
 	PICKUP_SNAPSHOT_BEGIN,
 	PICKUP_SNAPSHOT_ENTRY,
@@ -177,6 +178,7 @@ public:
 			sizeof(GangZoneState), // GANG_ZONE_STATE
 			sizeof(GangGroupMembershipUpdate), // GANG_GROUP_MEMBERSHIP_UPDATE
 			sizeof(GangRelationshipUpdate), // GANG_RELATIONSHIP_UPDATE
+			sizeof(GangWarLifecycleEvent), // GANG_WAR_LIFECYCLE_EVENT
 			sizeof(TeleportPlayerScripted), // TELEPORT_PLAYER_SCRIPTED
 			sizeof(PickupSnapshotBegin), // PICKUP_SNAPSHOT_BEGIN
 			sizeof(PickupSnapshotEntry), // PICKUP_SNAPSHOT_ENTRY
@@ -859,6 +861,20 @@ public:
 		uint8_t sourceGangGroupId;
 		uint8_t targetGangGroupId;
 		uint8_t relationshipFlags; // bit0 friendly, bit1 hostile
+	};
+
+	struct GangWarLifecycleEvent
+	{
+		uint32_t sequence;
+		uint8_t eventType; // 1 start trigger, 2 wave progression, 3 outcome, 4 territory ownership update
+		uint8_t warState;
+		uint8_t warPhase;
+		uint8_t outcome; // 0 unknown/in-progress, 1 win, 2 loss
+		uint16_t zoneId;
+		uint8_t owner;
+		uint8_t color;
+		uint8_t zoneState;
+		uint8_t currArea;
 	};
 
 	struct TeleportPlayerScripted

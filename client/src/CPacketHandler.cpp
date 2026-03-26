@@ -19,6 +19,7 @@
 #include <CNetworkPickupManager.h>
 #include <CNetworkFireManager.h>
 #include "Hooks/RadarHooks.h"
+#include <CGangWars.h>
 
 namespace
 {
@@ -53,6 +54,12 @@ namespace
 	uint32_t g_gangGroupMembershipUpdatesApplied = 0;
 	uint32_t g_gangRelationshipUpdatesReceived = 0;
 	uint32_t g_gangRelationshipUpdatesApplied = 0;
+	CPackets::GangWarLifecycleEvent g_lastGangWarLifecycleEvent{};
+	bool g_hasGangWarLifecycleEvent = false;
+	uint32_t g_lastGangWarLifecycleSequence = 0;
+	uint8_t g_lastObservedGangWarState = 0;
+	uint8_t g_lastObservedGangWarPhase = 0;
+	uint32_t g_lastObservedGangWarPollTick = 0;
 
 	uint16_t GetGangRelationshipKey(uint8_t sourceGangGroupId, uint8_t targetGangGroupId)
 	{
@@ -2276,6 +2283,77 @@ void CPacketHandler::GangRelationshipUpdate__Handle(void* data, int size)
 	g_gangRelationshipStates[relationshipKey] = *packet;
 	++g_gangRelationshipUpdatesApplied;
 	LogGangDebugCountersIfNeeded();
+}
+
+void CPacketHandler::GangWarLifecycleEvent__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::GangWarLifecycleEvent*)data;
+	if (g_hasGangWarLifecycleEvent && packet->sequence <= g_lastGangWarLifecycleEvent.sequence)
+	{
+		return;
+	}
+
+	g_lastGangWarLifecycleEvent = *packet;
+	g_hasGangWarLifecycleEvent = true;
+	g_lastObservedGangWarState = packet->warState;
+	g_lastObservedGangWarPhase = packet->warPhase;
+}
+
+void CPacketHandler::GangWarLifecycleEvent__Trigger()
+{
+	if (!CLocalPlayer::m_bIsHost)
+	{
+		return;
+	}
+
+	const uint32_t now = GetTickCount();
+	if (now < g_lastObservedGangWarPollTick + 150)
+	{
+		return;
+	}
+	g_lastObservedGangWarPollTick = now;
+
+	const uint8_t warState = static_cast<uint8_t>(CGangWars::State & 0xFF);
+	const uint8_t warPhase = static_cast<uint8_t>(CGangWars::State2 & 0xFF);
+
+	uint8_t eventType = 0;
+	if (g_lastObservedGangWarState == 0 && warState != 0)
+	{
+		eventType = 1;
+	}
+	else if (warPhase != g_lastObservedGangWarPhase)
+	{
+		eventType = 2;
+	}
+	else if (g_lastObservedGangWarState != 0 && warState == 0)
+	{
+		eventType = 3;
+	}
+
+	if (eventType == 0)
+	{
+		return;
+	}
+
+	CPackets::GangWarLifecycleEvent packet{};
+	packet.sequence = ++g_lastGangWarLifecycleSequence;
+	packet.eventType = eventType;
+	packet.warState = warState;
+	packet.warPhase = warPhase;
+	packet.outcome = 0;
+	if (eventType == 3)
+	{
+		packet.outcome = (g_lastObservedGangWarPhase >= 6) ? 1 : 2;
+	}
+	packet.zoneId = 0;
+	packet.owner = 0;
+	packet.color = 0;
+	packet.zoneState = 0;
+	packet.currArea = static_cast<uint8_t>(CGame::currArea);
+
+	g_lastObservedGangWarState = warState;
+	g_lastObservedGangWarPhase = warPhase;
+	CNetwork::SendPacket(CPacketsID::GANG_WAR_LIFECYCLE_EVENT, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
 
 void CPacketHandler::GangStateFromOpcode__Trigger(uint16_t opcode, const OpcodeParameter* params, uint8_t paramCount)

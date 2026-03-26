@@ -162,6 +162,11 @@ public:
 						CPacketHandler::GameWeatherTime__Trigger();
 						lastWeatherTimeSyncTickRate = tickCount;
 					}
+
+					if (CLocalPlayer::m_bIsHost)
+					{
+						CPacketHandler::GangWarLifecycleEvent__Trigger();
+					}
 					
 					if (localPlayer->m_pIntelligence->GetTaskUseGun())
 					{

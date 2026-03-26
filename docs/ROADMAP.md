@@ -41,7 +41,11 @@ Legend:
 ### P2 (nice-to-have)
 - [ ] Player voice commands. **[P2][S]**
 - [ ] Chat reactions (`LD_CHAT.txd`). **[P2][S]**
-- [ ] Gang wars sync. **[P2][L]**
+- [~] Gang wars sync (host-authoritative lifecycle + snapshots). **[P2][L]** 🚧 In progress (2026-03-26).
+  - **Acceptance criteria:** host emits authoritative lifecycle events for start trigger, wave progression, and win/loss outcome.
+  - **Acceptance criteria:** territory ownership updates remain synchronized with existing gang-zone owner/color propagation paths.
+  - **Acceptance criteria:** reconnecting and late-join peers receive lifecycle snapshot + latest ownership state without manual refresh.
+  - **Status update (2026-03-26):** added `GANG_WAR_LIFECYCLE_EVENT` replication path and late-join snapshot replay on server; QA checklist coverage added for start/finish, reconnect parity, and ownership persistence.
 - [ ] Parachute jump sync. **[P2][M]**
 - [ ] Stunt systems (`collecting`, per-player slow motion). **[P2][M]**
 - [ ] Chat gamepad support with on-screen keyboard. **[P2][M]**

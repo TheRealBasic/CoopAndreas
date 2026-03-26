@@ -93,6 +93,8 @@ public:
 	static void GangZoneState__Handle(void* data, int size);
 	static void GangGroupMembershipUpdate__Handle(void* data, int size);
 	static void GangRelationshipUpdate__Handle(void* data, int size);
+	static void GangWarLifecycleEvent__Handle(void* data, int size);
+	static void GangWarLifecycleEvent__Trigger();
 	static void GangStateFromOpcode__Trigger(uint16_t opcode, const OpcodeParameter* params, uint8_t paramCount);
 	static void TeleportPlayerScripted__Handle(void* data, int size);
 	static void PickupSnapshotBegin__Handle(void* data, int size);
