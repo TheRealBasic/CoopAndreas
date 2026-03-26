@@ -9,6 +9,31 @@ namespace
 		PICKUP_ACTION_COLLECT = 1,
 		PICKUP_ACTION_REMOVE = 2
 	};
+
+	enum ePickupOrigin : uint8_t
+	{
+		PICKUP_ORIGIN_COLLECTIBLE = 0
+	};
+}
+
+uint64_t CNetworkPickupManager::BuildCollectibleStateKey(uint8_t category, uint32_t worldCollectibleId)
+{
+	return (static_cast<uint64_t>(category) << 32) | static_cast<uint64_t>(worldCollectibleId);
+}
+
+bool CNetworkPickupManager::IsWorldCollectible(const Pickup& pickup)
+{
+	return pickup.origin == PICKUP_ORIGIN_COLLECTIBLE && pickup.worldCollectibleId != 0;
+}
+
+void CNetworkPickupManager::UpdateCollectibleState(const Pickup& pickup)
+{
+	if (!IsWorldCollectible(pickup))
+	{
+		return;
+	}
+
+	ms_collectibleStateByKey[BuildCollectibleStateKey(pickup.category, pickup.worldCollectibleId)] = pickup;
 }
 
 void CNetworkPickupManager::UpsertFromSnapshotEntry(const CPackets::PickupSnapshotEntry& packet)
@@ -17,6 +42,7 @@ void CNetworkPickupManager::UpsertFromSnapshotEntry(const CPackets::PickupSnapsh
 	pickup.networkId = packet.networkId;
 	pickup.type = packet.type;
 	pickup.category = packet.category;
+	pickup.worldCollectibleId = packet.worldCollectibleId;
 	pickup.origin = packet.origin;
 	pickup.flags = packet.flags;
 	pickup.position = packet.position;
@@ -31,6 +57,7 @@ void CNetworkPickupManager::UpsertFromSnapshotEntry(const CPackets::PickupSnapsh
 	pickup.weaponId = packet.weaponId;
 	pickup.ammo = packet.weaponAmmo;
 	ms_pickups[pickup.networkId] = pickup;
+	UpdateCollectibleState(pickup);
 }
 
 void CNetworkPickupManager::HandleSnapshotBegin(const CPackets::PickupSnapshotBegin& packet)
@@ -38,6 +65,7 @@ void CNetworkPickupManager::HandleSnapshotBegin(const CPackets::PickupSnapshotBe
 	ms_snapshotInProgress = true;
 	ms_snapshotReadyForInteraction = false;
 	ms_pickups.clear();
+	ms_collectibleStateByKey.clear();
 }
 
 void CNetworkPickupManager::HandleSnapshotEntry(const CPackets::PickupSnapshotEntry& packet)
@@ -86,6 +114,7 @@ void CNetworkPickupManager::HandleStateDelta(const CPackets::PickupStateDelta& p
 	it->second.collectorPlayerId = packet.collectorPlayerId;
 	it->second.stateTimestampMs = packet.stateTimestampMs;
 	it->second.stateVersion = packet.stateVersion;
+	UpdateCollectibleState(it->second);
 	if (!packet.isCollected)
 	{
 		it->second.lastCollectAttemptTick = 0;
@@ -166,6 +195,7 @@ void CNetworkPickupManager::Process()
 void CNetworkPickupManager::Reset()
 {
 	ms_pickups.clear();
+	ms_collectibleStateByKey.clear();
 	ms_snapshotInProgress = false;
 	ms_snapshotReadyForInteraction = false;
 }
@@ -175,9 +205,26 @@ void CNetworkPickupManager::BeginResync()
 	ms_snapshotInProgress = true;
 	ms_snapshotReadyForInteraction = false;
 	ms_pickups.clear();
+	ms_collectibleStateByKey.clear();
 }
 
 bool CNetworkPickupManager::IsReadyForInteraction()
 {
 	return ms_snapshotReadyForInteraction && !ms_snapshotInProgress;
+}
+
+bool CNetworkPickupManager::ShouldSuppressCollectible(uint8_t category, uint32_t worldCollectibleId)
+{
+	if (worldCollectibleId == 0)
+	{
+		return false;
+	}
+
+	const auto it = ms_collectibleStateByKey.find(BuildCollectibleStateKey(category, worldCollectibleId));
+	if (it == ms_collectibleStateByKey.end())
+	{
+		return false;
+	}
+
+	return !it->second.isSpawned || it->second.isCollected;
 }

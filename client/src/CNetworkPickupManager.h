@@ -11,6 +11,7 @@ public:
 		uint32_t networkId = 0;
 		uint8_t type = 0;
 		uint8_t category = 0;
+		uint32_t worldCollectibleId = 0;
 		uint8_t origin = 0;
 		uint8_t flags = 0;
 		CVector position{};
@@ -35,12 +36,17 @@ public:
 	static void HandleDropResolve(const CPackets::PickupDropResolve& packet);
 	static void BeginResync();
 	static bool IsReadyForInteraction();
+	static bool ShouldSuppressCollectible(uint8_t category, uint32_t worldCollectibleId);
 	static void Process();
 	static void Reset();
 
 private:
+	static uint64_t BuildCollectibleStateKey(uint8_t category, uint32_t worldCollectibleId);
+	static bool IsWorldCollectible(const Pickup& pickup);
+	static void UpdateCollectibleState(const Pickup& pickup);
 	static void UpsertFromSnapshotEntry(const CPackets::PickupSnapshotEntry& packet);
 	static inline std::unordered_map<uint32_t, Pickup> ms_pickups{};
+	static inline std::unordered_map<uint64_t, Pickup> ms_collectibleStateByKey{};
 	static inline bool ms_snapshotInProgress = false;
 	static inline bool ms_snapshotReadyForInteraction = false;
 };

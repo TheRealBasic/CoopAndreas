@@ -6,6 +6,26 @@
 #include "CPlayer.h"
 #include "CPlayerManager.h"
 
+uint64_t CPickupManager::BuildCollectibleStateKey(uint8_t category, uint32_t worldCollectibleId)
+{
+	return (static_cast<uint64_t>(category) << 32) | static_cast<uint64_t>(worldCollectibleId);
+}
+
+bool CPickupManager::IsWorldCollectible(const Pickup& pickup)
+{
+	return pickup.origin == CPickupStatePackets::PICKUP_ORIGIN_COLLECTIBLE && pickup.worldCollectibleId != 0;
+}
+
+void CPickupManager::PersistCollectibleState(const Pickup& pickup)
+{
+	if (!IsWorldCollectible(pickup))
+	{
+		return;
+	}
+
+	ms_collectibleStateByKey[BuildCollectibleStateKey(pickup.category, pickup.worldCollectibleId)] = pickup;
+}
+
 uint64_t CPickupManager::GetServerTimeMs()
 {
 	const auto now = std::chrono::steady_clock::now();
@@ -25,6 +45,7 @@ CPickupStatePackets::PickupSnapshotEntry CPickupManager::BuildSnapshotEntry(cons
 	packet.networkId = pickup.networkId;
 	packet.type = pickup.type;
 	packet.category = pickup.category;
+	packet.worldCollectibleId = pickup.worldCollectibleId;
 	packet.origin = pickup.origin;
 	packet.flags = pickup.flags;
 	packet.position = pickup.position;
@@ -41,12 +62,13 @@ CPickupStatePackets::PickupSnapshotEntry CPickupManager::BuildSnapshotEntry(cons
 	return packet;
 }
 
-uint32_t CPickupManager::CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs, int amount, uint8_t weaponId, uint16_t weaponAmmo, uint8_t origin, uint8_t flags)
+uint32_t CPickupManager::CreatePickup(uint8_t type, uint8_t category, const CVector& position, int modelId, uint32_t respawnMs, int amount, uint8_t weaponId, uint16_t weaponAmmo, uint8_t origin, uint8_t flags, uint32_t worldCollectibleId)
 {
 	Pickup pickup{};
 	pickup.networkId = ms_nextPickupId++;
 	pickup.type = type;
 	pickup.category = category;
+	pickup.worldCollectibleId = worldCollectibleId;
 	pickup.origin = origin;
 	pickup.flags = flags;
 	pickup.position = position;
@@ -60,9 +82,24 @@ uint32_t CPickupManager::CreatePickup(uint8_t type, uint8_t category, const CVec
 	pickup.collectorPlayerId = -1;
 	UpdateStateMetadata(pickup);
 
+	if (IsWorldCollectible(pickup))
+	{
+		const auto persistedState = ms_collectibleStateByKey.find(BuildCollectibleStateKey(pickup.category, pickup.worldCollectibleId));
+		if (persistedState != ms_collectibleStateByKey.end())
+		{
+			pickup.isSpawned = persistedState->second.isSpawned;
+			pickup.isCollected = persistedState->second.isCollected;
+			pickup.collectorPlayerId = persistedState->second.collectorPlayerId;
+			pickup.collectedAtMs = persistedState->second.collectedAtMs;
+			pickup.stateTimestampMs = persistedState->second.stateTimestampMs;
+			pickup.stateVersion = persistedState->second.stateVersion;
+		}
+	}
+
 	ms_pickups[pickup.networkId] = pickup;
+	PersistCollectibleState(pickup);
 	ms_snapshotVersion++;
-	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_SPAWN);
+	BroadcastDelta(pickup, pickup.isCollected ? CPickupStatePackets::PICKUP_ACTION_COLLECT : CPickupStatePackets::PICKUP_ACTION_SPAWN);
 
 	if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
 	{
@@ -167,6 +204,7 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, con
 	pickup.collectorPlayerId = player->m_iPlayerId;
 	pickup.collectedAtMs = GetServerTimeMs();
 	UpdateStateMetadata(pickup);
+	PersistCollectibleState(pickup);
 	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT);
 
 	if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
@@ -200,6 +238,7 @@ void CPickupManager::ProcessRespawns()
 		pickup.collectorPlayerId = -1;
 		pickup.collectedAtMs = 0;
 		UpdateStateMetadata(pickup);
+		PersistCollectibleState(pickup);
 		BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_SPAWN);
 	}
 }
