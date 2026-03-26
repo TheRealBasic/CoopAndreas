@@ -330,6 +330,8 @@ void CPacketHandler::PlayerBulletShot__Handle(void* data, int size)
 	player->m_pPed->m_nPedType = PED_TYPE_CIVMALE;
 	player->m_pPed->m_aWeapons[player->m_pPed->m_nActiveWeaponSlot].DoBulletImpact(player->m_pPed, victim, &packet->startPos, &packet->endPos, &packet->colPoint, packet->incrementalHit);
 	player->m_pPed->m_nPedType = PED_TYPE_PLAYER1;
+
+	CSniperAimMarkerSync::ApplyShotEvent(packet->playerid, packet->shotSizeMultiplier, packet->startPos, packet->endPos);
 }
 
 // PlayerHandshake
@@ -1435,6 +1437,12 @@ void CPacketHandler::PlayerAimSync__Handle(void* data, int size)
 			}
 		}
 	}
+}
+
+void CPacketHandler::PlayerSniperAimMarkerState__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PlayerSniperAimMarkerState*)data;
+	CSniperAimMarkerSync::HandleRemoteState(*packet);
 }
 
 void CPacketHandler::PlayerWantedLevel__Handle(void* data, int size)

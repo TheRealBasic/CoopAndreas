@@ -56,7 +56,14 @@ Legend:
   - **Acceptance criteria (passed):** reward replay is idempotent (no duplicate grants) across reconnect/late-join snapshot hydration.
   - **Validation artifact:** `docs/qa/parachute-stunt-sync-matrix.md` multi-peer and high-latency matrix (PS-01..PS-11).
 - [ ] Chat gamepad support with on-screen keyboard. **[P2][M]**
-- [ ] Minor ideas: sync laser sniper red dot, moon-sniper easter egg shot size effect. **[P2][S]**
+- [x] Sniper laser red-dot sync. **[P2][S]** ✅ Completed (2026-03-26).
+  - **Acceptance criteria (passed):** host-authoritative sniper aim marker payload replicates source/direction/range + visibility + tick and late-join peers hydrate the active marker without waiting for a new shot.
+  - **Acceptance criteria (passed):** non-host clients render remote sniper red-dot using replicated marker state only, with smoothing that avoids visible jitter under ordinary packet jitter.
+  - **Validation artifact:** `docs/qa/sniper-red-dot-moon-sync-matrix.md` (SN-01, SN-02, SN-04).
+- [x] Moon-sniper easter egg shot-size effect. **[P2][S]** ✅ Completed (2026-03-26).
+  - **Acceptance criteria (passed):** server computes deterministic moon-sniper activation and replicates `moonSniperActive` + `shotSizeMultiplier` in the authoritative shot payload.
+  - **Acceptance criteria (passed):** shot-size multiplier defaults to `1.0` when moon-sniper is inactive, with no local-only RNG divergence.
+  - **Validation artifact:** `docs/qa/sniper-red-dot-moon-sync-matrix.md` (SN-03).
 
 ## Milestone: Mission Parity
 

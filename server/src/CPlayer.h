@@ -38,6 +38,11 @@ class CPlayer
 		bool m_bHasJetpack = false;
 		uint8_t m_nCurrArea = 0;
 		CVector m_vecWaypointPos{};
+		CVector m_vecSniperAimSource{};
+		CVector m_vecSniperAimDirection{};
+		float m_fSniperAimRange = 0.0f;
+		uint32_t m_nSniperAimTick = 0;
+		bool m_bSniperAimVisible = false;
 		struct {
 			uint8_t bStatsModified : 1;
 			uint8_t bWantedLevelModified : 1;

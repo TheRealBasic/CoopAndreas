@@ -108,6 +108,9 @@ static void __fastcall CWeapon__DoBulletImpact_Hook(CWeapon* weapon, SKIP_EDX, C
         packet.endPos = *endPoint;
         packet.colPoint = *colPoint;
         packet.incrementalHit = incrementalHit;
+        packet.shotWeaponId = static_cast<unsigned char>(weapon->m_eWeaponType);
+        packet.moonSniperActive = false;
+        packet.shotSizeMultiplier = 1.0f;
 
         CNetwork::SendPacket(CPacketsID::PLAYER_BULLET_SHOT, &packet, sizeof(packet));
 

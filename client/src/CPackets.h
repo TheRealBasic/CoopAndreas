@@ -101,6 +101,7 @@ enum CPacketsID : unsigned short
 	SUBMISSION_MISSION_STATE_DELTA,
 	PLAYER_JETPACK_TRANSITION,
 	CHEAT_EFFECT_TRIGGER,
+	PLAYER_SNIPER_AIM_MARKER_STATE,
 	PACKET_ID_MAX
 };
 
@@ -206,6 +207,7 @@ public:
 			sizeof(SubmissionMissionStateDelta), // SUBMISSION_MISSION_STATE_DELTA
 			sizeof(PlayerJetpackTransition), // PLAYER_JETPACK_TRANSITION
 			sizeof(CheatEffectTrigger), // CHEAT_EFFECT_TRIGGER
+			sizeof(PlayerSniperAimMarkerState), // PLAYER_SNIPER_AIM_MARKER_STATE
 		};
 
 		return m_nPacketSize[id];
@@ -290,6 +292,19 @@ public:
 		CColPoint colPoint;
 		int incrementalHit;
 		unsigned char entityType;
+		unsigned char shotWeaponId;
+		bool moonSniperActive;
+		float shotSizeMultiplier;
+	};
+
+	struct PlayerSniperAimMarkerState
+	{
+		int playerid;
+		CVector source;
+		CVector direction;
+		float range;
+		bool visible;
+		uint32_t tick;
 	};
 
 	struct PlayerHandshake

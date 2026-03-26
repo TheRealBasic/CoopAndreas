@@ -769,16 +769,75 @@ public:
 		unsigned char colPoint[44]; // padding
 		int incrementalHit;
 		unsigned char entityType;
+		unsigned char shotWeaponId;
+		bool moonSniperActive;
+		float shotSizeMultiplier;
+
+		static bool IsMoonSniperShot(const CPlayerPackets::PlayerBulletShot& packet)
+		{
+			constexpr uint8_t SNIPER_WEAPON_ID = 34;
+			const CVector delta = packet.endPos - packet.startPos;
+			const float horizontalDistance = std::sqrt((delta.x * delta.x) + (delta.y * delta.y));
+			return packet.shotWeaponId == SNIPER_WEAPON_ID
+				&& delta.z > 120.0f
+				&& horizontalDistance > 250.0f;
+		}
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
 			// create packet
 			CPlayerPackets::PlayerBulletShot* packet = (CPlayerPackets::PlayerBulletShot*)data;
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player)
+			{
+				return;
+			}
 
 			// set packet`s playerid, cuz incoming packet has id = 0
-			packet->playerid = CPlayerManager::GetPlayer(peer)->m_iPlayerId;
+			packet->playerid = player->m_iPlayerId;
+			packet->shotWeaponId = player->m_ucCurrentWeapon;
+			packet->moonSniperActive = IsMoonSniperShot(*packet);
+			packet->shotSizeMultiplier = packet->moonSniperActive ? 1.75f : 1.0f;
 
 			CNetwork::SendPacketToAll(CPacketsID::PLAYER_BULLET_SHOT, packet, sizeof * packet, (ENetPacketFlag)0, peer);
+		}
+	};
+
+	struct PlayerSniperAimMarkerState
+	{
+		int playerid;
+		CVector source;
+		CVector direction;
+		float range;
+		bool visible;
+		uint32_t tick;
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost || size != sizeof(CPlayerPackets::PlayerSniperAimMarkerState))
+			{
+				return;
+			}
+
+			auto* packet = (CPlayerPackets::PlayerSniperAimMarkerState*)data;
+			packet->playerid = std::clamp(packet->playerid, 0, MAX_SERVER_PLAYERS - 1);
+			packet->direction.Normalise();
+			packet->range = std::clamp(packet->range, 0.0f, 1200.0f);
+
+			auto* owner = CPlayerManager::m_pPlayers[packet->playerid];
+			if (!owner)
+			{
+				return;
+			}
+
+			owner->m_vecSniperAimSource = packet->source;
+			owner->m_vecSniperAimDirection = packet->direction;
+			owner->m_fSniperAimRange = packet->range;
+			owner->m_bSniperAimVisible = packet->visible;
+			owner->m_nSniperAimTick = packet->tick;
+
+			CNetwork::SendPacketToAll(CPacketsID::PLAYER_SNIPER_AIM_MARKER_STATE, packet, sizeof(*packet), (ENetPacketFlag)0, peer);
 		}
 	};
 
@@ -964,9 +1023,33 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player)
+			{
+				return;
+			}
+
 			CPlayerPackets::PlayerAimSync* packet = (CPlayerPackets::PlayerAimSync*)data;
-			packet->playerid = CPlayerManager::GetPlayer(peer)->m_iPlayerId;
+			packet->playerid = player->m_iPlayerId;
 			CNetwork::SendPacketToAll(CPacketsID::PLAYER_AIM_SYNC, packet, sizeof * packet, (ENetPacketFlag)0, peer);
+
+			CPlayerPackets::PlayerSniperAimMarkerState markerPacket{};
+			markerPacket.playerid = player->m_iPlayerId;
+			markerPacket.source = packet->source;
+			markerPacket.direction = packet->front;
+			markerPacket.direction.Normalise();
+			markerPacket.range = 450.0f;
+			markerPacket.visible = player->m_ucCurrentWeapon == 34;
+			markerPacket.tick = (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now().time_since_epoch()).count();
+
+			player->m_vecSniperAimSource = markerPacket.source;
+			player->m_vecSniperAimDirection = markerPacket.direction;
+			player->m_fSniperAimRange = markerPacket.range;
+			player->m_bSniperAimVisible = markerPacket.visible;
+			player->m_nSniperAimTick = markerPacket.tick;
+
+			CNetwork::SendPacketToAll(CPacketsID::PLAYER_SNIPER_AIM_MARKER_STATE, &markerPacket, sizeof(markerPacket), (ENetPacketFlag)0, peer);
 		}
 	};
 

@@ -201,6 +201,7 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_SNAPSHOT_END, CPacketHandler::SubmissionMissionSnapshotEnd__Handle);
 	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, CPacketHandler::SubmissionMissionStateDelta__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPacketHandler::PlayerJetpackTransition__Handle);
+	CNetwork::AddListener(CPacketsID::PLAYER_SNIPER_AIM_MARKER_STATE, CPacketHandler::PlayerSniperAimMarkerState__Handle);
 }
 
 void CNetwork::HandlePacketReceive(ENetEvent& event)
