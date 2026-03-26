@@ -1799,16 +1799,17 @@ void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 		return;
 
 	CPackets::OnMissionFlagSync* packet = (CPackets::OnMissionFlagSync*)data;
+	CMissionSyncState::HandleMissionFlagSync(packet->bOnMission);
 
 	if (CTheScripts::OnAMissionFlag)
 	{
+		const bool wasOnMission = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] != 0;
 		CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] = packet->bOnMission;
-		if (packet->bOnMission == false && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] == true)
+		if (!packet->bOnMission && wasOnMission)
 		{
 			// cleanup
 			CNetworkCheckpoint::Remove();
 			CNetworkEntityBlip::ClearEntityBlips();
-			TheCamera.SetWideScreenOff();
 			CPad::GetPad(0)->SetDrunkInputDelay(0);
 			CPad::GetPad(0)->bApplyBrakes = 0;
 			CPad::GetPad(0)->bDisablePlayerEnterCar = 0;

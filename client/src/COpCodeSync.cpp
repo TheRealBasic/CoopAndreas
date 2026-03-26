@@ -704,6 +704,14 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
         return; // defer opcode execution until mission state is ready
     }
 
+    if (!CLocalPlayer::m_bIsHost
+        && header.opcode == 0x02A3
+        && scriptParamCount > 0
+        && !CMissionSyncState::HandleNetworkSwitchWidescreen(scriptParamsBuffer[0].value != 0))
+    {
+        return;
+    }
+
 
 
     switch (header.opcode)
