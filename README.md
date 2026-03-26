@@ -13,9 +13,33 @@ This mod is an unofficial modification for **Grand Theft Auto: San Andreas** and
 
 ## Building (Windows)
 
-### Quick Start (Windows)
+### Beginner-friendly: one command (recommended)
 
-Use the guided setup script to validate prerequisites, configure environment variables, build all targets, and deploy required DLLs automatically.
+If you are new and just want this to work, run this command from PowerShell in the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\bootstrap_and_build.ps1
+```
+
+What `bootstrap_and_build.ps1` does for you:
+- Installs missing build tools via `winget` (`git`, `cmake`, `xmake`).
+- Installs/checks Visual Studio 2022 Build Tools with the C++ workload.
+- Clones `plugin-sdk` into `third_party\plugin-sdk` (if missing) and checks out the required commit.
+- Runs `setup_and_build.ps1` to build `client`, `server`, and `proxy`, then deploy DLLs into your GTA:SA folder.
+
+Optional flags:
+
+```powershell
+# Skip build and only install prerequisites + plugin-sdk
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\bootstrap_and_build.ps1 -SkipBuild
+
+# Pre-fill paths to avoid prompts
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\bootstrap_and_build.ps1 -GtaSaDir "C:\Games\GTA San Andreas" -PluginSdkDir "D:\dev\plugin-sdk"
+```
+
+### Guided setup script (advanced/manual)
+
+Use this if you already have dependencies installed and only want validation + build + deploy:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup_and_build.ps1
@@ -28,12 +52,6 @@ What the script does:
 - Runs build steps in order: `xmake f -m release`, then `client`, `server`, and `proxy` targets.
 - Ensures `CoopAndreasSA.dll` is in `%GTA_SA_DIR%` and installs proxy as `%GTA_SA_DIR%\eax.dll` (backing up original to `eax_orig.dll` when needed).
 - Prints next steps for compiling `main.scm` when `%GTA_SA_DIR%\CoopAndreas\main.scm` is missing.
-
-Optional arguments (skip prompts):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup_and_build.ps1 -GtaSaDir "C:\Games\GTA San Andreas" -PluginSdkDir "D:\dev\plugin-sdk"
-```
 
 ### Client & Server
 
@@ -95,32 +113,35 @@ xmake --build proxy
 
 ### Server
 
-Install build prerequisites first (xmake is the primary build system, CMake is only needed for root-level wrapper tooling):
+Fast path (recommended):
+
+```bash
+./scripts/linux/setup_and_build.sh
+```
+
+What it does:
+- Installs required packages (`build-essential`, `clang`, `cmake`, `git`, `xmake`).
+- Configures xmake in `release` mode.
+- Builds the `server` target.
+- Prints the server binary location.
+
+Optional behavior:
+
+```bash
+# Build debug mode
+MODE=debug ./scripts/linux/setup_and_build.sh
+
+# Build and launch server immediately
+RUN_SERVER=1 ./scripts/linux/setup_and_build.sh
+```
+
+Manual build (if you prefer step-by-step):
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential clang cmake xmake
-```
-
-Verify your toolchain:
-
-```bash
-g++ --version
-clang --version
-cmake --version
-xmake --version
-```
-
-Build the server from the repository root:
-
-```bash
-# 1) Configure xmake for your desired mode (debug or release)
 xmake f -m release
-
-# 2) Build the Linux server target
 xmake --build server
-
-# 3) (optional) run the server binary
 ./build/linux/x86_64/release/server
 ```
 

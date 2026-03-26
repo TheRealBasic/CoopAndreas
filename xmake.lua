@@ -149,7 +149,6 @@ target("server")
             "HAS_GETHOSTBYADDR_R"
         )
 
-        add_includedirs("third_party/enet")
 
         add_syslinks("pthread")
     end
