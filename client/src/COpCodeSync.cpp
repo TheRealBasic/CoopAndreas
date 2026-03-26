@@ -85,6 +85,11 @@ const SSyncedOpCode syncedOpcodes[] =
     
     // World
     {0x00BF}, // get_time_of_day [var int] [var int]
+    {0x0164}, // remove_blip [Blip]
+    {0x02A7}, // add_sprite_blip_for_contact_point {x} [float] {y} [float] {z} [float] {sprite} [int]
+    {0x0629}, // set_int_stat {stat} [int] {value} [int]
+    {0x0652}, // get_int_stat {stat} [int] [var int]
+    {0x0956}, // find_number_of_players_in_group [var int]
     {0x0417}, // start_mission {missionNumber} [int]
     {COMMAND_SET_TAG_STATUS_IN_AREA},
     {0x06F0, true, {eSyncedParamType::PED}}, // remove_char_from_group [Char]
@@ -136,13 +141,17 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x00FF, true, {eSyncedParamType::PED}}, // is_char_near_point_on_foot_3d [Char] ...
     {0x0173, true, {eSyncedParamType::PED}}, // set_char_heading [Char] {heading} [float]
     {0x0350, true, {eSyncedParamType::PED}}, // set_char_stay_in_same_place [Char] {state} [bool]
+    {0x03C0, true, {eSyncedParamType::PED}}, // get_char_car_is_using [Char] [var Car]
     {0x07A1}, // set_next_desired_move_state {moveState} [MoveState]
+    {0x0811, true, {eSyncedParamType::PED}}, // get_char_car_is_using [Char] [var Car]
     {0x0245, true, {eSyncedParamType::PED}}, // set_anim_group_for_char[Char] {animGroup} [AnimGroup]
     {0x0860, true, {eSyncedParamType::PED}}, // {0860:} set_char_area_visible [Char] {interiorId} [int]
 
     // Vehicles
     {0x00AB, true, {eSyncedParamType::VEHICLE}}, // set_car_coordinates [Car] {x} [float] {y} [float] {z} [float]
     {0x0175, true, {eSyncedParamType::VEHICLE}}, // set_car_heading [Car] {heading} [float]
+    {0x08EC, true, {eSyncedParamType::VEHICLE}}, // get_car_class [Car] [var int]
+    {0x096E, true, {eSyncedParamType::VEHICLE}}, // is_car_lowrider [Car]
     
     // Explosions
     {0x070C, true, {eSyncedParamType::VEHICLE}}, // explode_car_in_cutscene [Car]
@@ -184,7 +193,10 @@ static int FindSyncedOpcodeIndex(uint16_t opcode)
 
 static void VerifyStorylineParityOpcodeCoverage()
 {
-    const uint16_t requiredOpcodes[] = {0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0256, 0x03EE, 0x0417, 0x045C};
+    const uint16_t requiredOpcodes[] = {
+        0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0164, 0x0256, 0x02A7,
+        0x03C0, 0x03EE, 0x0417, 0x045C, 0x0629, 0x0652, 0x0811, 0x08EC, 0x0956, 0x096E
+    };
     for (const auto opcode : requiredOpcodes)
     {
         assert(FindSyncedOpcodeIndex(opcode) != -1 && "Storyline parity opcode removed from synced opcode list");

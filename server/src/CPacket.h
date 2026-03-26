@@ -104,6 +104,19 @@ enum CPacketsID : unsigned short
 	PACKET_ID_MAX
 };
 
+class COpCodePackets
+{
+public:
+	#pragma pack(1)
+	struct OpCodeSyncHeader
+	{
+		uint16_t opcode;
+		uint16_t intParamCount;
+		uint16_t stringParamCount;
+	};
+	#pragma pack()
+};
+
 
 class CPickupStatePackets
 {
