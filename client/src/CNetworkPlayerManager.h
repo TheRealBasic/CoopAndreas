@@ -6,7 +6,12 @@ public:
 	{
 		static constexpr size_t maxSnapshotBuffer = 32;
 		static constexpr uint32_t interpolationDelayMs = 120;
+		static constexpr float translationSmoothFactor = 0.65f;
+		static constexpr float rotationSmoothFactor = 0.9f;
+		static constexpr float deadReckonPositionThreshold = 0.035f;
+		static constexpr float deadReckonRotationThresholdRad = 0.02f;
 		static constexpr float hardSnapDistance = 22.0f;
+		static constexpr float hardSnapHeadingThresholdRad = 1.0471975512f; // ~60 deg
 	};
 
 	struct StreamingOverview

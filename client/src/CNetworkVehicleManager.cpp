@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CNetworkVehicle.h"
+#include "CNetworkPlayerManager.h"
 #include <unordered_map>
 #include <algorithm>
 #include <cmath>
@@ -18,6 +19,11 @@ static std::vector<CPackets::VehicleTrailerLinkSync> s_pendingTrailerLinkEvents;
 
 namespace
 {
+	float Clamp01(float t)
+	{
+		return std::max(0.0f, std::min(1.0f, t));
+	}
+
 	CVector SlerpUnitVector(const CVector& from, const CVector& to, float t)
 	{
 		CVector a = from;
@@ -38,6 +44,17 @@ namespace
 		if (relLen > 0.0001f)
 			rel /= relLen;
 		return a * std::cos(theta) + rel * std::sin(theta);
+	}
+
+	float BasisVectorAngle(const CVector& a, const CVector& b)
+	{
+		float aLen = a.Magnitude();
+		float bLen = b.Magnitude();
+		if (aLen < 0.0001f || bLen < 0.0001f)
+			return 0.0f;
+		float dot = (a.x * b.x + a.y * b.y + a.z * b.z) / (aLen * bLen);
+		dot = std::max(-1.0f, std::min(1.0f, dot));
+		return std::acos(dot);
 	}
 }
 
@@ -141,7 +158,7 @@ void CNetworkVehicleManager::ProcessRemoteVehicles()
 	m_interpStats.bufferedSnapshots = 0;
 	m_interpStats.correctionCount = 0;
 	const uint32_t now = GetTickCount();
-	const uint32_t renderTick = now > InterpTuning::interpolationDelayMs ? now - InterpTuning::interpolationDelayMs : 0;
+	const uint32_t renderTick = now > CNetworkPlayerManager::InterpTuning::interpolationDelayMs ? now - CNetworkPlayerManager::InterpTuning::interpolationDelayMs : 0;
 
 	for (auto* vehicle : m_pVehicles)
 	{
@@ -158,7 +175,9 @@ void CNetworkVehicleManager::ProcessRemoteVehicles()
 		if (snapshots.size() == 1 || renderTick <= snapshots.front().arrivalTickMs)
 		{
 			const auto& s = snapshots.front();
-			if ((s.position - vehicle->m_pVehicle->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+			const float distanceError = (s.position - vehicle->m_pVehicle->m_matrix->pos).Magnitude();
+			const float rotationError = std::max(BasisVectorAngle(vehicle->m_pVehicle->m_matrix->right, s.roll), BasisVectorAngle(vehicle->m_pVehicle->m_matrix->up, s.up));
+			if (distanceError > CNetworkPlayerManager::InterpTuning::hardSnapDistance || rotationError > CNetworkPlayerManager::InterpTuning::hardSnapHeadingThresholdRad)
 			{
 				vehicle->m_nInterpCorrectionCount++;
 				m_interpStats.correctionCount++;
@@ -175,20 +194,37 @@ void CNetworkVehicleManager::ProcessRemoteVehicles()
 		const auto& from = snapshots.front();
 		const auto& to = snapshots[1];
 		float span = static_cast<float>(to.arrivalTickMs - from.arrivalTickMs);
-		float t = span > 0.0f ? std::max(0.0f, std::min(1.0f, (renderTick - from.arrivalTickMs) / span)) : 1.0f;
+		float t = span > 0.0f ? Clamp01((renderTick - from.arrivalTickMs) / span) : 1.0f;
+		const CVector targetPos = from.position + (to.position - from.position) * t;
+		const CVector targetRight = SlerpUnitVector(from.roll, to.roll, t);
+		const CVector targetUp = SlerpUnitVector(from.up, to.up, t);
+		const float positionError = (targetPos - vehicle->m_pVehicle->m_matrix->pos).Magnitude();
+		const float rotationError = std::max(BasisVectorAngle(vehicle->m_pVehicle->m_matrix->right, targetRight), BasisVectorAngle(vehicle->m_pVehicle->m_matrix->up, targetUp));
 
-		CVector interpPos = from.position + (to.position - from.position) * t;
-		if ((interpPos - vehicle->m_pVehicle->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+		if (positionError > CNetworkPlayerManager::InterpTuning::hardSnapDistance || rotationError > CNetworkPlayerManager::InterpTuning::hardSnapHeadingThresholdRad)
 		{
 			vehicle->m_nInterpCorrectionCount++;
 			m_interpStats.correctionCount++;
-			interpPos = to.position;
-			t = 1.0f;
+			vehicle->m_pVehicle->m_matrix->pos = to.position;
+			vehicle->m_pVehicle->m_matrix->right = to.roll;
+			vehicle->m_pVehicle->m_matrix->up = to.up;
+			vehicle->m_pVehicle->m_vecMoveSpeed = to.velocity;
+			vehicle->m_pVehicle->m_vecTurnSpeed = to.turnSpeed;
+			vehicle->ApplyHydraulicsPacketState(to.hydraulicsControlState, 0, to.hydraulicsTransitionSequence, true);
+			continue;
 		}
 
-		vehicle->m_pVehicle->m_matrix->pos = interpPos;
-		vehicle->m_pVehicle->m_matrix->right = SlerpUnitVector(from.roll, to.roll, t);
-		vehicle->m_pVehicle->m_matrix->up = SlerpUnitVector(from.up, to.up, t);
+		if (positionError > CNetworkPlayerManager::InterpTuning::deadReckonPositionThreshold)
+		{
+			const float posBlend = t * CNetworkPlayerManager::InterpTuning::translationSmoothFactor;
+			vehicle->m_pVehicle->m_matrix->pos = vehicle->m_pVehicle->m_matrix->pos + (targetPos - vehicle->m_pVehicle->m_matrix->pos) * posBlend;
+		}
+		if (rotationError > CNetworkPlayerManager::InterpTuning::deadReckonRotationThresholdRad)
+		{
+			const float rotBlend = t * CNetworkPlayerManager::InterpTuning::rotationSmoothFactor;
+			vehicle->m_pVehicle->m_matrix->right = SlerpUnitVector(vehicle->m_pVehicle->m_matrix->right, targetRight, rotBlend);
+			vehicle->m_pVehicle->m_matrix->up = SlerpUnitVector(vehicle->m_pVehicle->m_matrix->up, targetUp, rotBlend);
+		}
 		vehicle->m_pVehicle->m_vecMoveSpeed = from.velocity + (to.velocity - from.velocity) * t;
 		vehicle->m_pVehicle->m_vecTurnSpeed = from.turnSpeed + (to.turnSpeed - from.turnSpeed) * t;
 		const uint8_t interpHydraulicsControlState = (t < 0.5f) ? from.hydraulicsControlState : to.hydraulicsControlState;
