@@ -85,6 +85,8 @@ uintptr_t CTheZones__Update_Dest = 0x0;
 CControllerState oldControllerState;
 static bool g_hasLastLocalJetpackState = false;
 static bool g_lastLocalJetpackState = false;
+static uint8_t g_lastKeySyncArea = 0;
+static bool g_hasLastKeySyncArea = false;
 
 static void __cdecl CTheZones__Update_Hook()
 {
@@ -136,10 +138,14 @@ static void __cdecl CTheZones__Update_Hook()
 
     CControllerState newState = pad->NewState;
 
-    if (CUtil::CompareControllerStates(oldControllerState, newState))
+    const uint8_t currArea = static_cast<uint8_t>(CGame::currArea);
+    const bool areaChanged = !g_hasLastKeySyncArea || g_lastKeySyncArea != currArea;
+    if (CUtil::CompareControllerStates(oldControllerState, newState) && !areaChanged)
         return;
-    
+
     oldControllerState = newState;
+    g_lastKeySyncArea = currArea;
+    g_hasLastKeySyncArea = true;
 
     // send local player keys
     CPackets::PlayerKeySync packet{};
@@ -161,6 +167,7 @@ static void __cdecl CTheZones__Update_Hook()
     packet.newState.bDisablePlayerCycleWeapon = pad->bDisablePlayerCycleWeapon;
     packet.newState.bDisablePlayerJump = pad->bDisablePlayerJump;
     packet.newState.bDisablePlayerDisplayVitalStats = pad->bDisablePlayerDisplayVitalStats;
+    packet.currArea = currArea;
 
     CNetwork::SendPacket(CPacketsID::PLAYER_KEY_SYNC, &packet, sizeof packet);
 }
