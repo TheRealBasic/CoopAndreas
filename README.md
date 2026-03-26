@@ -13,6 +13,28 @@ This mod is an unofficial modification for **Grand Theft Auto: San Andreas** and
 
 ## Building (Windows)
 
+### Quick Start (Windows)
+
+Use the guided setup script to validate prerequisites, configure environment variables, build all targets, and deploy required DLLs automatically.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup_and_build.ps1
+```
+
+What the script does:
+- Checks required tooling: `xmake`, `cmake`, and Visual Studio 2022 C++ workload.
+- Prompts for (or reuses) `GTA_SA_DIR` and `PLUGIN_SDK_DIR`, validates them, and stores them for the current user.
+- Verifies `plugin-sdk` is on commit `050d18b6e1770477deab81a40028a40277583d97`.
+- Runs build steps in order: `xmake f -m release`, then `client`, `server`, and `proxy` targets.
+- Ensures `CoopAndreasSA.dll` is in `%GTA_SA_DIR%` and installs proxy as `%GTA_SA_DIR%\eax.dll` (backing up original to `eax_orig.dll` when needed).
+- Prints next steps for compiling `main.scm` when `%GTA_SA_DIR%\CoopAndreas\main.scm` is missing.
+
+Optional arguments (skip prompts):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup_and_build.ps1 -GtaSaDir "C:\Games\GTA San Andreas" -PluginSdkDir "D:\dev\plugin-sdk"
+```
+
 ### Client & Server
 
 1. Make sure you have the **C++ package** installed in **Visual Studio 2022** and **[xmake](https://xmake.io/)** (needed to build the project).
