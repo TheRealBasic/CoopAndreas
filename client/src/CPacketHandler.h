@@ -104,4 +104,9 @@ public:
 	static void PickupDropCreate__Handle(void* data, int size);
 	static void PickupDropResolve__Handle(void* data, int size);
 	static void PickupSnapshotResync__Trigger(uint8_t reason);
+	static void PropertyStateSnapshotBegin__Handle(void* data, int size);
+	static void PropertyStateSnapshotEntry__Handle(void* data, int size);
+	static void PropertyStateSnapshotEnd__Handle(void* data, int size);
+	static void PropertyStateDelta__Handle(void* data, int size);
+	static void PropertyStateDelta__Trigger(uint16_t propertyId, int ownerPlayerId, uint8_t unlocked, uint8_t linkedPickupActive, uint8_t linkedInteriorUnlocked, uint8_t currArea, uint8_t action);
 };

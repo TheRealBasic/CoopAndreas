@@ -45,6 +45,9 @@ namespace
 	std::vector<CPackets::PickupDropCreate> g_pickupBufferedDropCreates;
 	std::vector<CPackets::PickupDropResolve> g_pickupBufferedDropResolves;
 	bool g_pickupAwaitingBootstrapSnapshot = true;
+	std::unordered_map<uint16_t, CPackets::PropertyStateSnapshotEntry> g_propertyStates;
+	bool g_propertyAwaitingSnapshot = true;
+	uint32_t g_propertySnapshotVersion = 0;
 	std::unordered_map<uint16_t, CPackets::GangZoneState> g_gangZoneStates;
 	std::unordered_map<int, CPackets::GangGroupMembershipUpdate> g_gangGroupMembershipStates;
 	std::unordered_map<uint16_t, CPackets::GangRelationshipUpdate> g_gangRelationshipStates;
@@ -2399,6 +2402,22 @@ void CPacketHandler::GangStateFromOpcode__Trigger(uint16_t opcode, const OpcodeP
 		packet.targetGangGroupId = static_cast<uint8_t>(std::clamp(params[1].value, 0, 31));
 		packet.relationshipFlags = static_cast<uint8_t>(params[2].value) & 0x3;
 		CNetwork::SendPacket(CPacketsID::GANG_RELATIONSHIP_UPDATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+		return;
+	}
+
+	// 0x04BB set_area_visible {areaId}
+	if (opcode == 0x04BB && paramCount >= 1)
+	{
+		const uint8_t areaId = static_cast<uint8_t>(std::clamp(params[0].value, 0, 255));
+		const uint16_t syntheticPropertyId = static_cast<uint16_t>(1000 + areaId);
+		PropertyStateDelta__Trigger(
+			syntheticPropertyId,
+			CNetworkPlayerManager::m_nMyId,
+			1,
+			1,
+			1,
+			static_cast<uint8_t>(CGame::currArea),
+			0);
 	}
 }
 
@@ -2502,4 +2521,74 @@ void CPacketHandler::PickupDropResolve__Handle(void* data, int size)
 		return;
 	}
 	CNetworkPickupManager::HandleDropResolve(*packet);
+}
+
+void CPacketHandler::PropertyStateSnapshotBegin__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PropertyStateSnapshotBegin*)data;
+	g_propertyAwaitingSnapshot = true;
+	g_propertyStates.clear();
+	g_propertySnapshotVersion = packet->snapshotVersion;
+}
+
+void CPacketHandler::PropertyStateSnapshotEntry__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PropertyStateSnapshotEntry*)data;
+	g_propertyStates[packet->propertyId] = *packet;
+}
+
+void CPacketHandler::PropertyStateSnapshotEnd__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PropertyStateSnapshotEnd*)data;
+	g_propertySnapshotVersion = packet->snapshotVersion;
+	g_propertyAwaitingSnapshot = false;
+}
+
+void CPacketHandler::PropertyStateDelta__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PropertyStateDelta*)data;
+	g_propertySnapshotVersion = std::max(g_propertySnapshotVersion, packet->stateVersion);
+	if (packet->action == 1)
+	{
+		g_propertyStates.erase(packet->propertyId);
+		return;
+	}
+
+	auto it = g_propertyStates.find(packet->propertyId);
+	if (it != g_propertyStates.end() && packet->stateVersion < it->second.stateVersion)
+	{
+		return;
+	}
+
+	CPackets::PropertyStateSnapshotEntry entry{};
+	entry.propertyId = packet->propertyId;
+	entry.ownerPlayerId = packet->ownerPlayerId;
+	entry.unlocked = packet->unlocked;
+	entry.linkedPickupActive = packet->linkedPickupActive;
+	entry.linkedInteriorUnlocked = packet->linkedInteriorUnlocked;
+	entry.currArea = packet->currArea;
+	entry.stateTimestampMs = packet->stateTimestampMs;
+	entry.stateVersion = packet->stateVersion;
+	g_propertyStates[packet->propertyId] = entry;
+}
+
+void CPacketHandler::PropertyStateDelta__Trigger(uint16_t propertyId, int ownerPlayerId, uint8_t unlocked, uint8_t linkedPickupActive, uint8_t linkedInteriorUnlocked, uint8_t currArea, uint8_t action)
+{
+	if (!CLocalPlayer::m_bIsHost)
+	{
+		return;
+	}
+
+	static uint32_t stateVersion = 0;
+	CPackets::PropertyStateDelta packet{};
+	packet.propertyId = propertyId;
+	packet.ownerPlayerId = ownerPlayerId;
+	packet.unlocked = unlocked ? 1 : 0;
+	packet.linkedPickupActive = linkedPickupActive ? 1 : 0;
+	packet.linkedInteriorUnlocked = linkedInteriorUnlocked ? 1 : 0;
+	packet.currArea = currArea;
+	packet.stateTimestampMs = GetTickCount64();
+	packet.stateVersion = ++stateVersion;
+	packet.action = action;
+	CNetwork::SendPacket(CPacketsID::PROPERTY_STATE_DELTA, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }

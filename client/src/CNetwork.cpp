@@ -192,6 +192,10 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::PICKUP_STATE_DELTA, CPacketHandler::PickupStateDelta__Handle);
 	CNetwork::AddListener(CPacketsID::PICKUP_DROP_CREATE, CPacketHandler::PickupDropCreate__Handle);
 	CNetwork::AddListener(CPacketsID::PICKUP_DROP_RESOLVE, CPacketHandler::PickupDropResolve__Handle);
+	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_SNAPSHOT_BEGIN, CPacketHandler::PropertyStateSnapshotBegin__Handle);
+	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_SNAPSHOT_ENTRY, CPacketHandler::PropertyStateSnapshotEntry__Handle);
+	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_SNAPSHOT_END, CPacketHandler::PropertyStateSnapshotEnd__Handle);
+	CNetwork::AddListener(CPacketsID::PROPERTY_STATE_DELTA, CPacketHandler::PropertyStateDelta__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPacketHandler::PlayerJetpackTransition__Handle);
 }
 

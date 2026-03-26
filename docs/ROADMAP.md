@@ -174,7 +174,8 @@ Legend:
 ## Milestone: Optional Content
 
 ### P2
-- [ ] Property purchase sync. **[P2][M]**
+- [~] Property purchase sync. **[P2][M]** 🚧 In progress (2026-03-26).
+  - **Status update (2026-03-26):** added server-authoritative property state cache + delta replication channel (`PROPERTY_STATE_*`) with late-join snapshot replay and host-migration resync broadcast; added QA checklist coverage for purchase/rejoin/late-join/post-migration parity.
 - [ ] Submissions: `Taxi`, `Firefighter`, `Vigilante`, `Paramedic`, `Pimp`, `Freight Train`. **[P2][L]**
 - [ ] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]**
 - [ ] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]**

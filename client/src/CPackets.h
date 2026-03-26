@@ -91,6 +91,10 @@ enum CPacketsID : unsigned short
 	PICKUP_STATE_DELTA,
 	PICKUP_DROP_CREATE,
 	PICKUP_DROP_RESOLVE,
+	PROPERTY_STATE_SNAPSHOT_BEGIN,
+	PROPERTY_STATE_SNAPSHOT_ENTRY,
+	PROPERTY_STATE_SNAPSHOT_END,
+	PROPERTY_STATE_DELTA,
 	PLAYER_JETPACK_TRANSITION,
 	CHEAT_EFFECT_TRIGGER,
 	PACKET_ID_MAX
@@ -188,6 +192,10 @@ public:
 			sizeof(PickupStateDelta), // PICKUP_STATE_DELTA
 			sizeof(PickupDropCreate), // PICKUP_DROP_CREATE
 			sizeof(PickupDropResolve), // PICKUP_DROP_RESOLVE
+			sizeof(PropertyStateSnapshotBegin), // PROPERTY_STATE_SNAPSHOT_BEGIN
+			sizeof(PropertyStateSnapshotEntry), // PROPERTY_STATE_SNAPSHOT_ENTRY
+			sizeof(PropertyStateSnapshotEnd), // PROPERTY_STATE_SNAPSHOT_END
+			sizeof(PropertyStateDelta), // PROPERTY_STATE_DELTA
 			sizeof(PlayerJetpackTransition), // PLAYER_JETPACK_TRANSITION
 			sizeof(CheatEffectTrigger), // CHEAT_EFFECT_TRIGGER
 		};
@@ -954,5 +962,33 @@ public:
 		int resolverPlayerId;
 		uint64_t stateTimestampMs;
 		uint32_t stateVersion;
+	};
+
+	struct PropertyStateSnapshotBegin
+	{
+		uint32_t snapshotVersion;
+		uint16_t propertyCount;
+	};
+
+	struct PropertyStateSnapshotEntry
+	{
+		uint16_t propertyId;
+		int ownerPlayerId;
+		uint8_t unlocked;
+		uint8_t linkedPickupActive;
+		uint8_t linkedInteriorUnlocked;
+		uint8_t currArea;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct PropertyStateSnapshotEnd
+	{
+		uint32_t snapshotVersion;
+	};
+
+	struct PropertyStateDelta : public PropertyStateSnapshotEntry
+	{
+		uint8_t action; // 0 upsert, 1 remove/reset
 	};
 };

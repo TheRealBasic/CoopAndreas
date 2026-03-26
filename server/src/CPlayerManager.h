@@ -64,6 +64,17 @@ public:
 		}
 	}
 
+	static void BroadcastPropertyStateResync()
+	{
+		for (auto* player : CPlayerManager::m_pPlayers)
+		{
+			if (player && player->m_pPeer)
+			{
+				SendPropertyStateSnapshot(player->m_pPeer);
+			}
+		}
+	}
+
 	struct GangZoneState
 	{
 		uint16_t zoneId;
@@ -111,11 +122,25 @@ public:
 		uint8_t currArea;
 	};
 
+	struct PropertyState
+	{
+		uint16_t propertyId = 0;
+		int ownerPlayerId = -1;
+		uint8_t unlocked = 0;
+		uint8_t linkedPickupActive = 0;
+		uint8_t linkedInteriorUnlocked = 0;
+		uint8_t currArea = 0;
+		uint64_t stateTimestampMs = 0;
+		uint32_t stateVersion = 0;
+	};
+
 	static inline std::unordered_map<uint16_t, GangZoneState> ms_gangZoneStates{};
 	static inline std::unordered_map<int, GangGroupMembershipState> ms_gangGroupMembershipStates{};
 	static inline std::unordered_map<uint16_t, GangRelationshipState> ms_gangRelationshipStates{};
 	static inline GangWarLifecycleState ms_lastGangWarLifecycleState{};
 	static inline std::vector<MapPinState> ms_activeMapPins{};
+	static inline std::unordered_map<uint16_t, PropertyState> ms_propertyStates{};
+	static inline uint32_t ms_propertySnapshotVersion = 0;
 	static inline uint8_t ms_lastOnMissionFlag = 0;
 
 	struct MissionFlowSyncState
@@ -209,6 +234,37 @@ public:
 		MissionFlowSyncState replayPacket = ms_lastMissionFlowSync;
 		replayPacket.replay = 1;
 		CNetwork::SendPacket(peer, CPacketsID::MISSION_FLOW_SYNC, &replayPacket, sizeof(replayPacket), ENET_PACKET_FLAG_RELIABLE);
+	}
+
+	static void SendPropertyStateSnapshot(ENetPeer* peer)
+	{
+		if (!peer)
+		{
+			return;
+		}
+
+		CPropertyStatePackets::PropertyStateSnapshotBegin beginPacket{};
+		beginPacket.snapshotVersion = ms_propertySnapshotVersion;
+		beginPacket.propertyCount = static_cast<uint16_t>(std::min<size_t>(ms_propertyStates.size(), UINT16_MAX));
+		CNetwork::SendPacket(peer, CPacketsID::PROPERTY_STATE_SNAPSHOT_BEGIN, &beginPacket, sizeof(beginPacket), ENET_PACKET_FLAG_RELIABLE);
+
+		for (const auto& [propertyId, state] : ms_propertyStates)
+		{
+			CPropertyStatePackets::PropertyStateSnapshotEntry entry{};
+			entry.propertyId = propertyId;
+			entry.ownerPlayerId = state.ownerPlayerId;
+			entry.unlocked = state.unlocked;
+			entry.linkedPickupActive = state.linkedPickupActive;
+			entry.linkedInteriorUnlocked = state.linkedInteriorUnlocked;
+			entry.currArea = state.currArea;
+			entry.stateTimestampMs = state.stateTimestampMs;
+			entry.stateVersion = state.stateVersion;
+			CNetwork::SendPacket(peer, CPacketsID::PROPERTY_STATE_SNAPSHOT_ENTRY, &entry, sizeof(entry), ENET_PACKET_FLAG_RELIABLE);
+		}
+
+		CPropertyStatePackets::PropertyStateSnapshotEnd endPacket{};
+		endPacket.snapshotVersion = ms_propertySnapshotVersion;
+		CNetwork::SendPacket(peer, CPacketsID::PROPERTY_STATE_SNAPSHOT_END, &endPacket, sizeof(endPacket), ENET_PACKET_FLAG_RELIABLE);
 	}
 	struct CutsceneSkipVoteState
 	{
@@ -441,6 +497,49 @@ public:
 			}
 
 			SendPickupBootstrap(peer);
+		}
+	};
+
+	struct PropertyStateDelta : public CPropertyStatePackets::PropertyStateDelta
+	{
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost || size < (int)sizeof(CPropertyStatePackets::PropertyStateDelta))
+			{
+				return;
+			}
+
+			auto* packet = (CPropertyStatePackets::PropertyStateDelta*)data;
+			packet->action = std::min<uint8_t>(packet->action, CPropertyStatePackets::PROPERTY_STATE_ACTION_REMOVE);
+
+			if (packet->action == CPropertyStatePackets::PROPERTY_STATE_ACTION_REMOVE)
+			{
+				ms_propertyStates.erase(packet->propertyId);
+			}
+			else
+			{
+				PropertyState state{};
+				state.propertyId = packet->propertyId;
+				state.ownerPlayerId = packet->ownerPlayerId;
+				state.unlocked = packet->unlocked ? 1 : 0;
+				state.linkedPickupActive = packet->linkedPickupActive ? 1 : 0;
+				state.linkedInteriorUnlocked = packet->linkedInteriorUnlocked ? 1 : 0;
+				state.currArea = packet->currArea;
+				state.stateTimestampMs = packet->stateTimestampMs;
+				state.stateVersion = packet->stateVersion;
+
+				auto it = ms_propertyStates.find(packet->propertyId);
+				if (it != ms_propertyStates.end() && state.stateVersion < it->second.stateVersion)
+				{
+					return;
+				}
+
+				ms_propertyStates[packet->propertyId] = state;
+			}
+
+			ms_propertySnapshotVersion++;
+			CNetwork::SendPacketToAll(CPacketsID::PROPERTY_STATE_DELTA, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
 
