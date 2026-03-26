@@ -174,6 +174,69 @@ public:
 		return (uint64_t)ms.count();
 	}
 
+	enum eCheatEffectType : uint8_t
+	{
+		CHEAT_EFFECT_WORLD_WEATHER_TIME = 0,
+		CHEAT_EFFECT_PLAYER_WANTED_LEVEL = 1,
+		CHEAT_EFFECT_PLAYER_STATS = 2
+	};
+
+	struct CheatEffectTrigger
+	{
+		uint8_t effectType = CHEAT_EFFECT_WORLD_WEATHER_TIME;
+		unsigned char newWeather = 0;
+		unsigned char oldWeather = 0;
+		unsigned char forcedWeather = 0;
+		unsigned char currentMonth = 0;
+		unsigned char currentDay = 0;
+		unsigned char currentHour = 0;
+		unsigned char currentMinute = 0;
+		unsigned int gameTickCount = 0;
+		uint8_t wantedLevel = 0;
+		float stats[CPlayer::PLAYER_STATS_SYNCED_COUNT]{};
+		int money = 0;
+	};
+
+	struct CheatEffectThrottleState
+	{
+		uint64_t windowStartMs = 0;
+		uint8_t eventCount = 0;
+	};
+
+	static inline std::unordered_map<ENetPeer*, CheatEffectThrottleState> ms_cheatEffectThrottleByPeer{};
+
+	static bool IsCheatEffectRateLimited(ENetPeer* peer)
+	{
+		constexpr uint64_t THROTTLE_WINDOW_MS = 1000;
+		constexpr uint8_t THROTTLE_MAX_EVENTS_PER_WINDOW = 8;
+
+		auto& state = ms_cheatEffectThrottleByPeer[peer];
+		const uint64_t nowMs = GetServerTimeMs();
+		if (state.windowStartMs == 0 || nowMs < state.windowStartMs || (nowMs - state.windowStartMs) >= THROTTLE_WINDOW_MS)
+		{
+			state.windowStartMs = nowMs;
+			state.eventCount = 0;
+		}
+
+		if (state.eventCount >= THROTTLE_MAX_EVENTS_PER_WINDOW)
+		{
+			return true;
+		}
+
+		state.eventCount++;
+		return false;
+	}
+
+	static void ResetCheatEffectThrottle(ENetPeer* peer)
+	{
+		if (!peer)
+		{
+			return;
+		}
+
+		ms_cheatEffectThrottleByPeer.erase(peer);
+	}
+
 	static void RecalculateCutsceneVoteThreshold()
 	{
 		auto& state = ms_cutsceneSkipVoteState;
@@ -523,6 +586,64 @@ public:
 
 			CPlayerPackets::GameWeatherTime* packet = (CPlayerPackets::GameWeatherTime*)data;
 			CNetwork::SendPacketToAll(CPacketsID::GAME_WEATHER_TIME, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+		}
+	};
+
+	struct CheatEffectTriggerPacket
+	{
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost)
+			{
+				return;
+			}
+
+			if (size != sizeof(CPlayerPackets::CheatEffectTrigger))
+			{
+				return;
+			}
+
+			if (IsCheatEffectRateLimited(peer))
+			{
+				return;
+			}
+
+			auto* packet = (CPlayerPackets::CheatEffectTrigger*)data;
+			switch (packet->effectType)
+			{
+				case CHEAT_EFFECT_WORLD_WEATHER_TIME:
+				{
+					CPlayerPackets::GameWeatherTime weatherPacket{};
+					weatherPacket.newWeather = packet->newWeather;
+					weatherPacket.oldWeather = packet->oldWeather;
+					weatherPacket.forcedWeather = packet->forcedWeather;
+					weatherPacket.currentMonth = packet->currentMonth;
+					weatherPacket.currentDay = packet->currentDay;
+					weatherPacket.currentHour = packet->currentHour;
+					weatherPacket.currentMinute = packet->currentMinute;
+					weatherPacket.gameTickCount = packet->gameTickCount;
+					CPlayerPackets::GameWeatherTime::Handle(peer, &weatherPacket, sizeof(weatherPacket));
+					break;
+				}
+				case CHEAT_EFFECT_PLAYER_WANTED_LEVEL:
+				{
+					CPlayerPackets::PlayerWantedLevel wantedPacket{};
+					wantedPacket.wantedLevel = std::min<uint8_t>(packet->wantedLevel, 6);
+					CPlayerPackets::PlayerWantedLevel::Handle(peer, &wantedPacket, sizeof(wantedPacket));
+					break;
+				}
+				case CHEAT_EFFECT_PLAYER_STATS:
+				{
+					CPlayerPackets::PlayerStats statsPacket{};
+					memcpy(statsPacket.stats, packet->stats, sizeof(statsPacket.stats));
+					statsPacket.money = std::clamp(packet->money, 0, INT_MAX);
+					CPlayerPackets::PlayerStats::Handle(peer, &statsPacket, sizeof(statsPacket));
+					break;
+				}
+				default:
+					return;
+			}
 		}
 	};
 

@@ -88,6 +88,7 @@ enum CPacketsID : unsigned short
 	PICKUP_DROP_CREATE,
 	PICKUP_DROP_RESOLVE,
 	PLAYER_JETPACK_TRANSITION,
+	CHEAT_EFFECT_TRIGGER,
 	PACKET_ID_MAX
 };
 
@@ -180,6 +181,7 @@ public:
 			sizeof(PickupDropCreate), // PICKUP_DROP_CREATE
 			sizeof(PickupDropResolve), // PICKUP_DROP_RESOLVE
 			sizeof(PlayerJetpackTransition), // PLAYER_JETPACK_TRANSITION
+			sizeof(CheatEffectTrigger), // CHEAT_EFFECT_TRIGGER
 		};
 
 		return m_nPacketSize[id];
@@ -229,6 +231,29 @@ public:
 		int playerid = 0;
 		uint8_t intent = JETPACK_TRANSITION_ACQUIRE;
 		bool hasJetpack = false;
+	};
+
+	enum eCheatEffectType : uint8_t
+	{
+		CHEAT_EFFECT_WORLD_WEATHER_TIME = 0,
+		CHEAT_EFFECT_PLAYER_WANTED_LEVEL = 1,
+		CHEAT_EFFECT_PLAYER_STATS = 2
+	};
+
+	struct CheatEffectTrigger
+	{
+		uint8_t effectType = CHEAT_EFFECT_WORLD_WEATHER_TIME;
+		unsigned char newWeather = 0;
+		unsigned char oldWeather = 0;
+		unsigned char forcedWeather = 0;
+		unsigned char currentMonth = 0;
+		unsigned char currentDay = 0;
+		unsigned char currentHour = 0;
+		unsigned char currentMinute = 0;
+		unsigned int gameTickCount = 0;
+		uint8_t wantedLevel = 0;
+		float stats[PLAYER_STATS_SYNCED_COUNT]{};
+		int money = 0;
 	};
 
 	#pragma pack(1)
