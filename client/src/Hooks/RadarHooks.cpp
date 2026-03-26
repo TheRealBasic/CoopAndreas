@@ -3,6 +3,24 @@
 #include "CNetworkStaticBlip.h"
 #include <CEntryExit.h>
 
+CVector RadarHooks::NormalizeMapPinPosition(const CVector& position)
+{
+	CVector normalized = position;
+	constexpr float mapWorldRange = 3000.0f;
+	normalized.x = std::clamp(normalized.x, -mapWorldRange, mapWorldRange);
+	normalized.y = std::clamp(normalized.y, -mapWorldRange, mapWorldRange);
+	normalized.z = std::clamp(normalized.z, -500.0f, 2000.0f);
+
+	const float aspect = static_cast<float>(RsGlobal.maximumWidth) / static_cast<float>(std::max(1, RsGlobal.maximumHeight));
+	const float aspectSafe = std::clamp(aspect, 1.0f, 3.0f);
+	const float normalizedX = normalized.x / mapWorldRange;
+	const float normalizedY = normalized.y / mapWorldRange;
+	normalized.x = std::clamp((normalizedX / aspectSafe) * mapWorldRange * aspectSafe, -mapWorldRange, mapWorldRange);
+	normalized.y = std::clamp(normalizedY * mapWorldRange, -mapWorldRange, mapWorldRange);
+
+	return normalized;
+}
+
 void CheckAndMarkRadarSync(int blipHandle)
 {
 	if (!CLocalPlayer::m_bIsHost)
@@ -25,7 +43,7 @@ void CRadar__SetBlipSprite_Hook(int blipHandle, char spriteId)
 
 int CRadar__SetCoordBlip_Hook(eBlipType type, CVector posn, int a5, eBlipDisplay display)
 {
-	int result = CRadar::SetCoordBlip(type, posn, a5, display, nullptr);
+	int result = CRadar::SetCoordBlip(type, RadarHooks::NormalizeMapPinPosition(posn), a5, display, nullptr);
 	CheckAndMarkRadarSync(result);
 	return result;
 }

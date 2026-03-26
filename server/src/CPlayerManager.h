@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <climits>
 #include <unordered_set>
+#include <unordered_map>
 #include <cmath>
 #include <chrono>
 
@@ -60,6 +61,64 @@ public:
 			{
 				SendPickupBootstrap(player->m_pPeer);
 			}
+		}
+	}
+
+	struct GangZoneState
+	{
+		uint16_t zoneId;
+		uint8_t owner;
+		uint8_t color;
+		uint8_t state;
+		uint8_t currArea;
+	};
+
+	struct MapPinState
+	{
+		int playerid;
+		bool place;
+		CVector position;
+		uint8_t currArea;
+	};
+
+	static inline std::unordered_map<uint16_t, GangZoneState> ms_gangZoneStates{};
+	static inline std::vector<MapPinState> ms_activeMapPins{};
+
+	static void RefreshActiveMapPinsSnapshot()
+	{
+		ms_activeMapPins.clear();
+		for (auto* connectedPlayer : CPlayerManager::m_pPlayers)
+		{
+			if (!connectedPlayer || !connectedPlayer->m_ucSyncFlags.bWaypointModified)
+			{
+				continue;
+			}
+
+			MapPinState waypointPacket{};
+			waypointPacket.playerid = connectedPlayer->m_iPlayerId;
+			waypointPacket.place = true;
+			waypointPacket.position = connectedPlayer->m_vecWaypointPos;
+			waypointPacket.currArea = connectedPlayer->m_nCurrArea;
+			ms_activeMapPins.push_back(waypointPacket);
+		}
+	}
+
+	static void SendMapStateSnapshot(ENetPeer* peer)
+	{
+		if (!peer)
+		{
+			return;
+		}
+
+		for (const auto& [zoneId, zoneState] : ms_gangZoneStates)
+		{
+			CNetwork::SendPacket(peer, CPacketsID::GANG_ZONE_STATE, (void*)&zoneState, sizeof(zoneState), ENET_PACKET_FLAG_RELIABLE);
+		}
+
+		RefreshActiveMapPinsSnapshot();
+		for (auto& waypointPacket : ms_activeMapPins)
+		{
+			CNetwork::SendPacket(peer, CPacketsID::PLAYER_PLACE_WAYPOINT, &waypointPacket, sizeof(waypointPacket), ENET_PACKET_FLAG_RELIABLE);
 		}
 	}
 	struct CutsceneSkipVoteState
@@ -367,6 +426,7 @@ public:
 		int playerid;
 		bool place;
 		CVector position;
+		uint8_t currArea;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
@@ -376,6 +436,7 @@ public:
 				packet->playerid = player->m_iPlayerId;
 				packet->position.x = std::clamp(packet->position.x, -3000.0f, 3000.0f);
 				packet->position.y = std::clamp(packet->position.y, -3000.0f, 3000.0f);
+				packet->currArea = player->m_nCurrArea;
 				player->m_ucSyncFlags.bWaypointModified = packet->place != 0;
 				player->m_vecWaypointPos = packet->position;
 				CNetwork::SendPacketToAll(CPacketsID::PLAYER_PLACE_WAYPOINT, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
@@ -432,11 +493,14 @@ public:
 	{
 		int playerid;
 		CCompressedControllerState newState;
+		uint8_t currArea;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
 			CPlayerPackets::PlayerKeySync* packet = (CPlayerPackets::PlayerKeySync*)data;
-			packet->playerid = CPlayerManager::GetPlayer(peer)->m_iPlayerId;
+			auto* player = CPlayerManager::GetPlayer(peer);
+			packet->playerid = player->m_iPlayerId;
+			player->m_nCurrArea = packet->currArea;
 			CNetwork::SendPacketToAll(CPacketsID::PLAYER_KEY_SYNC, packet, sizeof * packet, (ENetPacketFlag)0, peer);
 		}
 	};
@@ -1054,6 +1118,40 @@ public:
 			{
 				CNetwork::SendPacketToAll(CPacketsID::TAG_UPDATE, data, sizeof(TagUpdate), ENET_PACKET_FLAG_RELIABLE, peer);
 			}
+		}
+	};
+
+	struct GangZoneStatePacket
+	{
+		uint16_t zoneId;
+		uint8_t owner;
+		uint8_t color;
+		uint8_t state;
+		uint8_t currArea;
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost)
+			{
+				return;
+			}
+
+			auto* packet = (GangZoneStatePacket*)data;
+			packet->owner = std::min<uint8_t>(packet->owner, 10);
+			packet->color = std::min<uint8_t>(packet->color, 255);
+			packet->state = std::min<uint8_t>(packet->state, 4);
+			player->m_nCurrArea = packet->currArea;
+
+			GangZoneState cachedState{};
+			cachedState.zoneId = packet->zoneId;
+			cachedState.owner = packet->owner;
+			cachedState.color = packet->color;
+			cachedState.state = packet->state;
+			cachedState.currArea = packet->currArea;
+			ms_gangZoneStates[packet->zoneId] = cachedState;
+
+			CNetwork::SendPacketToAll(CPacketsID::GANG_ZONE_STATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
 

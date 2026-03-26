@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "WorldHooks.h"
+#include "RadarHooks.h"
 #include "CNetworkVehicle.h"
 #include "CNetworkPed.h"
 #include <CEntryExit.h>
@@ -29,14 +30,14 @@ static void __cdecl CWeather__SetWeatherToAppropriateTypeNow_Hook()
 static CdeclEvent	 <AddressList<0x5775D2, H_CALL>, PRIORITY_AFTER, ArgPick5N<eBlipType, 0, CVector, 1, eBlipColour, 2, eBlipDisplay, 3, char*, 4>, void(eBlipType, CVector, eBlipColour, eBlipDisplay, char*)> waypointPlaceEvent;
 static void PlaceWaypointHook(eBlipType type, CVector posn, eBlipColour color, eBlipDisplay blipDisplay, char* scriptName)
 {
-    CPackets::PlayerPlaceWaypoint packet = { 0, true, posn };
+    CPackets::PlayerPlaceWaypoint packet = { 0, true, RadarHooks::NormalizeMapPinPosition(posn), static_cast<uint8_t>(CGame::currArea) };
     CNetwork::SendPacket(CPacketsID::PLAYER_PLACE_WAYPOINT, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
 }
 
 // hide waypoint
 static void __fastcall CRadar__ClearBlip_Hook(int blipIndex, SKIP_EDX)
 {
-    CPackets::PlayerPlaceWaypoint packet = { 0, false, CVector(0, 0, 0) };
+    CPackets::PlayerPlaceWaypoint packet = { 0, false, CVector(0, 0, 0), static_cast<uint8_t>(CGame::currArea) };
     CNetwork::SendPacket(CPacketsID::PLAYER_PLACE_WAYPOINT, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
     CRadar::ClearBlip(blipIndex);
 }

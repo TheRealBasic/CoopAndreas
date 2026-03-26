@@ -77,6 +77,7 @@ enum CPacketsID : unsigned short
 	FIRE_REMOVE,
 	TAG_UPDATE,
 	UPDATE_ALL_TAGS,
+	GANG_ZONE_STATE,
 	TELEPORT_PLAYER_SCRIPTED,
 	PICKUP_SNAPSHOT_BEGIN,
 	PICKUP_SNAPSHOT_ENTRY,
@@ -166,6 +167,7 @@ public:
 			sizeof(FireRemove), // FIRE_REMOVE
 			sizeof(TagUpdate), // TAG_UPDATE
 			sizeof(UpdateAllTags), // UPDATE_ALL_TAGS
+			sizeof(GangZoneState), // GANG_ZONE_STATE
 			sizeof(TeleportPlayerScripted), // TELEPORT_PLAYER_SCRIPTED
 			sizeof(PickupSnapshotBegin), // PICKUP_SNAPSHOT_BEGIN
 			sizeof(PickupSnapshotEntry), // PICKUP_SNAPSHOT_ENTRY
@@ -249,6 +251,7 @@ public:
 		int playerid;
 		bool place;
 		CVector position;
+		uint8_t currArea;
 	};
 
 	struct PlayerSetHost
@@ -459,6 +462,7 @@ public:
 	{
 		int playerid;
 		CCompressedControllerState newState;
+		uint8_t currArea;
 	};
 
 	struct PedDriverUpdate
@@ -774,6 +778,15 @@ public:
 	struct UpdateAllTags
 	{
 		TagUpdate tags[150];
+	};
+
+	struct GangZoneState
+	{
+		uint16_t zoneId;
+		uint8_t owner;
+		uint8_t color;
+		uint8_t state;
+		uint8_t currArea;
 	};
 
 	struct TeleportPlayerScripted

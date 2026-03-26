@@ -88,6 +88,7 @@ public:
 	static void TagUpdate__Handle(void* data, int size);
 	static void UpdateAllTags__Handle(void* data, int size);
 	static void UpdateAllTags__Trigger();
+	static void GangZoneState__Handle(void* data, int size);
 	static void TeleportPlayerScripted__Handle(void* data, int size);
 	static void PickupSnapshotBegin__Handle(void* data, int size);
 	static void PickupSnapshotEntry__Handle(void* data, int size);
