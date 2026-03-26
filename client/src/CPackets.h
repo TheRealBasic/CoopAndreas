@@ -278,6 +278,9 @@ public:
 		float health;
 		char paintjob;
 		float planeGearState;
+		uint8_t hydraulicsControlState;
+		uint8_t hydraulicsTransitionMask;
+		uint16_t hydraulicsTransitionSequence;
 		unsigned char locked;
 	};
 
@@ -300,6 +303,9 @@ public:
 		float bikeLean;
 		unsigned short miscComponentAngle; // hydra thrusters
 		float planeGearState;
+		uint8_t hydraulicsControlState;
+		uint8_t hydraulicsTransitionMask;
+		uint16_t hydraulicsTransitionSequence;
 		unsigned char locked;
 	};
 

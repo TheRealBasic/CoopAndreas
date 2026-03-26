@@ -105,6 +105,9 @@ class CVehiclePackets
 			float health;
 			char paintjob;
 			float planeGearState;
+			uint8_t hydraulicsControlState;
+			uint8_t hydraulicsTransitionMask;
+			uint16_t hydraulicsTransitionSequence;
 			unsigned char locked;
 
 			static void Handle(ENetPeer* peer, void* data, int size)
@@ -119,6 +122,9 @@ class CVehiclePackets
 					{
 						vehicle->m_vecPosition = packet->pos;
 						vehicle->m_vecRotation = packet->rot;
+						vehicle->m_hydraulicsState.controlState = packet->hydraulicsControlState;
+						vehicle->m_hydraulicsState.transitionMask = packet->hydraulicsTransitionMask;
+						vehicle->m_hydraulicsState.transitionSequence = packet->hydraulicsTransitionSequence;
 						CNetwork::SendPacketToAll(CPacketsID::VEHICLE_IDLE_UPDATE, packet, sizeof * packet, (ENetPacketFlag)0, peer);
 					}
 					else
@@ -148,6 +154,9 @@ class CVehiclePackets
 			float bikeLean;
 			unsigned short miscComponentAngle; // hydra thrusters
 			float planeGearState;
+			uint8_t hydraulicsControlState;
+			uint8_t hydraulicsTransitionMask;
+			uint16_t hydraulicsTransitionSequence;
 			unsigned char locked;
 
 			static void Handle(ENetPeer* peer, void* data, int size)
@@ -167,6 +176,9 @@ class CVehiclePackets
 						vehicle->m_vecPosition = packet->pos;
 						vehicle->m_vecRotation = packet->rot;
 						vehicle->m_bUsedByPed = false;
+						vehicle->m_hydraulicsState.controlState = packet->hydraulicsControlState;
+						vehicle->m_hydraulicsState.transitionMask = packet->hydraulicsTransitionMask;
+						vehicle->m_hydraulicsState.transitionSequence = packet->hydraulicsTransitionSequence;
 						vehicle->ReassignSyncer(player);
 					}
 				}

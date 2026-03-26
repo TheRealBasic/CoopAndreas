@@ -165,6 +165,7 @@ void CNetworkVehicleManager::ProcessRemoteVehicles()
 			vehicle->m_pVehicle->m_matrix->up = s.up;
 			vehicle->m_pVehicle->m_vecMoveSpeed = s.velocity;
 			vehicle->m_pVehicle->m_vecTurnSpeed = s.turnSpeed;
+			vehicle->ApplyHydraulicsPacketState(s.hydraulicsControlState, 0, s.hydraulicsTransitionSequence, true);
 			continue;
 		}
 
@@ -187,6 +188,9 @@ void CNetworkVehicleManager::ProcessRemoteVehicles()
 		vehicle->m_pVehicle->m_matrix->up = SlerpUnitVector(from.up, to.up, t);
 		vehicle->m_pVehicle->m_vecMoveSpeed = from.velocity + (to.velocity - from.velocity) * t;
 		vehicle->m_pVehicle->m_vecTurnSpeed = from.turnSpeed + (to.turnSpeed - from.turnSpeed) * t;
+		const uint8_t interpHydraulicsControlState = (t < 0.5f) ? from.hydraulicsControlState : to.hydraulicsControlState;
+		const uint16_t interpHydraulicsTransitionSequence = (t < 0.5f) ? from.hydraulicsTransitionSequence : to.hydraulicsTransitionSequence;
+		vehicle->ApplyHydraulicsPacketState(interpHydraulicsControlState, 0, interpHydraulicsTransitionSequence, false);
 	}
 }
 
@@ -268,6 +272,7 @@ void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const C
 	vehicle->m_cachedState.color2 = packet.color2;
 	vehicle->m_cachedState.health = packet.health;
 	vehicle->m_cachedState.locked = (eDoorLock)packet.locked;
+	vehicle->ApplyHydraulicsPacketState(packet.hydraulicsControlState, packet.hydraulicsTransitionMask, packet.hydraulicsTransitionSequence, false);
 
 	CNetworkVehicle::InterpSnapshot snapshot{};
 	snapshot.position = packet.pos;
@@ -276,6 +281,8 @@ void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const C
 	snapshot.velocity = packet.velocity;
 	snapshot.turnSpeed = packet.turnSpeed;
 	snapshot.health = packet.health;
+	snapshot.hydraulicsControlState = packet.hydraulicsControlState;
+	snapshot.hydraulicsTransitionSequence = packet.hydraulicsTransitionSequence;
 	snapshot.arrivalTickMs = GetTickCount();
 	snapshot.serverSequence = ++vehicle->m_nSnapshotSequence;
 	vehicle->m_interpSnapshots.push_back(snapshot);
@@ -298,6 +305,7 @@ void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const C
 	vehicle->m_cachedState.paintjob = packet.paintjob;
 	vehicle->m_cachedState.locked = (eDoorLock)packet.locked;
 	vehicle->m_cachedState.driverPlayerId = packet.playerid;
+	vehicle->ApplyHydraulicsPacketState(packet.hydraulicsControlState, packet.hydraulicsTransitionMask, packet.hydraulicsTransitionSequence, false);
 
 	CNetworkVehicle::InterpSnapshot snapshot{};
 	snapshot.position = packet.pos;
@@ -306,6 +314,8 @@ void CNetworkVehicleManager::CacheNetworkState(CNetworkVehicle* vehicle, const C
 	snapshot.velocity = packet.velocity;
 	snapshot.turnSpeed = vehicle->m_cachedState.turnSpeed;
 	snapshot.health = packet.health;
+	snapshot.hydraulicsControlState = packet.hydraulicsControlState;
+	snapshot.hydraulicsTransitionSequence = packet.hydraulicsTransitionSequence;
 	snapshot.arrivalTickMs = GetTickCount();
 	snapshot.serverSequence = ++vehicle->m_nSnapshotSequence;
 	vehicle->m_interpSnapshots.push_back(snapshot);
