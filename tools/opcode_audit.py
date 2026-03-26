@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from collections import Counter, defaultdict
 
@@ -72,7 +74,31 @@ def category_for(cmd):
     return 'other'
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Audit storyline opcodes against syncedOpcodes coverage.',
+    )
+    parser.add_argument(
+        '--output',
+        type=Path,
+        default=OUT_MD,
+        help='Path to write the generated markdown report.',
+    )
+    parser.add_argument(
+        '--max-missing',
+        type=int,
+        default=None,
+        help='Fail with exit code 1 if missing opcode count is greater than this value.',
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    out_md = args.output
+    if not out_md.is_absolute():
+        out_md = ROOT / out_md
+
     targets = load_targets()
     by_class_member, by_name = load_opcode_index()
     data = json.loads(SA_JSON.read_text(encoding='utf-8'))
@@ -155,9 +181,19 @@ def main():
             f"| `0x{op:04X}` | `{item['display']}` | {item['category']}; used {item['count']} times across {len(item['files'])} target scripts. |"
         )
 
-    OUT_MD.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    print(f'Wrote {OUT_MD}')
+    out_md.parent.mkdir(parents=True, exist_ok=True)
+    out_md.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    print(f'Wrote {out_md}')
+    print(f'Missing vs syncedOpcodes: {len(missing)}')
+
+    if args.max_missing is not None and len(missing) > args.max_missing:
+        print(
+            f'ERROR: missing opcode count {len(missing)} exceeds threshold {args.max_missing}.',
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())
