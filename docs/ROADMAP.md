@@ -47,8 +47,14 @@ Legend:
   - **Acceptance criteria (passed):** reconnecting and late-join peers receive in-progress lifecycle snapshot plus final ownership state without manual refresh.
   - **Acceptance criteria (passed):** interior/area transitions and mission-overlap situations do not suppress gang-war lifecycle propagation.
   - **Validation artifact:** `docs/qa/gang-wars-sync-matrix.md` multi-peer matrix with pass/fail criteria for GW-01..GW-10.
-- [ ] Parachute jump sync. **[P2][M]**
-- [ ] Stunt systems (`collecting`, per-player slow motion). **[P2][M]**
+- [x] Parachute jump sync. **[P2][M]** ✅ Completed (2026-03-26).
+  - **Acceptance criteria (passed):** host-authoritative parachute lifecycle transitions replicate deterministically (`deploy`, `glide`, `cut`, `landing`, `fail`).
+  - **Acceptance criteria (passed):** reconnect and late-join peers hydrate in-progress lifecycle state without duplicate terminal outcomes or reward side effects.
+- [x] Stunt systems (`collecting`, per-player slow motion). **[P2][M]** ✅ Completed (2026-03-26).
+  - **Acceptance criteria (passed):** stunt triggers and scoring replicate per player without cross-player slow-motion bleed.
+  - **Acceptance criteria (passed):** stunt collection/checkpoint progress remains authoritative and persists through reconnect and late join.
+  - **Acceptance criteria (passed):** reward replay is idempotent (no duplicate grants) across reconnect/late-join snapshot hydration.
+  - **Validation artifact:** `docs/qa/parachute-stunt-sync-matrix.md` multi-peer and high-latency matrix (PS-01..PS-11).
 - [ ] Chat gamepad support with on-screen keyboard. **[P2][M]**
 - [ ] Minor ideas: sync laser sniper red dot, moon-sniper easter egg shot size effect. **[P2][S]**
 
