@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CNetworkStaticBlip.h"
+#include "Hooks/RadarHooks.h"
 #include "CEntryExit.h"
 #include <CEntryExitManager.h>
 
@@ -29,6 +30,7 @@ void CNetworkStaticBlip::Create(CPackets::CreateStaticBlip& packet)
 		ms_bMassUpdateJustReceived = false;
 	}
 
+	packet.position = RadarHooks::NormalizeMapPinPosition(packet.position);
 	int blip = CRadar::SetCoordBlip(static_cast<eBlipType>(packet.type ? eBlipType::BLIP_COORD : eBlipType::BLIP_CONTACTPOINT), packet.position, 0, static_cast<eBlipDisplay>(packet.display), nullptr);
 	CRadar::SetBlipSprite(blip, packet.sprite);
 	CRadar::ChangeBlipDisplay(blip, static_cast<eBlipDisplay>(packet.display));
@@ -69,6 +71,7 @@ void CNetworkStaticBlip::Send()
 			packet.position = trace.m_vecPos;
 		}
 
+		packet.position = RadarHooks::NormalizeMapPinPosition(packet.position);
 		packet.display = trace.m_nBlipDisplay;
 		packet.sprite = trace.m_nRadarSprite;
 		packet.type = trace.m_nBlipType == eBlipType::BLIP_COORD;

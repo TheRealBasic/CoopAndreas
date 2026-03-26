@@ -18,6 +18,7 @@
 #include <game_sa/CTagManager.h>
 #include <CNetworkPickupManager.h>
 #include <CNetworkFireManager.h>
+#include "Hooks/RadarHooks.h"
 
 namespace
 {
@@ -43,6 +44,7 @@ namespace
 	std::vector<CPackets::PickupDropCreate> g_pickupBufferedDropCreates;
 	std::vector<CPackets::PickupDropResolve> g_pickupBufferedDropResolves;
 	bool g_pickupAwaitingBootstrapSnapshot = true;
+	std::unordered_map<uint16_t, CPackets::GangZoneState> g_gangZoneStates;
 }
 
 // PlayerConnected
@@ -309,6 +311,7 @@ void CPacketHandler::PlayerPlaceWaypoint__Handle(void* data, int size)
 	CNetworkPlayer* player = CNetworkPlayerManager::GetPlayer(packet->playerid);
 
 	player->m_bWaypointPlaced = packet->place;
+	packet->position = RadarHooks::NormalizeMapPinPosition(packet->position);
 	player->m_vecWaypointPos = &packet->position;
 
 #ifdef PACKET_DEBUG_MESSAGES
@@ -2176,6 +2179,12 @@ void CPacketHandler::UpdateAllTags__Trigger()
 	}
 
 	CNetwork::SendPacket(CPacketsID::UPDATE_ALL_TAGS, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void CPacketHandler::GangZoneState__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::GangZoneState*)data;
+	g_gangZoneStates[packet->zoneId] = *packet;
 }
 
 // TeleportPlayerScripted

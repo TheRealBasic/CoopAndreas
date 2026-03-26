@@ -34,6 +34,7 @@ class CPlayer
 		unsigned short m_usCurrentAmmo = 0;
 		uint8_t m_nWantedLevel = 0;
 		bool m_bHasJetpack = false;
+		uint8_t m_nCurrArea = 0;
 		CVector m_vecWaypointPos{};
 		struct {
 			uint8_t bStatsModified : 1;
