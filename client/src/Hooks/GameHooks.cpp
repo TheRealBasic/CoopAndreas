@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "GameHooks.h"
 #include "CKeySync.h"
+#include "../CStatsSync.h"
 #include <CCutsceneMgr.h>
 
 static uint32_t g_cutsceneSessionToken = 0;
@@ -26,11 +27,126 @@ static void __cdecl CClock__SetGameClock_Hook(unsigned char h, unsigned char m, 
 }
 
 DWORD ProcessCheat_Hook_Ret = 0x438589;
+static int g_lastCheatWantedLevel = -1;
+static int g_lastCheatMoney = 0;
+static float g_lastCheatStats[CPackets::PLAYER_STATS_SYNCED_COUNT]{};
+static bool g_hasCheatSnapshot = false;
+
+static void CaptureCheatState()
+{
+    auto* localPlayer = FindPlayerPed(0);
+    if (!localPlayer)
+    {
+        g_hasCheatSnapshot = false;
+        return;
+    }
+
+    g_lastCheatWantedLevel = std::clamp(localPlayer->GetWantedLevel(), 0, 6);
+    g_lastCheatMoney = 0;
+
+    if (auto* playerInfo = localPlayer->GetPlayerInfoForThisPlayerPed())
+    {
+        g_lastCheatMoney = std::clamp(playerInfo->m_nMoney, 0, INT_MAX);
+    }
+
+    for (uint8_t i = 0; i < CPackets::PLAYER_STATS_SYNCED_COUNT; i++)
+    {
+        g_lastCheatStats[i] = CStats::GetStatValue(CStatsSync::m_aeSyncedStats[i]);
+    }
+
+    g_hasCheatSnapshot = true;
+}
+
+static void SendCheatEffect(CPackets::CheatEffectTrigger& packet)
+{
+    if (!CNetwork::m_bConnected || !CLocalPlayer::m_bIsHost)
+    {
+        return;
+    }
+
+    CNetwork::SendPacket(CPacketsID::CHEAT_EFFECT_TRIGGER, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+}
+
+static void ProcessCheatStateMutations()
+{
+    if (!g_hasCheatSnapshot)
+    {
+        return;
+    }
+
+    auto* localPlayer = FindPlayerPed(0);
+    if (!localPlayer)
+    {
+        return;
+    }
+
+    const int wantedLevel = std::clamp(localPlayer->GetWantedLevel(), 0, 6);
+    if (wantedLevel != g_lastCheatWantedLevel)
+    {
+        CPackets::CheatEffectTrigger wantedPacket{};
+        wantedPacket.effectType = CPackets::CHEAT_EFFECT_PLAYER_WANTED_LEVEL;
+        wantedPacket.wantedLevel = (uint8_t)wantedLevel;
+        SendCheatEffect(wantedPacket);
+    }
+
+    bool statsChanged = false;
+    for (uint8_t i = 0; i < CPackets::PLAYER_STATS_SYNCED_COUNT; i++)
+    {
+        const float currentStat = CStats::GetStatValue(CStatsSync::m_aeSyncedStats[i]);
+        if (std::fabs(currentStat - g_lastCheatStats[i]) > 0.001f)
+        {
+            statsChanged = true;
+            break;
+        }
+    }
+
+    int currentMoney = 0;
+    if (auto* playerInfo = localPlayer->GetPlayerInfoForThisPlayerPed())
+    {
+        currentMoney = std::clamp(playerInfo->m_nMoney, 0, INT_MAX);
+    }
+    if (currentMoney != g_lastCheatMoney)
+    {
+        statsChanged = true;
+    }
+
+    if (statsChanged)
+    {
+        CPackets::CheatEffectTrigger statsPacket{};
+        statsPacket.effectType = CPackets::CHEAT_EFFECT_PLAYER_STATS;
+        for (uint8_t i = 0; i < CPackets::PLAYER_STATS_SYNCED_COUNT; i++)
+        {
+            statsPacket.stats[i] = CStats::GetStatValue(CStatsSync::m_aeSyncedStats[i]);
+        }
+        statsPacket.money = currentMoney;
+        SendCheatEffect(statsPacket);
+    }
+
+    // existing behavior: keep weather/time synchronized after cheat processing
+    CPacketHandler::GameWeatherTime__Trigger();
+
+    CPackets::CheatEffectTrigger weatherPacket{};
+    weatherPacket.effectType = CPackets::CHEAT_EFFECT_WORLD_WEATHER_TIME;
+    weatherPacket.newWeather = (unsigned char)CWeather::NewWeatherType;
+    weatherPacket.oldWeather = (unsigned char)CWeather::OldWeatherType;
+    weatherPacket.forcedWeather = (unsigned char)CWeather::ForcedWeatherType;
+    weatherPacket.currentMonth = CClock::ms_nGameClockMonth;
+    weatherPacket.currentDay = CClock::CurrentDay;
+    weatherPacket.currentHour = CClock::ms_nGameClockHours;
+    weatherPacket.currentMinute = CClock::ms_nGameClockMinutes;
+    weatherPacket.gameTickCount = CClock::ms_nMillisecondsPerGameMinute;
+    SendCheatEffect(weatherPacket);
+}
+
 static void __declspec(naked) ProcessCheat_Hook()
 {
     // finally figured out how to hook functions without masturbating RedirectCallRedirectCallRedirectCallRedirectCallRedirectCallRedirectCallRedirectCallRedirectCallRedirectCallRedirectCall
     __asm
     {
+        pushad
+        call CaptureCheatState
+        popad
+
         call eax; call orig code
         pop edi
         pop esi
@@ -39,8 +155,7 @@ static void __declspec(naked) ProcessCheat_Hook()
         pushad; store registers
     }
 
-    // sync time and weather after processing cheat code
-    CPacketHandler::GameWeatherTime__Trigger();
+    ProcessCheatStateMutations();
 
     __asm
     {

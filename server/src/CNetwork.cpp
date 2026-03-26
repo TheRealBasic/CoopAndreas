@@ -167,6 +167,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_REQUEST, CPlayerPackets::PickupSnapshotRequest::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPlayerPackets::PlayerJetpackTransition::Handle);
+    CNetwork::AddListener(CPacketsID::CHEAT_EFFECT_TRIGGER, CPlayerPackets::CheatEffectTriggerPacket::Handle);
 }
 
 void CNetwork::SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag)
@@ -255,6 +256,7 @@ void CNetwork::HandlePlayerDisconnected(ENetEvent& event)
     CVehicleManager::RemoveAllHostedAndNotify(player);
     CPlayerPackets::OnPlayerDisconnectedFromCutsceneVote(player->m_iPlayerId);
     CFireSyncManager::OnPlayerDisconnected(player->m_iPlayerId);
+    CPlayerPackets::ResetCheatEffectThrottle(event.peer);
 
     // remove
     CPlayerManager::Remove(player);
