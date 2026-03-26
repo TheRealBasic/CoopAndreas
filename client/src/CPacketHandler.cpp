@@ -219,6 +219,23 @@ void CPacketHandler::PlayerOnFoot__Handle(void* data, int size)
 	networkPlayer->m_playerOnFoot = *packet;
 }
 
+void CPacketHandler::PlayerJetpackTransition__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PlayerJetpackTransition*)data;
+	CNetworkPlayer* networkPlayer = CNetworkPlayerManager::GetPlayer(packet->playerid);
+	if (!networkPlayer || !networkPlayer->m_pPed)
+	{
+		return;
+	}
+
+	if (packet->hasJetpack != CUtil::IsPedHasJetpack(networkPlayer->m_pPed))
+	{
+		CUtil::SetPlayerJetpack(networkPlayer, packet->hasJetpack);
+	}
+
+	printf("[JetpackTransition][Client][Recv] player=%d intent=%u hasJetpack=%d\n", packet->playerid, packet->intent, packet->hasJetpack ? 1 : 0);
+}
+
 // PlayerBulletShot
 
 void CPacketHandler::PlayerBulletShot__Handle(void* data, int size)

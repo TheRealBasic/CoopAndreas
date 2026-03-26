@@ -187,6 +187,7 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::PICKUP_STATE_DELTA, CPacketHandler::PickupStateDelta__Handle);
 	CNetwork::AddListener(CPacketsID::PICKUP_DROP_CREATE, CPacketHandler::PickupDropCreate__Handle);
 	CNetwork::AddListener(CPacketsID::PICKUP_DROP_RESOLVE, CPacketHandler::PickupDropResolve__Handle);
+	CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPacketHandler::PlayerJetpackTransition__Handle);
 }
 
 void CNetwork::HandlePacketReceive(ENetEvent& event)

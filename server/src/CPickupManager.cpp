@@ -238,6 +238,20 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, con
 	pickup.pendingCollectorPlayerId = -1;
 	pickup.pendingClaimAtMs = 0;
 	pickup.collectedAtMs = GetServerTimeMs();
+
+	if (pickup.type == PICKUP_TYPE_JETPACK)
+	{
+		player->m_bHasJetpack = true;
+		pickup.flags &= ~PICKUP_FLAG_RESPAWNABLE;
+		pickup.respawnMs = 0;
+		CPlayerPackets::PlayerJetpackTransition transitionPacket{};
+		transitionPacket.playerid = player->m_iPlayerId;
+		transitionPacket.intent = CPlayerPackets::JETPACK_TRANSITION_ACQUIRE;
+		transitionPacket.hasJetpack = true;
+		CNetwork::SendPacketToAll(CPacketsID::PLAYER_JETPACK_TRANSITION, &transitionPacket, sizeof(transitionPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
+		printf("[JetpackTransition][Server][PickupCollect] player=%d pickup=%u type=jetpack hasJetpack=1 nonReusable=1\n", player->m_iPlayerId, pickup.networkId);
+	}
+
 	UpdateStateMetadata(pickup);
 	PersistCollectibleState(pickup);
 	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT);
@@ -304,5 +318,12 @@ void CPickupManager::CreateDropsForPlayerDeath(CPlayer* player)
 	if (player->m_bHasJetpack)
 	{
 		CreatePickup(PICKUP_TYPE_JETPACK, 0, dropPos, 370, 90000, 0, 0, 0, CPickupStatePackets::PICKUP_ORIGIN_DROPPED, droppedFlags);
+		player->m_bHasJetpack = false;
+		CPlayerPackets::PlayerJetpackTransition transitionPacket{};
+		transitionPacket.playerid = player->m_iPlayerId;
+		transitionPacket.intent = CPlayerPackets::JETPACK_TRANSITION_FORCED_REMOVE;
+		transitionPacket.hasJetpack = false;
+		CNetwork::SendPacketToAll(CPacketsID::PLAYER_JETPACK_TRANSITION, &transitionPacket, sizeof(transitionPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
+		printf("[JetpackTransition][Server][DropOnDeath] player=%d hasJetpack=0\n", player->m_iPlayerId);
 	}
 }

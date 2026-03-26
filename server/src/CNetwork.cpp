@@ -165,6 +165,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPlayerPackets::TeleportPlayerScripted::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_REQUEST, CPlayerPackets::PickupSnapshotRequest::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);
+    CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPlayerPackets::PlayerJetpackTransition::Handle);
 }
 
 void CNetwork::SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag)
@@ -397,6 +398,16 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             waypointPacket.position = i->m_vecWaypointPos;
             waypointPacket.place = true;
             CNetwork::SendPacket(peer, CPacketsID::PLAYER_PLACE_WAYPOINT, &waypointPacket, sizeof(waypointPacket), ENET_PACKET_FLAG_RELIABLE);
+        }
+
+        if (i->m_bHasJetpack)
+        {
+            CPlayerPackets::PlayerJetpackTransition jetpackPacket{};
+            jetpackPacket.playerid = i->m_iPlayerId;
+            jetpackPacket.intent = CPlayerPackets::JETPACK_TRANSITION_ACQUIRE;
+            jetpackPacket.hasJetpack = true;
+            CNetwork::SendPacket(peer, CPacketsID::PLAYER_JETPACK_TRANSITION, &jetpackPacket, sizeof(jetpackPacket), ENET_PACKET_FLAG_RELIABLE);
+            printf("[JetpackTransition][Server][Snapshot] player=%d hasJetpack=1\n", i->m_iPlayerId);
         }
     }
 
