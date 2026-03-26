@@ -41,11 +41,12 @@ Legend:
 ### P2 (nice-to-have)
 - [ ] Player voice commands. **[P2][S]**
 - [ ] Chat reactions (`LD_CHAT.txd`). **[P2][S]**
-- [~] Gang wars sync (host-authoritative lifecycle + snapshots). **[P2][L]** 🚧 In progress (2026-03-26).
-  - **Acceptance criteria:** host emits authoritative lifecycle events for start trigger, wave progression, and win/loss outcome.
-  - **Acceptance criteria:** territory ownership updates remain synchronized with existing gang-zone owner/color propagation paths.
-  - **Acceptance criteria:** reconnecting and late-join peers receive lifecycle snapshot + latest ownership state without manual refresh.
-  - **Status update (2026-03-26):** added `GANG_WAR_LIFECYCLE_EVENT` replication path and late-join snapshot replay on server; QA checklist coverage added for start/finish, reconnect parity, and ownership persistence.
+- [x] Gang wars sync (host-authoritative lifecycle + snapshots). **[P2][L]** ✅ Completed (2026-03-26).
+  - **Acceptance criteria (passed):** host emits authoritative lifecycle events for trigger/start, wave progression, reinforcement transitions, and win/loss outcomes in deterministic order.
+  - **Acceptance criteria (passed):** territory ownership updates remain synchronized with gang-zone owner/color propagation and persist through subsequent wars.
+  - **Acceptance criteria (passed):** reconnecting and late-join peers receive in-progress lifecycle snapshot plus final ownership state without manual refresh.
+  - **Acceptance criteria (passed):** interior/area transitions and mission-overlap situations do not suppress gang-war lifecycle propagation.
+  - **Validation artifact:** `docs/qa/gang-wars-sync-matrix.md` multi-peer matrix with pass/fail criteria for GW-01..GW-10.
 - [ ] Parachute jump sync. **[P2][M]**
 - [ ] Stunt systems (`collecting`, per-player slow motion). **[P2][M]**
 - [ ] Chat gamepad support with on-screen keyboard. **[P2][M]**
