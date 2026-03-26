@@ -292,6 +292,48 @@ public:
 		}
 	};
 
+	enum eJetpackTransitionIntent : uint8_t
+	{
+		JETPACK_TRANSITION_ACQUIRE = 0,
+		JETPACK_TRANSITION_REMOVE = 1,
+		JETPACK_TRANSITION_FORCED_REMOVE = 2
+	};
+
+	struct PlayerJetpackTransition
+	{
+		int playerid = 0;
+		uint8_t intent = JETPACK_TRANSITION_ACQUIRE;
+		bool hasJetpack = false;
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player)
+			{
+				return;
+			}
+
+			auto* packet = (CPlayerPackets::PlayerJetpackTransition*)data;
+			packet->playerid = player->m_iPlayerId;
+
+			const bool previousState = player->m_bHasJetpack;
+			const bool nextState = packet->hasJetpack;
+			const bool duplicatedAcquire = previousState && packet->intent == JETPACK_TRANSITION_ACQUIRE;
+			const bool staleRemove = !previousState && (packet->intent == JETPACK_TRANSITION_REMOVE || packet->intent == JETPACK_TRANSITION_FORCED_REMOVE);
+
+			printf("[JetpackTransition][Server][Recv] player=%d intent=%u prev=%d next=%d duplicateAcquire=%d staleRemove=%d\n",
+				packet->playerid,
+				packet->intent,
+				previousState ? 1 : 0,
+				nextState ? 1 : 0,
+				duplicatedAcquire ? 1 : 0,
+				staleRemove ? 1 : 0);
+
+			player->m_bHasJetpack = nextState;
+			CNetwork::SendPacketToAll(CPacketsID::PLAYER_JETPACK_TRANSITION, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
+		}
+	};
+
 #pragma pack(1)
 	struct PlayerBulletShot
 	{

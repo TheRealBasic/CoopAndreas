@@ -86,6 +86,7 @@ enum CPacketsID : unsigned short
 	PICKUP_STATE_DELTA,
 	PICKUP_DROP_CREATE,
 	PICKUP_DROP_RESOLVE,
+	PLAYER_JETPACK_TRANSITION,
 	PACKET_ID_MAX
 };
 
@@ -174,6 +175,7 @@ public:
 			sizeof(PickupStateDelta), // PICKUP_STATE_DELTA
 			sizeof(PickupDropCreate), // PICKUP_DROP_CREATE
 			sizeof(PickupDropResolve), // PICKUP_DROP_RESOLVE
+			sizeof(PlayerJetpackTransition), // PLAYER_JETPACK_TRANSITION
 		};
 
 		return m_nPacketSize[id];
@@ -209,6 +211,20 @@ public:
 		bool ducking = false;
 		bool hasJetpack = false;
 		char fightingStyle = 4;
+	};
+
+	enum eJetpackTransitionIntent : uint8_t
+	{
+		JETPACK_TRANSITION_ACQUIRE = 0,
+		JETPACK_TRANSITION_REMOVE = 1,
+		JETPACK_TRANSITION_FORCED_REMOVE = 2
+	};
+
+	struct PlayerJetpackTransition
+	{
+		int playerid = 0;
+		uint8_t intent = JETPACK_TRANSITION_ACQUIRE;
+		bool hasJetpack = false;
 	};
 
 	#pragma pack(1)

@@ -83,6 +83,8 @@ static void __declspec(naked) CRenderer__AddEntityToRenderList_Hook()
 
 uintptr_t CTheZones__Update_Dest = 0x0;
 CControllerState oldControllerState;
+static bool g_hasLastLocalJetpackState = false;
+static bool g_lastLocalJetpackState = false;
 
 static void __cdecl CTheZones__Update_Hook()
 {
@@ -100,6 +102,38 @@ static void __cdecl CTheZones__Update_Hook()
     }
 
     CPad* pad = CPad::GetPad(0);
+    CPlayerPed* localPlayer = FindPlayerPed(-1);
+
+    if (localPlayer)
+    {
+        const bool hasJetpackNow = CUtil::IsPedHasJetpack(localPlayer);
+
+        if (!g_hasLastLocalJetpackState)
+        {
+            g_hasLastLocalJetpackState = true;
+            g_lastLocalJetpackState = hasJetpackNow;
+        }
+        else if (g_lastLocalJetpackState != hasJetpackNow)
+        {
+            CPackets::PlayerJetpackTransition transitionPacket{};
+            transitionPacket.hasJetpack = hasJetpackNow;
+
+            if (hasJetpackNow)
+            {
+                transitionPacket.intent = CPackets::JETPACK_TRANSITION_ACQUIRE;
+            }
+            else
+            {
+                transitionPacket.intent = localPlayer->m_pVehicle ? CPackets::JETPACK_TRANSITION_FORCED_REMOVE : CPackets::JETPACK_TRANSITION_REMOVE;
+            }
+
+            CNetwork::SendPacket(CPacketsID::PLAYER_JETPACK_TRANSITION, &transitionPacket, sizeof transitionPacket, ENET_PACKET_FLAG_RELIABLE);
+            printf("[JetpackTransition][Client][Send] intent=%u hasJetpack=%d inVehicle=%d\n", transitionPacket.intent, transitionPacket.hasJetpack ? 1 : 0, localPlayer->m_pVehicle ? 1 : 0);
+
+            g_lastLocalJetpackState = hasJetpackNow;
+        }
+    }
+
     CControllerState newState = pad->NewState;
 
     if (CUtil::CompareControllerStates(oldControllerState, newState))
