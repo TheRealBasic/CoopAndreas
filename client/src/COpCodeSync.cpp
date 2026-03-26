@@ -432,6 +432,11 @@ void BuildAndSendOpcode()
             message.flag = (scriptParamCount > 1) ? (uint8_t)scriptParamsBuffer[1].value : 0;
             message.messageType = (lastOpCodeProcessed == 0x00BA) ? 1 : (lastOpCodeProcessed == 0x00BC ? 2 : (lastOpCodeProcessed == 0x03E5 ? 3 : 0));
             CMissionSyncState::EmitMissionFlowText((uint16_t)lastOpCodeProcessed, message);
+
+            if (lastOpCodeProcessed == 0x0318)
+            {
+                CMissionSyncState::HandleSubmissionMissionOutcome(true);
+            }
         }
     }
     else if (lastOpCodeProcessed == 0x045C)
@@ -442,6 +447,7 @@ void BuildAndSendOpcode()
         message.time = 4000;
         message.flag = 1;
         CMissionSyncState::EmitMissionFlowText((uint16_t)lastOpCodeProcessed, message);
+        CMissionSyncState::HandleSubmissionMissionOutcome(false);
     }
 
     if (lastOpCodeProcessed == COMMAND_ADD_SCORE && scriptParamCount >= 2)

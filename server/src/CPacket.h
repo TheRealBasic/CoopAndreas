@@ -299,10 +299,14 @@ public:
 	{
 		uint8_t submissionType;
 		uint8_t active;
+		uint8_t level;
 		uint8_t stage;
 		uint16_t progress;
 		int32_t timerMs;
+		int32_t score;
 		int32_t rewardCash;
+		uint8_t outcome;
+		uint8_t participantCount;
 		uint8_t currArea;
 		uint64_t stateTimestampMs;
 		uint32_t stateVersion;

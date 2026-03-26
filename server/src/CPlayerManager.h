@@ -149,10 +149,14 @@ public:
 	{
 		uint8_t submissionType = 0;
 		uint8_t active = 0;
+		uint8_t level = 0;
 		uint8_t stage = 0;
 		uint16_t progress = 0;
 		int32_t timerMs = 0;
+		int32_t score = 0;
 		int32_t rewardCash = 0;
+		uint8_t outcome = 0;
+		uint8_t participantCount = 0;
 		uint8_t currArea = 0;
 		uint64_t stateTimestampMs = 0;
 		uint32_t stateVersion = 0;
@@ -310,10 +314,14 @@ public:
 			CSubmissionMissionPackets::SubmissionMissionSnapshotEntry entry{};
 			entry.submissionType = submissionType;
 			entry.active = state.active ? 1 : 0;
+			entry.level = state.level;
 			entry.stage = state.stage;
 			entry.progress = state.progress;
 			entry.timerMs = state.timerMs;
+			entry.score = state.score;
 			entry.rewardCash = state.rewardCash;
+			entry.outcome = state.outcome;
+			entry.participantCount = state.participantCount;
 			entry.currArea = state.currArea;
 			entry.stateTimestampMs = state.stateTimestampMs;
 			entry.stateVersion = state.stateVersion;
@@ -624,10 +632,14 @@ public:
 				SubmissionMissionState state{};
 				state.submissionType = packet->submissionType;
 				state.active = packet->active ? 1 : 0;
+				state.level = packet->level;
 				state.stage = packet->stage;
 				state.progress = packet->progress;
 				state.timerMs = packet->timerMs;
+				state.score = packet->score;
 				state.rewardCash = packet->rewardCash;
+				state.outcome = packet->outcome;
+				state.participantCount = packet->participantCount;
 				state.currArea = packet->currArea;
 				state.stateTimestampMs = packet->stateTimestampMs;
 				state.stateVersion = packet->stateVersion;

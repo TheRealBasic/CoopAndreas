@@ -35,6 +35,7 @@ public:
     static void HandleSubmissionMissionSnapshotEnd(const CPackets::SubmissionMissionSnapshotEnd& packet);
     static void HandleSubmissionMissionStateDelta(const CPackets::SubmissionMissionStateDelta& packet);
     static void TriggerSubmissionMissionRewardDelta(int rewardDelta);
+    static void HandleSubmissionMissionOutcome(bool passed);
 
     static bool HandleEndSceneSkip();
     static bool HandleStartCutscene();
