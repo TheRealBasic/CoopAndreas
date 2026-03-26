@@ -107,14 +107,10 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x0792, true, {eSyncedParamType::PED}}, // clear_char_tasks_immediately [Char]
     {0x0967, true, {eSyncedParamType::PED}}, // start_char_facial_talk [Char] {duration} [int]
     {0x0968, true, {eSyncedParamType::PED}}, // stop_char_facial_talk [Char]
-    {COMMAND_TASK_PLAY_ANIM_NON_INTERRUPTABLE, true, eSyncedParamType::PED},
     {COMMAND_TASK_GO_STRAIGHT_TO_COORD, true, eSyncedParamType::PED},
     {COMMAND_TASK_ACHIEVE_HEADING, true, eSyncedParamType::PED},
     {COMMAND_TASK_JUMP, true, eSyncedParamType::PED},
     {COMMAND_TASK_TIRED, true, eSyncedParamType::PED},
-    {COMMAND_TASK_PLAY_ANIM_SECONDARY, true, eSyncedParamType::PED},
-    {COMMAND_TASK_CHAR_SLIDE_TO_COORD_AND_PLAY_ANIM, true, eSyncedParamType::PED},
-    {COMMAND_TASK_PLAY_ANIM, true, eSyncedParamType::PED},
     {COMMAND_TASK_TURN_CHAR_TO_FACE_CHAR, true, eSyncedParamType::PED, eSyncedParamType::PED},
     {COMMAND_TASK_SHOOT_AT_COORD, true, eSyncedParamType::PED},
     {COMMAND_TASK_LOOK_AT_CHAR, true, eSyncedParamType::PED, eSyncedParamType::PED},
@@ -123,8 +119,6 @@ const SSyncedOpCode syncedOpcodes[] =
     {COMMAND_TASK_STAND_STILL, true, eSyncedParamType::PED},
     {COMMAND_TASK_LOOK_AT_COORD, true, eSyncedParamType::PED},
     {COMMAND_TASK_LEAVE_CAR, true, eSyncedParamType::PED, eSyncedParamType::VEHICLE},
-    {COMMAND_TASK_DIE_NAMED_ANIM, true, eSyncedParamType::PED},
-    {COMMAND_TASK_PLAY_ANIM_WITH_FLAGS, true, eSyncedParamType::PED},
     {COMMAND_TASK_LEAVE_ANY_CAR, true, eSyncedParamType::PED},
 
     // Actors
@@ -149,6 +143,11 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x04ED}, // request_animation {animationFile} [string]
     {0x04EF}, // remove_animation {animationFile} [string]
     {0x0605, true, {eSyncedParamType::PED}}, // task_play_anim {handle} [Char] {animationName} [string] {animationFile} [string] {frameDelta} [float] {loop} [bool] {lockX} [bool] {lockY} [bool] {lockF} [bool] {time} [int]
+    {0x0804, true, {eSyncedParamType::PED}}, // task_char_slide_to_coord_and_play_anim {handle} [Char] ...
+    {0x0812, true, {eSyncedParamType::PED}}, // task_play_anim_non_interruptable {handle} [Char] ...
+    {0x0829, true, {eSyncedParamType::PED}}, // task_die_named_anim {handle} [Char] ...
+    {0x088A, true, {eSyncedParamType::PED}}, // task_play_anim_with_flags {handle} [Char] ...
+    {0x0A1A, true, {eSyncedParamType::PED}}, // task_play_anim_secondary {handle} [Char] {animationFile} [string] {animationName} [string] ...
     
     // Controls
     {0x01B4, true, {eSyncedParamType::PLAYER}}, // set_player_control[Player] {state}[bool]
@@ -399,6 +398,36 @@ bool IsOpcodeRequiresStrictCheck(uint16_t opcode)
         return false;
     }
     return true;
+}
+
+static bool IsAnimTaskOpcode(uint16_t opcode)
+{
+    switch (opcode)
+    {
+    case COMMAND_TASK_PLAY_ANIM:
+    case COMMAND_TASK_CHAR_SLIDE_TO_COORD_AND_PLAY_ANIM:
+    case COMMAND_TASK_PLAY_ANIM_NON_INTERRUPTABLE:
+    case COMMAND_TASK_DIE_NAMED_ANIM:
+    case COMMAND_TASK_PLAY_ANIM_WITH_FLAGS:
+    case COMMAND_TASK_PLAY_ANIM_SECONDARY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static int GetAnimLibTextParamIndex(uint16_t opcode)
+{
+    // Secondary animation task argument order is:
+    // animLib, animName, ...
+    if (opcode == COMMAND_TASK_PLAY_ANIM_SECONDARY)
+    {
+        return 0;
+    }
+
+    // Most animation tasks use:
+    // animName, animLib, ...
+    return 1;
 }
 
 void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
@@ -673,36 +702,57 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
 
     switch (header.opcode)
     {
-    case COMMAND_TASK_PLAY_ANIM:
-    case COMMAND_TASK_CHAR_SLIDE_TO_COORD_AND_PLAY_ANIM:
-    case COMMAND_TASK_PLAY_ANIM_NON_INTERRUPTABLE:
-    case COMMAND_TASK_DIE_NAMED_ANIM:
-    case COMMAND_TASK_PLAY_ANIM_WITH_FLAGS:
-    case COMMAND_TASK_PLAY_ANIM_SECONDARY:
+    default:
     {
-        char* animlib = textParamBuffer[1];
-        int id = CAnimManager::GetAnimationBlockIndex(animlib);
-        if (id != -1)
+        if (IsAnimTaskOpcode(header.opcode))
         {
-            if (!CAnimManager::ms_aAnimBlocks[id].bLoaded)
+            const int animLibIdx = GetAnimLibTextParamIndex(header.opcode);
+            if (animLibIdx >= textParamCount)
             {
-                CStreaming::RequestModel(25575 + id, eStreamingFlags::MISSION_REQUIRED | eStreamingFlags::GAME_REQUIRED);
-                CStreaming::LoadAllRequestedModels(false);
-
-                if (CMissionSyncState::IsProcessingTaskSequence())
-                {
-                    CTaskSequenceSync::ms_bFailedToProcessSequence = true;
-                }
-                else
-                {
-                    CNetworkAnimQueue::AddOpCode(buffer, bufferSize);
-                }
-
                 return;
+            }
+
+            char* animlib = textParamBuffer[animLibIdx];
+            int id = CAnimManager::GetAnimationBlockIndex(animlib);
+            if (id != -1)
+            {
+                if (!CAnimManager::ms_aAnimBlocks[id].bLoaded)
+                {
+                    CStreaming::RequestModel(25575 + id, eStreamingFlags::MISSION_REQUIRED | eStreamingFlags::GAME_REQUIRED);
+                    CStreaming::LoadAllRequestedModels(false);
+
+                    if (CMissionSyncState::IsProcessingTaskSequence())
+                    {
+                        const bool hasResolvedTarget = scriptParamCount > 0 && scriptParamsBuffer[0].value != -1;
+                        if (hasResolvedTarget)
+                        {
+                            CTaskSequenceSync::ms_bFailedToProcessSequence = true;
+                        }
+                    }
+                    else
+                    {
+                        CNetworkAnimQueue::AddOpCode(buffer, bufferSize);
+                    }
+
+                    return;
+                }
             }
         }
         break;
     }
+    }
+
+    if (CLocalPlayer::m_bIsHost && IsAnimTaskOpcode(header.opcode))
+    {
+        const auto localPed = FindPlayerPed(0);
+        if (localPed && scriptParamCount > 0)
+        {
+            const int localPedRef = CPools::GetPedRef(localPed);
+            if (scriptParamsBuffer[0].value == localPedRef)
+            {
+                return;
+            }
+        }
     }
 
 	argCount = 0;
