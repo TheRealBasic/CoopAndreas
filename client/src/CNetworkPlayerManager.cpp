@@ -18,6 +18,16 @@ namespace
 		while (delta < -kPi) delta += kTwoPi;
 		return a + delta * t;
 	}
+
+	float AbsAngleDelta(float a, float b)
+	{
+		constexpr float kPi = 3.14159265358979323846f;
+		constexpr float kTwoPi = 6.28318530717958647692f;
+		float delta = b - a;
+		while (delta > kPi) delta -= kTwoPi;
+		while (delta < -kPi) delta += kTwoPi;
+		return std::fabs(delta);
+	}
 }
 
 std::vector<CNetworkPlayer*> CNetworkPlayerManager::m_pPlayers;
@@ -118,7 +128,7 @@ void CNetworkPlayerManager::ProcessRemotePlayers()
 
 	for (auto* player : m_pPlayers)
 	{
-		if (!player || !player->m_pPed || player->m_pPed->m_nPedFlags.bInVehicle)
+		if (!player || !player->m_pPed || player->m_iPlayerId == m_nMyId || player->m_pPed == FindPlayerPed(0) || player->m_pPed->m_nPedFlags.bInVehicle)
 			continue;
 
 		auto& snapshots = player->m_interpSnapshots;
@@ -132,7 +142,9 @@ void CNetworkPlayerManager::ProcessRemotePlayers()
 
 		auto applySnapshot = [&](const CNetworkPlayer::InterpSnapshot& snapshot)
 		{
-			if ((snapshot.position - player->m_pPed->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+			const float distanceError = (snapshot.position - player->m_pPed->m_matrix->pos).Magnitude();
+			const float headingError = AbsAngleDelta(player->m_pPed->m_fCurrentRotation, snapshot.currentRotation);
+			if (distanceError > InterpTuning::hardSnapDistance || headingError > InterpTuning::hardSnapHeadingThresholdRad)
 			{
 				player->m_nInterpCorrectionCount++;
 				m_streamingOverview.playerInterpCorrections++;
@@ -155,18 +167,37 @@ void CNetworkPlayerManager::ProcessRemotePlayers()
 		float denom = static_cast<float>(to.arrivalTickMs - from.arrivalTickMs);
 		float t = denom > 0.0f ? Clamp01((renderTick - from.arrivalTickMs) / denom) : 1.0f;
 
-		CVector pos = from.position + (to.position - from.position) * t;
-		if ((pos - player->m_pPed->m_matrix->pos).Magnitude() > InterpTuning::hardSnapDistance)
+		const CVector targetPos = from.position + (to.position - from.position) * t;
+		const float currentHeading = player->m_pPed->m_fCurrentRotation;
+		const float targetHeading = LerpAngle(from.currentRotation, to.currentRotation, t);
+		const float positionError = (targetPos - player->m_pPed->m_matrix->pos).Magnitude();
+		const float headingError = AbsAngleDelta(currentHeading, targetHeading);
+
+		if (positionError > InterpTuning::hardSnapDistance || headingError > InterpTuning::hardSnapHeadingThresholdRad)
 		{
 			player->m_nInterpCorrectionCount++;
 			m_streamingOverview.playerInterpCorrections++;
-			pos = to.position;
-			t = 1.0f;
+			player->m_pPed->m_matrix->pos = to.position;
+			player->m_pPed->m_fCurrentRotation = to.currentRotation;
+			player->m_pPed->m_fAimingRotation = to.aimingRotation;
+			player->m_pPed->m_vecMoveSpeed = to.velocity;
+			continue;
 		}
 
-		player->m_pPed->m_matrix->pos = pos;
-		player->m_pPed->m_fCurrentRotation = LerpAngle(from.currentRotation, to.currentRotation, t);
-		player->m_pPed->m_fAimingRotation = LerpAngle(from.aimingRotation, to.aimingRotation, t);
+		if (positionError > InterpTuning::deadReckonPositionThreshold)
+		{
+			const float posBlend = t * InterpTuning::translationSmoothFactor;
+			player->m_pPed->m_matrix->pos = player->m_pPed->m_matrix->pos + (targetPos - player->m_pPed->m_matrix->pos) * posBlend;
+		}
+
+		if (headingError > InterpTuning::deadReckonRotationThresholdRad)
+		{
+			const float rotBlend = t * InterpTuning::rotationSmoothFactor;
+			player->m_pPed->m_fCurrentRotation = LerpAngle(currentHeading, targetHeading, rotBlend);
+			const float targetAim = LerpAngle(from.aimingRotation, to.aimingRotation, t);
+			player->m_pPed->m_fAimingRotation = LerpAngle(player->m_pPed->m_fAimingRotation, targetAim, rotBlend);
+		}
+
 		player->m_pPed->m_vecMoveSpeed = from.velocity + (to.velocity - from.velocity) * t;
 	}
 }
