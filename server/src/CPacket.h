@@ -100,6 +100,13 @@ public:
 		PICKUP_ACTION_REMOVE = 2
 	};
 
+	enum ePickupDropResolveAction : uint8_t
+	{
+		PICKUP_DROP_RESOLVE_ACTION_CLAIM = 0,
+		PICKUP_DROP_RESOLVE_ACTION_ACCEPTED = 1,
+		PICKUP_DROP_RESOLVE_ACTION_REJECTED = 2
+	};
+
 	enum ePickupOrigin : uint8_t
 	{
 		PICKUP_ORIGIN_COLLECTIBLE = 0,
