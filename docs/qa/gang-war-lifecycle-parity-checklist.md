@@ -1,5 +1,7 @@
 # Gang-war lifecycle parity checklist
 
+> For full multi-peer coverage (deterministic ordering, reinforcement, reconnect/late-join snapshots, interior/mission overlap), run `docs/qa/gang-wars-sync-matrix.md` in addition to this quick checklist.
+
 ## Setup
 1. Start one host and at least two clients.
 2. Ensure one client joins after a gang war has already started.
