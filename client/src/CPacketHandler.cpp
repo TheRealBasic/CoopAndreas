@@ -2143,14 +2143,38 @@ void CPacketHandler::TeleportPlayerScripted__Handle(void* data, int size)
 	playerPed->UpdateRwMatrix();
 }
 
-void CPacketHandler::PickupCreate__Handle(void* data, int size)
+void CPacketHandler::PickupSnapshotBegin__Handle(void* data, int size)
 {
-	auto* packet = (CPackets::PickupCreate*)data;
-	CNetworkPickupManager::HandleCreate(*packet);
+	auto* packet = (CPackets::PickupSnapshotBegin*)data;
+	CNetworkPickupManager::HandleSnapshotBegin(*packet);
 }
 
-void CPacketHandler::PickupStateChange__Handle(void* data, int size)
+void CPacketHandler::PickupSnapshotEntry__Handle(void* data, int size)
 {
-	auto* packet = (CPackets::PickupStateChange*)data;
-	CNetworkPickupManager::HandleState(*packet);
+	auto* packet = (CPackets::PickupSnapshotEntry*)data;
+	CNetworkPickupManager::HandleSnapshotEntry(*packet);
+}
+
+void CPacketHandler::PickupSnapshotEnd__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PickupSnapshotEnd*)data;
+	CNetworkPickupManager::HandleSnapshotEnd(*packet);
+}
+
+void CPacketHandler::PickupStateDelta__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PickupStateDelta*)data;
+	CNetworkPickupManager::HandleStateDelta(*packet);
+}
+
+void CPacketHandler::PickupDropCreate__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PickupDropCreate*)data;
+	CNetworkPickupManager::HandleDropCreate(*packet);
+}
+
+void CPacketHandler::PickupDropResolve__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::PickupDropResolve*)data;
+	CNetworkPickupManager::HandleDropResolve(*packet);
 }

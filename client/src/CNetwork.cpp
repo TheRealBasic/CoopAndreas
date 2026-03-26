@@ -180,8 +180,12 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::TAG_UPDATE, CPacketHandler::TagUpdate__Handle);
 	CNetwork::AddListener(CPacketsID::UPDATE_ALL_TAGS, CPacketHandler::UpdateAllTags__Handle);
 	CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPacketHandler::TeleportPlayerScripted__Handle);
-	CNetwork::AddListener(CPacketsID::PICKUP_CREATE, CPacketHandler::PickupCreate__Handle);
-	CNetwork::AddListener(CPacketsID::PICKUP_STATE_CHANGE, CPacketHandler::PickupStateChange__Handle);
+	CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_BEGIN, CPacketHandler::PickupSnapshotBegin__Handle);
+	CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_ENTRY, CPacketHandler::PickupSnapshotEntry__Handle);
+	CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_END, CPacketHandler::PickupSnapshotEnd__Handle);
+	CNetwork::AddListener(CPacketsID::PICKUP_STATE_DELTA, CPacketHandler::PickupStateDelta__Handle);
+	CNetwork::AddListener(CPacketsID::PICKUP_DROP_CREATE, CPacketHandler::PickupDropCreate__Handle);
+	CNetwork::AddListener(CPacketsID::PICKUP_DROP_RESOLVE, CPacketHandler::PickupDropResolve__Handle);
 }
 
 void CNetwork::HandlePacketReceive(ENetEvent& event)

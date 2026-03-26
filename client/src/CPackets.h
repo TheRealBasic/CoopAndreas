@@ -77,9 +77,13 @@ enum CPacketsID : unsigned short
 	TAG_UPDATE,
 	UPDATE_ALL_TAGS,
 	TELEPORT_PLAYER_SCRIPTED,
-	PICKUP_CREATE,
+	PICKUP_SNAPSHOT_BEGIN,
+	PICKUP_SNAPSHOT_ENTRY,
+	PICKUP_SNAPSHOT_END,
 	PICKUP_COLLECT_REQUEST,
-	PICKUP_STATE_CHANGE,
+	PICKUP_STATE_DELTA,
+	PICKUP_DROP_CREATE,
+	PICKUP_DROP_RESOLVE,
 	PACKET_ID_MAX
 };
 
@@ -159,9 +163,13 @@ public:
 			sizeof(TagUpdate), // TAG_UPDATE
 			sizeof(UpdateAllTags), // UPDATE_ALL_TAGS
 			sizeof(TeleportPlayerScripted), // TELEPORT_PLAYER_SCRIPTED
-			sizeof(PickupCreate), // PICKUP_CREATE
+			sizeof(PickupSnapshotBegin), // PICKUP_SNAPSHOT_BEGIN
+			sizeof(PickupSnapshotEntry), // PICKUP_SNAPSHOT_ENTRY
+			sizeof(PickupSnapshotEnd), // PICKUP_SNAPSHOT_END
 			sizeof(PickupCollectRequest), // PICKUP_COLLECT_REQUEST
-			sizeof(PickupStateChange), // PICKUP_STATE_CHANGE
+			sizeof(PickupStateDelta), // PICKUP_STATE_DELTA
+			sizeof(PickupDropCreate), // PICKUP_DROP_CREATE
+			sizeof(PickupDropResolve), // PICKUP_DROP_RESOLVE
 		};
 
 		return m_nPacketSize[id];
@@ -731,31 +739,67 @@ public:
 		float heading;
 	};
 
-	struct PickupCreate
+	struct PickupSnapshotBegin
 	{
-		int pickupid;
+		uint32_t snapshotVersion;
+		uint32_t pickupCount;
+	};
+
+	struct PickupSnapshotEntry
+	{
+		uint32_t networkId;
 		uint8_t type;
 		uint8_t category;
+		uint8_t origin;
+		uint8_t flags;
 		CVector position;
-		int modelid;
-		bool collected;
-		uint32_t respawnMs;
+		int modelId;
 		int amount;
-		uint8_t weaponid;
-		uint16_t ammo;
+		uint8_t weaponId;
+		uint16_t weaponAmmo;
+		uint32_t respawnMs;
+		bool isSpawned;
+		bool isCollected;
+		int collectorPlayerId;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct PickupSnapshotEnd
+	{
+		uint32_t snapshotVersion;
 	};
 
 	struct PickupCollectRequest
 	{
-		int pickupid;
-		int playerid;
+		uint32_t networkId;
+		int playerId;
 		CVector playerPosition;
+		uint32_t knownStateVersion;
 	};
 
-	struct PickupStateChange
+	struct PickupStateDelta
 	{
-		int pickupid;
-		bool collected;
+		uint32_t networkId;
+		uint8_t action;
+		bool isSpawned;
+		bool isCollected;
 		int collectorPlayerId;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
+	};
+
+	struct PickupDropCreate
+	{
+		PickupSnapshotEntry pickup;
+	};
+
+	struct PickupDropResolve
+	{
+		uint32_t networkId;
+		uint8_t action;
+		int resolverPlayerId;
+		uint64_t stateTimestampMs;
+		uint32_t stateVersion;
 	};
 };
