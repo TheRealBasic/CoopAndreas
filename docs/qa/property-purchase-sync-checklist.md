@@ -43,3 +43,34 @@
 ## Pass/Fail
 - **PASS:** ownership flags, unlocked state, and linked pickup/interior state remain identical across connected peers, rejoiners, late joiners, and post-migration peers.
 - **FAIL:** any purchased property reverts to for-sale/locked for any peer, or diverges after reconnect/host migration.
+
+## Execution record
+
+- **Date (UTC):** 2026-03-26
+- **Build/commit:** `1919137c80dc63ddc63bb5ce4f1ac710f80109a7` (repo HEAD)
+- **Peer count exercised:** 0 (blocked: runtime environment does not include GTA:SA client/runtime needed for multi-peer end-to-end session)
+- **Case IDs:**
+  - `PP-01` Basic buy propagation — **FAIL (blocked by environment; not executable in this container)**
+  - `PP-02` Reconnect parity — **FAIL (blocked by environment; not executable in this container)**
+  - `PP-03` Late-join snapshot parity — **FAIL (blocked by environment; not executable in this container)**
+  - `PP-04` Host-migration parity — **FAIL (blocked by environment; not executable in this container)**
+- **Passed case IDs:** none
+- **Notes:** Attempted to prepare a runnable build environment, but `xmake` is unavailable in this container (`xmake: command not found`), and no GTA:SA runtime/assets are present to execute multiplayer parity scenarios end-to-end.
+
+## Retry record (after installing `xmake`)
+
+- **Date (UTC):** 2026-03-26
+- **Build/commit:** `28a198c` (retry run HEAD before compile-fix patch)
+- **Peer count exercised:** 0 (blocked: no GTA:SA runtime/assets or multiplayer clients in container)
+- **Retry steps:**
+  1. Installed `xmake` via apt.
+  2. Fixed `server/src/CPlayerManager.h` compile issue in `MissionFlowSyncState` by removing in-struct default member initializers that broke this toolchain.
+  3. Rebuilt with `XMAKE_ROOT=y xmake f -m release && XMAKE_ROOT=y xmake --build server`.
+  4. Smoke-launched server binary with `timeout 5s ./build/linux/x86_64/release/server`.
+- **Build result:** **PASS** (server target builds successfully in this container after the header fix).
+- **Case IDs:**
+  - `PP-01` Basic buy propagation — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
+  - `PP-02` Reconnect parity — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
+  - `PP-03` Late-join snapshot parity — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
+  - `PP-04` Host-migration parity — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
+- **Passed case IDs:** none

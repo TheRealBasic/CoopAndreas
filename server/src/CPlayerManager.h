@@ -175,16 +175,16 @@ public:
 
 	struct MissionFlowSyncState
 	{
-		uint8_t eventType = 0;
-		uint8_t messageType = 0;
-		uint32_t time = 0;
-		uint8_t flag = 0;
-		uint8_t currArea = 0;
-		uint8_t onMission = 0;
-		uint8_t replay = 0;
-		uint32_t sequence = 0;
-		char gxt[8]{};
-		char cutsceneName[8]{};
+		uint8_t eventType;
+		uint8_t messageType;
+		uint32_t time;
+		uint8_t flag;
+		uint8_t currArea;
+		uint8_t onMission;
+		uint8_t replay;
+		uint32_t sequence;
+		char gxt[8];
+		char cutsceneName[8];
 	};
 
 	static inline MissionFlowSyncState ms_lastMissionFlowSync{};
