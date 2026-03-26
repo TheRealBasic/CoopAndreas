@@ -162,6 +162,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::ADD_PROJECTILE, CPlayerPackets::AddProjectile::Handle);
     CNetwork::AddListener(CPacketsID::TAG_UPDATE, CPlayerPackets::TagUpdate::Handle);
     CNetwork::AddListener(CPacketsID::UPDATE_ALL_TAGS, CPlayerPackets::UpdateAllTags::Handle);
+    CNetwork::AddListener(CPacketsID::GANG_ZONE_STATE, CPlayerPackets::GangZoneStatePacket::Handle);
     CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPlayerPackets::TeleportPlayerScripted::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_REQUEST, CPlayerPackets::PickupSnapshotRequest::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);
@@ -391,15 +392,6 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             CNetwork::SendPacket(peer, CPacketsID::REBUILD_PLAYER, &rebuildPacket, sizeof(rebuildPacket), ENET_PACKET_FLAG_RELIABLE);
         }
 
-        if (i->m_ucSyncFlags.bWaypointModified)
-        {
-            CPlayerPackets::PlayerPlaceWaypoint waypointPacket{};
-            waypointPacket.playerid = i->m_iPlayerId;
-            waypointPacket.position = i->m_vecWaypointPos;
-            waypointPacket.place = true;
-            CNetwork::SendPacket(peer, CPacketsID::PLAYER_PLACE_WAYPOINT, &waypointPacket, sizeof(waypointPacket), ENET_PACKET_FLAG_RELIABLE);
-        }
-
         if (i->m_bHasJetpack)
         {
             CPlayerPackets::PlayerJetpackTransition jetpackPacket{};
@@ -472,6 +464,8 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             CNetwork::SendPacket(peer, CPacketsID::ENEX_SYNC, CPlayerPackets::EnExSync::ms_vLastData.data(), CPlayerPackets::EnExSync::ms_vLastData.size(), ENET_PACKET_FLAG_RELIABLE);
         }
     }
+
+    CPlayerPackets::SendMapStateSnapshot(peer);
 
     CFireSyncManager::SendSnapshotTo(peer, player->m_vecPosition);
 
