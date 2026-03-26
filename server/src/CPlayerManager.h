@@ -834,17 +834,58 @@ public:
 		}
 	};
 
+	#pragma pack(push, 1)
+	struct OpCodeSyncHeader
+	{
+		uint16_t opcode;
+		uint16_t intParamCount;
+		uint16_t stringParamCount;
+	};
+	#pragma pack(pop)
+
+	static bool IsHostAuthoritativeOpcode(uint16_t opcode)
+	{
+		switch (opcode)
+		{
+		case 0x00BC: // Text.PrintNow
+		case 0x00BF: // Clock.GetTimeOfDay
+		case 0x00DF: // Char.IsInAnyCar
+		case 0x00FE: // Char.LocateAnyMeans3D
+		case 0x00FF: // Char.LocateOnFoot3D
+		case 0x0256: // Player.IsPlaying
+		case 0x03EE: // Player.CanStartMission
+		case 0x0417: // Mission.LoadAndLaunchInternal
+			return true;
+		default:
+			return false;
+		}
+	}
+
 	struct OpCodeSync
 	{
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			if (auto player = CPlayerManager::GetPlayer(peer))
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !data || size < (int)sizeof(OpCodeSyncHeader))
 			{
-				/*if (player->m_bIsHost)
-				{*/
-					CNetwork::SendPacketToAll(CPacketsID::OPCODE_SYNC, data, size, ENET_PACKET_FLAG_RELIABLE, peer);
-				//}
+				return;
 			}
+
+			auto* packet = (OpCodeSyncHeader*)data;
+			const int expectedMinSize = (int)sizeof(OpCodeSyncHeader)
+				+ (int)packet->intParamCount * (int)sizeof(int)
+				+ (int)packet->stringParamCount * (int)sizeof(uint8_t);
+			if (expectedMinSize > size)
+			{
+				return;
+			}
+
+			if (IsHostAuthoritativeOpcode(packet->opcode) && !player->m_bIsHost)
+			{
+				return;
+			}
+
+			CNetwork::SendPacketToAll(CPacketsID::OPCODE_SYNC, data, size, ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
 
