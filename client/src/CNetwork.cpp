@@ -181,6 +181,8 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::TAG_UPDATE, CPacketHandler::TagUpdate__Handle);
 	CNetwork::AddListener(CPacketsID::UPDATE_ALL_TAGS, CPacketHandler::UpdateAllTags__Handle);
 	CNetwork::AddListener(CPacketsID::GANG_ZONE_STATE, CPacketHandler::GangZoneState__Handle);
+	CNetwork::AddListener(CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, CPacketHandler::GangGroupMembershipUpdate__Handle);
+	CNetwork::AddListener(CPacketsID::GANG_RELATIONSHIP_UPDATE, CPacketHandler::GangRelationshipUpdate__Handle);
 	CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPacketHandler::TeleportPlayerScripted__Handle);
 	CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_BEGIN, CPacketHandler::PickupSnapshotBegin__Handle);
 	CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_ENTRY, CPacketHandler::PickupSnapshotEntry__Handle);
