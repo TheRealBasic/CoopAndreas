@@ -89,6 +89,20 @@ public:
 		uint8_t relationshipFlags;
 	};
 
+	struct GangWarLifecycleState
+	{
+		uint32_t sequence;
+		uint8_t eventType;
+		uint8_t warState;
+		uint8_t warPhase;
+		uint8_t outcome;
+		uint16_t zoneId;
+		uint8_t owner;
+		uint8_t color;
+		uint8_t zoneState;
+		uint8_t currArea;
+	};
+
 	struct MapPinState
 	{
 		int playerid;
@@ -100,6 +114,7 @@ public:
 	static inline std::unordered_map<uint16_t, GangZoneState> ms_gangZoneStates{};
 	static inline std::unordered_map<int, GangGroupMembershipState> ms_gangGroupMembershipStates{};
 	static inline std::unordered_map<uint16_t, GangRelationshipState> ms_gangRelationshipStates{};
+	static inline GangWarLifecycleState ms_lastGangWarLifecycleState{};
 	static inline std::vector<MapPinState> ms_activeMapPins{};
 	static inline uint8_t ms_lastOnMissionFlag = 0;
 
@@ -158,6 +173,11 @@ public:
 		for (const auto& [relationshipKey, relationshipState] : ms_gangRelationshipStates)
 		{
 			CNetwork::SendPacket(peer, CPacketsID::GANG_RELATIONSHIP_UPDATE, (void*)&relationshipState, sizeof(relationshipState), ENET_PACKET_FLAG_RELIABLE);
+		}
+
+		if (ms_lastGangWarLifecycleState.sequence != 0)
+		{
+			CNetwork::SendPacket(peer, CPacketsID::GANG_WAR_LIFECYCLE_EVENT, (void*)&ms_lastGangWarLifecycleState, sizeof(ms_lastGangWarLifecycleState), ENET_PACKET_FLAG_RELIABLE);
 		}
 
 		RefreshActiveMapPinsSnapshot();
@@ -1509,6 +1529,60 @@ public:
 
 			ms_gangRelationshipStates[relationshipKey] = cachedState;
 			CNetwork::SendPacketToAll(CPacketsID::GANG_RELATIONSHIP_UPDATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
+		}
+	};
+
+	struct GangWarLifecycleEventPacket
+	{
+		uint32_t sequence;
+		uint8_t eventType;
+		uint8_t warState;
+		uint8_t warPhase;
+		uint8_t outcome;
+		uint16_t zoneId;
+		uint8_t owner;
+		uint8_t color;
+		uint8_t zoneState;
+		uint8_t currArea;
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost)
+			{
+				return;
+			}
+
+			auto* packet = (GangWarLifecycleEventPacket*)data;
+			if (packet->eventType < 1 || packet->eventType > 4)
+			{
+				return;
+			}
+
+			if (packet->sequence <= ms_lastGangWarLifecycleState.sequence)
+			{
+				return;
+			}
+
+			packet->outcome = std::min<uint8_t>(packet->outcome, 2);
+			packet->owner = std::min<uint8_t>(packet->owner, 10);
+			packet->zoneState = std::min<uint8_t>(packet->zoneState, 4);
+			player->m_nCurrArea = packet->currArea;
+
+			GangWarLifecycleState cachedState{};
+			cachedState.sequence = packet->sequence;
+			cachedState.eventType = packet->eventType;
+			cachedState.warState = packet->warState;
+			cachedState.warPhase = packet->warPhase;
+			cachedState.outcome = packet->outcome;
+			cachedState.zoneId = packet->zoneId;
+			cachedState.owner = packet->owner;
+			cachedState.color = packet->color;
+			cachedState.zoneState = packet->zoneState;
+			cachedState.currArea = packet->currArea;
+			ms_lastGangWarLifecycleState = cachedState;
+
+			CNetwork::SendPacketToAll(CPacketsID::GANG_WAR_LIFECYCLE_EVENT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
 
