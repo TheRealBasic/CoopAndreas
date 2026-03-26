@@ -51,6 +51,7 @@
 #include "CDraw.h"
 #include "CMenuManager.h"
 #include "CSprite.h"
+#include "CSprite2d.h"
 #include "CFont.h"
 #include "CHud.h"
 #include "CModelInfo.h"
@@ -125,4 +126,5 @@ using namespace plugin;
 #include "ePlayerDisconnectReason.h"
 #include "CStatsSync.h"
 #include "CMassPacketBuilder.h"
+#include "CSniperAimMarkerSync.h"
 // -----------------------------------------------------------------------------------------

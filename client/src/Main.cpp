@@ -174,6 +174,7 @@ public:
 						if (tickCount > lastPlayerAimSyncTickRate + 50)
 						{
 							CPacketHandler::PlayerAimSync__Trigger();
+							lastPlayerAimSyncTickRate = tickCount;
 						}
 					}
 					else if (localPlayer->m_pVehicle && CUtil::IsVehicleHasTurret(localPlayer->m_pVehicle))
@@ -181,6 +182,7 @@ public:
 						if (tickCount > lastPlayerAimSyncTickRate + 150)
 						{
 							CPacketHandler::PlayerAimSync__Trigger();
+							lastPlayerAimSyncTickRate = tickCount;
 						}
 					}
 					else if (localPlayer->m_pIntelligence->GetTaskSwim() || localPlayer->m_pIntelligence->GetTaskJetPack() || localPlayer->m_pIntelligence->GetTaskFighting())
@@ -188,6 +190,7 @@ public:
 						if (tickCount > lastPlayerAimSyncTickRate + 200)
 						{
 							CPacketHandler::PlayerAimSync__Trigger();
+							lastPlayerAimSyncTickRate = tickCount;
 						}
 					}
 
@@ -232,6 +235,7 @@ public:
 
 				CNetworkCheckpoint::Process();
 				CNetworkPlayerNameTag::Process();
+				CSniperAimMarkerSync::Process();
 				CChat::Draw();
 				CChat::DrawInput();
 

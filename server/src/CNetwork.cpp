@@ -409,6 +409,18 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
             CNetwork::SendPacket(peer, CPacketsID::PLAYER_JETPACK_TRANSITION, &jetpackPacket, sizeof(jetpackPacket), ENET_PACKET_FLAG_RELIABLE);
             printf("[JetpackTransition][Server][Snapshot] player=%d hasJetpack=1\n", i->m_iPlayerId);
         }
+
+        if (i->m_nSniperAimTick != 0)
+        {
+            CPlayerPackets::PlayerSniperAimMarkerState sniperAimPacket{};
+            sniperAimPacket.playerid = i->m_iPlayerId;
+            sniperAimPacket.source = i->m_vecSniperAimSource;
+            sniperAimPacket.direction = i->m_vecSniperAimDirection;
+            sniperAimPacket.range = i->m_fSniperAimRange;
+            sniperAimPacket.visible = i->m_bSniperAimVisible;
+            sniperAimPacket.tick = i->m_nSniperAimTick;
+            CNetwork::SendPacket(peer, CPacketsID::PLAYER_SNIPER_AIM_MARKER_STATE, &sniperAimPacket, sizeof(sniperAimPacket), ENET_PACKET_FLAG_RELIABLE);
+        }
     }
 
     for (auto i : CVehicleManager::m_pVehicles)
