@@ -28,15 +28,15 @@ Legend:
   - **Acceptance criteria:** task/state machine replication avoids stuck or desynced behavior over mission-length sessions.
 
 ### P1 (important)
-- [ ] Jetpack pickup interaction (depends on pickup sync). **[P1][S]**
-- [ ] Player map sync: `Areas/GangZones`, map-pin proportion fix. **[P1][M]**
-- [ ] Stats sync: `breath level bar`, `max hp sync`. **[P1][M]**
-- [ ] Fire sync. **[P1][M]**
-- [ ] Cheat code sync. **[P1][M]**
-- [ ] Animation sync: `idle anims`, special `TAB+NUM4/NUM6` anims. **[P1][M]**
-- [ ] Gang groups sync. **[P1][M]**
-- [ ] Widescreen fix. **[P1][S]**
-- [ ] Smooth interpolation: movement + rotation. **[P1][M]**
+- [x] Jetpack pickup interaction (depends on pickup sync). **[P1][S]**
+- [x] Player map sync: `Areas/GangZones`, map-pin proportion fix. **[P1][M]**
+- [x] Stats sync: `breath level bar`, `max hp sync`. **[P1][M]**
+- [x] Fire sync. **[P1][M]**
+- [x] Cheat code sync. **[P1][M]**
+- [x] Animation sync: `idle anims`, special `TAB+NUM4/NUM6` anims. **[P1][M]**
+- [x] Gang groups sync. **[P1][M]**
+- [x] Widescreen fix. **[P1][S]**
+- [x] Smooth interpolation: movement + rotation. **[P1][M]**
 
 ### P2 (nice-to-have)
 - [ ] Player voice commands. **[P2][S]**
