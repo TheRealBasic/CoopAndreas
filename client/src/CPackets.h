@@ -78,6 +78,8 @@ enum CPacketsID : unsigned short
 	TAG_UPDATE,
 	UPDATE_ALL_TAGS,
 	GANG_ZONE_STATE,
+	GANG_GROUP_MEMBERSHIP_UPDATE,
+	GANG_RELATIONSHIP_UPDATE,
 	TELEPORT_PLAYER_SCRIPTED,
 	PICKUP_SNAPSHOT_BEGIN,
 	PICKUP_SNAPSHOT_ENTRY,
@@ -171,6 +173,8 @@ public:
 			sizeof(TagUpdate), // TAG_UPDATE
 			sizeof(UpdateAllTags), // UPDATE_ALL_TAGS
 			sizeof(GangZoneState), // GANG_ZONE_STATE
+			sizeof(GangGroupMembershipUpdate), // GANG_GROUP_MEMBERSHIP_UPDATE
+			sizeof(GangRelationshipUpdate), // GANG_RELATIONSHIP_UPDATE
 			sizeof(TeleportPlayerScripted), // TELEPORT_PLAYER_SCRIPTED
 			sizeof(PickupSnapshotBegin), // PICKUP_SNAPSHOT_BEGIN
 			sizeof(PickupSnapshotEntry), // PICKUP_SNAPSHOT_ENTRY
@@ -814,6 +818,22 @@ public:
 		uint8_t color;
 		uint8_t state;
 		uint8_t currArea;
+	};
+
+	struct GangGroupMembershipUpdate
+	{
+		uint32_t sequence;
+		int pedNetworkId;
+		uint8_t gangGroupId;
+		uint8_t action; // 0 add, 1 remove, 2 clear group
+	};
+
+	struct GangRelationshipUpdate
+	{
+		uint32_t sequence;
+		uint8_t sourceGangGroupId;
+		uint8_t targetGangGroupId;
+		uint8_t relationshipFlags; // bit0 friendly, bit1 hostile
 	};
 
 	struct TeleportPlayerScripted

@@ -73,6 +73,22 @@ public:
 		uint8_t currArea;
 	};
 
+	struct GangGroupMembershipState
+	{
+		uint32_t sequence;
+		int pedNetworkId;
+		uint8_t gangGroupId;
+		uint8_t action;
+	};
+
+	struct GangRelationshipState
+	{
+		uint32_t sequence;
+		uint8_t sourceGangGroupId;
+		uint8_t targetGangGroupId;
+		uint8_t relationshipFlags;
+	};
+
 	struct MapPinState
 	{
 		int playerid;
@@ -82,6 +98,8 @@ public:
 	};
 
 	static inline std::unordered_map<uint16_t, GangZoneState> ms_gangZoneStates{};
+	static inline std::unordered_map<int, GangGroupMembershipState> ms_gangGroupMembershipStates{};
+	static inline std::unordered_map<uint16_t, GangRelationshipState> ms_gangRelationshipStates{};
 	static inline std::vector<MapPinState> ms_activeMapPins{};
 
 	static void RefreshActiveMapPinsSnapshot()
@@ -113,6 +131,16 @@ public:
 		for (const auto& [zoneId, zoneState] : ms_gangZoneStates)
 		{
 			CNetwork::SendPacket(peer, CPacketsID::GANG_ZONE_STATE, (void*)&zoneState, sizeof(zoneState), ENET_PACKET_FLAG_RELIABLE);
+		}
+
+		for (const auto& [pedNetworkId, membershipState] : ms_gangGroupMembershipStates)
+		{
+			CNetwork::SendPacket(peer, CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, (void*)&membershipState, sizeof(membershipState), ENET_PACKET_FLAG_RELIABLE);
+		}
+
+		for (const auto& [relationshipKey, relationshipState] : ms_gangRelationshipStates)
+		{
+			CNetwork::SendPacket(peer, CPacketsID::GANG_RELATIONSHIP_UPDATE, (void*)&relationshipState, sizeof(relationshipState), ENET_PACKET_FLAG_RELIABLE);
 		}
 
 		RefreshActiveMapPinsSnapshot();
@@ -1274,6 +1302,73 @@ public:
 			ms_gangZoneStates[packet->zoneId] = cachedState;
 
 			CNetwork::SendPacketToAll(CPacketsID::GANG_ZONE_STATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
+		}
+	};
+
+	struct GangGroupMembershipUpdatePacket
+	{
+		uint32_t sequence;
+		int pedNetworkId;
+		uint8_t gangGroupId;
+		uint8_t action; // 0 add, 1 remove, 2 clear group
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost)
+			{
+				return;
+			}
+
+			auto* packet = (GangGroupMembershipUpdatePacket*)data;
+			packet->gangGroupId = std::min<uint8_t>(packet->gangGroupId, 31);
+			packet->action = std::min<uint8_t>(packet->action, 2);
+
+			auto it = ms_gangGroupMembershipStates.find(packet->pedNetworkId);
+			if (it != ms_gangGroupMembershipStates.end() && packet->sequence <= it->second.sequence)
+			{
+				return;
+			}
+
+			ms_gangGroupMembershipStates[packet->pedNetworkId] = *packet;
+			CNetwork::SendPacketToAll(CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
+		}
+	};
+
+	struct GangRelationshipUpdatePacket
+	{
+		uint32_t sequence;
+		uint8_t sourceGangGroupId;
+		uint8_t targetGangGroupId;
+		uint8_t relationshipFlags; // bit0 friendly, bit1 hostile
+
+		static uint16_t GetRelationshipKey(uint8_t sourceGangGroupId, uint8_t targetGangGroupId)
+		{
+			return (uint16_t(sourceGangGroupId) << 8) | uint16_t(targetGangGroupId);
+		}
+
+		static void Handle(ENetPeer* peer, void* data, int size)
+		{
+			auto* player = CPlayerManager::GetPlayer(peer);
+			if (!player || !player->m_bIsHost)
+			{
+				return;
+			}
+
+			auto* packet = (GangRelationshipUpdatePacket*)data;
+			packet->sourceGangGroupId = std::min<uint8_t>(packet->sourceGangGroupId, 31);
+			packet->targetGangGroupId = std::min<uint8_t>(packet->targetGangGroupId, 31);
+			packet->relationshipFlags &= 0x3;
+
+			const uint16_t relationshipKey = GetRelationshipKey(packet->sourceGangGroupId, packet->targetGangGroupId);
+			auto it = ms_gangRelationshipStates.find(relationshipKey);
+			if (it != ms_gangRelationshipStates.end() && packet->sequence <= it->second.sequence)
+			{
+				return;
+			}
+
+			ms_gangRelationshipStates[relationshipKey] = *packet;
+			CNetwork::SendPacketToAll(CPacketsID::GANG_RELATIONSHIP_UPDATE, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};
 

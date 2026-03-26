@@ -39,6 +39,7 @@
 #include <CTaskSequenceSync.h>
 #include <CNetworkAnimQueue.h>
 #include "CMissionSyncState.h"
+#include "CPacketHandler.h"
 
 // Keep sorted!
 const SSyncedOpCode syncedOpcodes[] =
@@ -82,6 +83,9 @@ const SSyncedOpCode syncedOpcodes[] =
     
     // World
     {COMMAND_SET_TAG_STATUS_IN_AREA},
+    {0x06F0, true, {eSyncedParamType::PED}}, // remove_char_from_group [Char]
+    {0x06F5, true, {eSyncedParamType::PED}}, // add_char_to_group [Char] [Group]
+    {0x0746}, // set_relationship [GroupA] [GroupB] [flags]
 
     // Interiors
     {0x04BB}, // set_area_visible {areaId} [Interior]
@@ -376,6 +380,8 @@ void BuildAndSendOpcode()
     }
 
     int idx = 0;
+    CPacketHandler::GangStateFromOpcode__Trigger((uint16_t)lastOpCodeProcessed, COpCodeSync::scriptParamsBuffer, (uint8_t)scriptParamCount);
+
     if (!COpCodeSync::IsOpcodeSyncable(lastOpCodeProcessed, &idx))
         return;
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "CNetworkPed.h"
+struct OpcodeParameter;
 class CPacketHandler
 {
 public:
@@ -89,6 +90,9 @@ public:
 	static void UpdateAllTags__Handle(void* data, int size);
 	static void UpdateAllTags__Trigger();
 	static void GangZoneState__Handle(void* data, int size);
+	static void GangGroupMembershipUpdate__Handle(void* data, int size);
+	static void GangRelationshipUpdate__Handle(void* data, int size);
+	static void GangStateFromOpcode__Trigger(uint16_t opcode, const OpcodeParameter* params, uint8_t paramCount);
 	static void TeleportPlayerScripted__Handle(void* data, int size);
 	static void PickupSnapshotBegin__Handle(void* data, int size);
 	static void PickupSnapshotEntry__Handle(void* data, int size);

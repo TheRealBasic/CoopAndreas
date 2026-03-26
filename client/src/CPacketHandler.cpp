@@ -45,6 +45,37 @@ namespace
 	std::vector<CPackets::PickupDropResolve> g_pickupBufferedDropResolves;
 	bool g_pickupAwaitingBootstrapSnapshot = true;
 	std::unordered_map<uint16_t, CPackets::GangZoneState> g_gangZoneStates;
+	std::unordered_map<int, CPackets::GangGroupMembershipUpdate> g_gangGroupMembershipStates;
+	std::unordered_map<uint16_t, CPackets::GangRelationshipUpdate> g_gangRelationshipStates;
+	uint32_t g_gangZoneUpdatesReceived = 0;
+	uint32_t g_gangZoneUpdatesApplied = 0;
+	uint32_t g_gangGroupMembershipUpdatesReceived = 0;
+	uint32_t g_gangGroupMembershipUpdatesApplied = 0;
+	uint32_t g_gangRelationshipUpdatesReceived = 0;
+	uint32_t g_gangRelationshipUpdatesApplied = 0;
+
+	uint16_t GetGangRelationshipKey(uint8_t sourceGangGroupId, uint8_t targetGangGroupId)
+	{
+		return (uint16_t(sourceGangGroupId) << 8) | uint16_t(targetGangGroupId);
+	}
+
+	void LogGangDebugCountersIfNeeded()
+	{
+		const uint32_t totalReceived = g_gangZoneUpdatesReceived + g_gangGroupMembershipUpdatesReceived + g_gangRelationshipUpdatesReceived;
+		if (totalReceived == 0 || (totalReceived % 64) != 0)
+		{
+			return;
+		}
+
+		CChat::AddMessage(
+			"[GangSync] recv z:%u g:%u r:%u | applied z:%u g:%u r:%u",
+			g_gangZoneUpdatesReceived,
+			g_gangGroupMembershipUpdatesReceived,
+			g_gangRelationshipUpdatesReceived,
+			g_gangZoneUpdatesApplied,
+			g_gangGroupMembershipUpdatesApplied,
+			g_gangRelationshipUpdatesApplied);
+	}
 }
 
 // PlayerConnected
@@ -2184,7 +2215,100 @@ void CPacketHandler::UpdateAllTags__Trigger()
 void CPacketHandler::GangZoneState__Handle(void* data, int size)
 {
 	auto* packet = (CPackets::GangZoneState*)data;
+	++g_gangZoneUpdatesReceived;
+
+	auto existing = g_gangZoneStates.find(packet->zoneId);
+	if (existing != g_gangZoneStates.end()
+		&& existing->second.owner == packet->owner
+		&& existing->second.color == packet->color
+		&& existing->second.state == packet->state
+		&& existing->second.currArea == packet->currArea)
+	{
+		return;
+	}
+
 	g_gangZoneStates[packet->zoneId] = *packet;
+	++g_gangZoneUpdatesApplied;
+	LogGangDebugCountersIfNeeded();
+}
+
+void CPacketHandler::GangGroupMembershipUpdate__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::GangGroupMembershipUpdate*)data;
+	++g_gangGroupMembershipUpdatesReceived;
+
+	auto existing = g_gangGroupMembershipStates.find(packet->pedNetworkId);
+	if (existing != g_gangGroupMembershipStates.end() && packet->sequence <= existing->second.sequence)
+	{
+		return;
+	}
+
+	g_gangGroupMembershipStates[packet->pedNetworkId] = *packet;
+	++g_gangGroupMembershipUpdatesApplied;
+	LogGangDebugCountersIfNeeded();
+}
+
+void CPacketHandler::GangRelationshipUpdate__Handle(void* data, int size)
+{
+	auto* packet = (CPackets::GangRelationshipUpdate*)data;
+	++g_gangRelationshipUpdatesReceived;
+
+	const uint16_t relationshipKey = GetGangRelationshipKey(packet->sourceGangGroupId, packet->targetGangGroupId);
+	auto existing = g_gangRelationshipStates.find(relationshipKey);
+	if (existing != g_gangRelationshipStates.end() && packet->sequence <= existing->second.sequence)
+	{
+		return;
+	}
+
+	g_gangRelationshipStates[relationshipKey] = *packet;
+	++g_gangRelationshipUpdatesApplied;
+	LogGangDebugCountersIfNeeded();
+}
+
+void CPacketHandler::GangStateFromOpcode__Trigger(uint16_t opcode, const OpcodeParameter* params, uint8_t paramCount)
+{
+	if (!CLocalPlayer::m_bIsHost || !params)
+	{
+		return;
+	}
+
+	// 0x06F5 add_char_to_group [Char] [Group]
+	if (opcode == 0x06F5 && paramCount >= 2)
+	{
+		static uint32_t sequence = 0;
+		CPackets::GangGroupMembershipUpdate packet{};
+		packet.sequence = ++sequence;
+		packet.pedNetworkId = params[0].value;
+		packet.gangGroupId = static_cast<uint8_t>(std::clamp(params[1].value, 0, 31));
+		packet.action = 0;
+		CNetwork::SendPacket(CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+		return;
+	}
+
+	// 0x06F0 remove_char_from_group [Char]
+	if (opcode == 0x06F0 && paramCount >= 1)
+	{
+		static uint32_t sequence = 0;
+		CPackets::GangGroupMembershipUpdate packet{};
+		packet.sequence = ++sequence;
+		packet.pedNetworkId = params[0].value;
+		packet.gangGroupId = 0;
+		packet.action = 1;
+		CNetwork::SendPacket(CPacketsID::GANG_GROUP_MEMBERSHIP_UPDATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+		return;
+	}
+
+	// 0x0746 set_relationship [GroupA] [GroupB] [flags]
+	if (opcode == 0x0746 && paramCount >= 3)
+	{
+		static uint32_t sequence = 0;
+		CPackets::GangRelationshipUpdate packet{};
+		packet.sequence = ++sequence;
+		packet.sourceGangGroupId = static_cast<uint8_t>(std::clamp(params[0].value, 0, 31));
+		packet.targetGangGroupId = static_cast<uint8_t>(std::clamp(params[1].value, 0, 31));
+		packet.relationshipFlags = static_cast<uint8_t>(params[2].value) & 0x3;
+		CNetwork::SendPacket(CPacketsID::GANG_RELATIONSHIP_UPDATE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+	}
 }
 
 // TeleportPlayerScripted
