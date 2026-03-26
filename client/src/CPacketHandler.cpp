@@ -21,6 +21,13 @@
 
 namespace
 {
+	enum ePickupSnapshotResyncReason : uint8_t
+	{
+		PICKUP_RESYNC_REASON_JOIN_BOOTSTRAP = 0,
+		PICKUP_RESYNC_REASON_HOST_MIGRATION = 1,
+		PICKUP_RESYNC_REASON_REJOIN = 2
+	};
+
 	struct CutsceneVoteHudState
 	{
 		bool active = false;
@@ -32,6 +39,10 @@ namespace
 	};
 
 	CutsceneVoteHudState g_cutsceneVoteHudState;
+	std::vector<CPackets::PickupStateDelta> g_pickupBufferedDeltas;
+	std::vector<CPackets::PickupDropCreate> g_pickupBufferedDropCreates;
+	std::vector<CPackets::PickupDropResolve> g_pickupBufferedDropResolves;
+	bool g_pickupAwaitingBootstrapSnapshot = true;
 }
 
 // PlayerConnected
@@ -266,8 +277,10 @@ void CPacketHandler::PlayerBulletShot__Handle(void* data, int size)
 void CPacketHandler::PlayerHandshake__Handle(void* data, int size)
 {
 	CPackets::PlayerHandshake* packet = (CPackets::PlayerHandshake*)data;
+	const bool isRejoin = (CNetworkPlayerManager::m_nMyId != -1 && CNetworkPlayerManager::m_nMyId != packet->yourid);
 
 	CNetworkPlayerManager::m_nMyId = packet->yourid;
+	PickupSnapshotResync__Trigger(isRejoin ? PICKUP_RESYNC_REASON_REJOIN : PICKUP_RESYNC_REASON_JOIN_BOOTSTRAP);
 }
 
 // PlayerPlaceWaypoint
@@ -303,6 +316,7 @@ void CPacketHandler::PlayerSetHost__Handle(void* data, int size)
 
 		CPacketHandler::GameWeatherTime__Trigger();
 		CPacketHandler::UpdateAllTags__Trigger();
+		CPacketHandler::PickupSnapshotResync__Trigger(PICKUP_RESYNC_REASON_HOST_MIGRATION);
 		return;
 	}
 	CNetworkPlayer* player = CNetworkPlayerManager::GetPlayer(packet->playerid);
@@ -310,6 +324,7 @@ void CPacketHandler::PlayerSetHost__Handle(void* data, int size)
 	CChat::AddMessage("[Player] " + std::string(player->GetName()) + " is now the host");
 
 	CLocalPlayer::m_bIsHost = false;
+	CPacketHandler::PickupSnapshotResync__Trigger(PICKUP_RESYNC_REASON_HOST_MIGRATION);
 }
 
 // AddExplosion
@@ -2143,9 +2158,28 @@ void CPacketHandler::TeleportPlayerScripted__Handle(void* data, int size)
 	playerPed->UpdateRwMatrix();
 }
 
+void CPacketHandler::PickupSnapshotResync__Trigger(uint8_t reason)
+{
+	CNetworkPickupManager::BeginResync();
+	g_pickupAwaitingBootstrapSnapshot = true;
+	g_pickupBufferedDeltas.clear();
+	g_pickupBufferedDropCreates.clear();
+	g_pickupBufferedDropResolves.clear();
+
+	CPackets::PickupSnapshotRequest request{};
+	request.requesterPlayerId = CNetworkPlayerManager::m_nMyId;
+	request.clientSnapshotVersion = 0;
+	request.reason = reason;
+	CNetwork::SendPacket(CPacketsID::PICKUP_SNAPSHOT_REQUEST, &request, sizeof(request), ENET_PACKET_FLAG_RELIABLE);
+}
+
 void CPacketHandler::PickupSnapshotBegin__Handle(void* data, int size)
 {
 	auto* packet = (CPackets::PickupSnapshotBegin*)data;
+	g_pickupAwaitingBootstrapSnapshot = true;
+	g_pickupBufferedDeltas.clear();
+	g_pickupBufferedDropCreates.clear();
+	g_pickupBufferedDropResolves.clear();
 	CNetworkPickupManager::HandleSnapshotBegin(*packet);
 }
 
@@ -2159,22 +2193,55 @@ void CPacketHandler::PickupSnapshotEnd__Handle(void* data, int size)
 {
 	auto* packet = (CPackets::PickupSnapshotEnd*)data;
 	CNetworkPickupManager::HandleSnapshotEnd(*packet);
+	g_pickupAwaitingBootstrapSnapshot = false;
+
+	for (const auto& delta : g_pickupBufferedDeltas)
+	{
+		CNetworkPickupManager::HandleStateDelta(delta);
+	}
+	for (const auto& dropCreate : g_pickupBufferedDropCreates)
+	{
+		CNetworkPickupManager::HandleDropCreate(dropCreate);
+	}
+	for (const auto& dropResolve : g_pickupBufferedDropResolves)
+	{
+		CNetworkPickupManager::HandleDropResolve(dropResolve);
+	}
+
+	g_pickupBufferedDeltas.clear();
+	g_pickupBufferedDropCreates.clear();
+	g_pickupBufferedDropResolves.clear();
 }
 
 void CPacketHandler::PickupStateDelta__Handle(void* data, int size)
 {
 	auto* packet = (CPackets::PickupStateDelta*)data;
+	if (g_pickupAwaitingBootstrapSnapshot || !CNetworkPickupManager::IsReadyForInteraction())
+	{
+		g_pickupBufferedDeltas.push_back(*packet);
+		return;
+	}
 	CNetworkPickupManager::HandleStateDelta(*packet);
 }
 
 void CPacketHandler::PickupDropCreate__Handle(void* data, int size)
 {
 	auto* packet = (CPackets::PickupDropCreate*)data;
+	if (g_pickupAwaitingBootstrapSnapshot || !CNetworkPickupManager::IsReadyForInteraction())
+	{
+		g_pickupBufferedDropCreates.push_back(*packet);
+		return;
+	}
 	CNetworkPickupManager::HandleDropCreate(*packet);
 }
 
 void CPacketHandler::PickupDropResolve__Handle(void* data, int size)
 {
 	auto* packet = (CPackets::PickupDropResolve*)data;
+	if (g_pickupAwaitingBootstrapSnapshot || !CNetworkPickupManager::IsReadyForInteraction())
+	{
+		g_pickupBufferedDropResolves.push_back(*packet);
+		return;
+	}
 	CNetworkPickupManager::HandleDropResolve(*packet);
 }

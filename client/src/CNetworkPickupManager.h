@@ -33,6 +33,8 @@ public:
 	static void HandleStateDelta(const CPackets::PickupStateDelta& packet);
 	static void HandleDropCreate(const CPackets::PickupDropCreate& packet);
 	static void HandleDropResolve(const CPackets::PickupDropResolve& packet);
+	static void BeginResync();
+	static bool IsReadyForInteraction();
 	static void Process();
 	static void Reset();
 
@@ -40,4 +42,5 @@ private:
 	static void UpsertFromSnapshotEntry(const CPackets::PickupSnapshotEntry& packet);
 	static inline std::unordered_map<uint32_t, Pickup> ms_pickups{};
 	static inline bool ms_snapshotInProgress = false;
+	static inline bool ms_snapshotReadyForInteraction = false;
 };

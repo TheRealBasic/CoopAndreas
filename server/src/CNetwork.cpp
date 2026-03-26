@@ -162,6 +162,7 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::TAG_UPDATE, CPlayerPackets::TagUpdate::Handle);
     CNetwork::AddListener(CPacketsID::UPDATE_ALL_TAGS, CPlayerPackets::UpdateAllTags::Handle);
     CNetwork::AddListener(CPacketsID::TELEPORT_PLAYER_SCRIPTED, CPlayerPackets::TeleportPlayerScripted::Handle);
+    CNetwork::AddListener(CPacketsID::PICKUP_SNAPSHOT_REQUEST, CPlayerPackets::PickupSnapshotRequest::Handle);
     CNetwork::AddListener(CPacketsID::PICKUP_COLLECT_REQUEST, CPickupPackets::PickupCollectRequest::Handle);
 }
 
@@ -345,6 +346,8 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
 
     CNetwork::SendPacketToAll(CPacketsID::PLAYER_CONNECTED, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, peer);
 
+    CPlayerPackets::SendPickupBootstrap(peer);
+
     for (auto i : CPlayerManager::m_pPlayers)
     {
         if (i->m_iPlayerId == freeId)
@@ -458,7 +461,6 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
         }
     }
 
-    CPickupManager::SendSnapshot(peer);
     CFireSyncManager::SendSnapshotTo(peer, player->m_vecPosition);
 
     CPlayerPackets::PlayerHandshake handshakePacket = { freeId };
