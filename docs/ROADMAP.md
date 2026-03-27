@@ -200,7 +200,15 @@ Legend:
   - **Freight Train:** ✅ SS-02..SS-11 multiplayer QA complete.
   - **Validation artifacts:** `docs/qa/submissions-sync-matrix.md`, `docs/qa/submissions-sync-evidence.md`.
 - [ ] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]**
-- [ ] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]**
+- [x] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]** ✅ Completed (2026-03-27).
+  - **Acceptance criteria (passed):** objective parity for all four stadium modes using the fixed stadium opcode/state-transition contract.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each stadium mode.
+  - **Acceptance criteria (passed):** reconnect parity restores active attempts with checkpoint/timer state without restarting the mode.
+  - **Acceptance criteria (passed):** late-join parity hydrates active stadium attempts without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-stadium-events-checklist.md`.
+  - **Completion note (2026-03-27):** each stadium mode is marked `done` only after passing all four parity gates (objective parity, fail/pass parity, reconnect parity, late-join parity).
+    - Evidence index: `docs/qa/phase-stadium-events-checklist.md`.
+    - Per-mode execution sections: [8-Track](docs/qa/phase-stadium-events-checklist.md#8-track-execution), [Blood Bowl](docs/qa/phase-stadium-events-checklist.md#blood-bowl-execution), [Dirt Track](docs/qa/phase-stadium-events-checklist.md#dirt-track-execution), [Kick Start](docs/qa/phase-stadium-events-checklist.md#kick-start-execution).
 - [ ] Ammu-Nation challenge. **[P2][S]**
 - [x] Schools: `Driving`, `Flight`, `Bike`, `Boat`. **[P2][L]** ✅ Completed (2026-03-27).
   - **Acceptance criteria (passed):** objective parity for all four school modes using the fixed schools opcode/state-transition contract.
@@ -266,23 +274,28 @@ All four required schools parity gates are complete with checklist evidence:
 
 #### Stadium events execution checklist
 
-Use the fixed stadium events sync gates for every mode with no substitutions: `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore.
+Use the fixed sync gates for every stadium mode with no substitutions: `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore.
 
-1. **Shared sync primitives** (common stadium event state + restore plumbing)
-   - [ ] 8-Track — owner: _unassigned_; status: `not started`
-   - [ ] Blood Bowl — owner: _unassigned_; status: `not started`
-   - [ ] Dirt Track — owner: _unassigned_; status: `not started`
-   - [ ] Kick Start — owner: _unassigned_; status: `not started`
+1. **Shared sync primitives** (common stadium state + restore plumbing)
+   - [x] 8-Track — owner: _unassigned_; status: `done`
+   - [x] Blood Bowl — owner: _unassigned_; status: `done`
+   - [x] Dirt Track — owner: _unassigned_; status: `done`
+   - [x] Kick Start — owner: _unassigned_; status: `done`
 2. **Mode-specific script/opcode mapping** (`Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission`)
-   - [ ] 8-Track — owner: _unassigned_; status: `not started`
-   - [ ] Blood Bowl — owner: _unassigned_; status: `not started`
-   - [ ] Dirt Track — owner: _unassigned_; status: `not started`
-   - [ ] Kick Start — owner: _unassigned_; status: `not started`
+   - [x] 8-Track — owner: _unassigned_; status: `done`
+   - [x] Blood Bowl — owner: _unassigned_; status: `done`
+   - [x] Dirt Track — owner: _unassigned_; status: `done`
+   - [x] Kick Start — owner: _unassigned_; status: `done`
 3. **QA sign-off** (`docs/qa/phase-stadium-events-checklist.md`)
-   - [ ] 8-Track — owner: _unassigned_; status: `not started`
-   - [ ] Blood Bowl — owner: _unassigned_; status: `not started`
-   - [ ] Dirt Track — owner: _unassigned_; status: `not started`
-   - [ ] Kick Start — owner: _unassigned_; status: `not started`
+   - [x] 8-Track — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+   - [x] Blood Bowl — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+   - [x] Dirt Track — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+   - [x] Kick Start — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+
+#### Stadium events phase completion note (2026-03-27)
+
+- Stadium events phase is `done` because all four parity gates passed for each mode in scope.
+- Validation/evidence source of truth: `docs/qa/phase-stadium-events-checklist.md`.
 
 ### Progress tracking (per-mode)
 
@@ -294,10 +307,10 @@ Allowed status values: `not started`, `in progress`, `done`.
 | Schools | Flight school | done |
 | Schools | Bike school | done |
 | Schools | Boat school | done |
-| Stadium events | 8-Track | not started |
-| Stadium events | Blood Bowl | not started |
-| Stadium events | Dirt Track | not started |
-| Stadium events | Kick Start | not started |
+| Stadium events | 8-Track | done |
+| Stadium events | Blood Bowl | done |
+| Stadium events | Dirt Track | done |
+| Stadium events | Kick Start | done |
 | Hidden races | BMX | not started |
 | Hidden races | NRG-500 | not started |
 | Hidden races | Chiliad Challenge | not started |
