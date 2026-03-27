@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import socket
 import subprocess
 import threading
@@ -316,6 +317,43 @@ class GameValidationResult:
     missing: list[str]
 
 
+class ToolTip:
+    """Small hover tooltip helper for Tk widgets."""
+
+    def __init__(self, widget: tk.Widget, text: str) -> None:
+        self.widget = widget
+        self.text = text
+        self.window: tk.Toplevel | None = None
+        self.widget.bind("<Enter>", self._show)
+        self.widget.bind("<Leave>", self._hide)
+
+    def _show(self, _event: object | None = None) -> None:
+        if self.window is not None:
+            return
+        x = self.widget.winfo_rootx() + 18
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 8
+        self.window = tk.Toplevel(self.widget)
+        self.window.wm_overrideredirect(True)
+        self.window.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            self.window,
+            text=self.text,
+            justify="left",
+            background="#fffad1",
+            relief="solid",
+            borderwidth=1,
+            padx=6,
+            pady=4,
+            wraplength=320,
+        )
+        label.pack()
+
+    def _hide(self, _event: object | None = None) -> None:
+        if self.window is not None:
+            self.window.destroy()
+            self.window = None
+
+
 class LauncherApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -334,10 +372,20 @@ class LauncherApp:
         self.host_var = tk.StringVar(value=active_profile.host)
         self.port_var = tk.StringVar(value=str(active_profile.port))
         self.gta_path_var = tk.StringVar(value=self.config.gta_path)
+        self.maxplayers_var = tk.StringVar(value="32")
+        self.server_password_var = tk.StringVar(value="")
+        self.server_name_var = tk.StringVar(value="CoopAndreas Server")
+        self.auto_start_server_var = tk.BooleanVar(value=False)
 
         self.server_running_var = tk.StringVar(value="No")
         self.port_bound_var = tk.StringVar(value="No")
         self.last_error_var = tk.StringVar(value="None")
+        self.server_summary_var = tk.StringVar(value="Not started yet.")
+        self.advanced_visible_var = tk.BooleanVar(value=False)
+        self.advanced_toggle_text_var = tk.StringVar(value="▶ Advanced Server Settings")
+        self.advanced_error_var = tk.StringVar(value="")
+
+        self._load_server_options()
 
         self.setup_banner_var = tk.StringVar(value="")
 
@@ -347,6 +395,8 @@ class LauncherApp:
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._update_status()
         self._maybe_start_wizard()
+        if self.auto_start_server_var.get():
+            self.root.after(600, self.start_server)
 
     def _build_ui(self) -> None:
         self.wrapper = ttk.Frame(self.root, padding=12)
@@ -394,8 +444,50 @@ class LauncherApp:
         ttk.Entry(config_frame, textvariable=self.gta_path_var).grid(row=2, column=1, columnspan=3, sticky="we", padx=(8, 8), pady=(8, 0))
         ttk.Button(config_frame, text="Browse", command=self._browse_gta_path).grid(row=2, column=4, sticky="e", pady=(8, 0))
 
+        advanced_toggle = ttk.Button(
+            config_frame,
+            textvariable=self.advanced_toggle_text_var,
+            command=self._toggle_advanced_server_settings,
+        )
+        advanced_toggle.grid(row=3, column=0, columnspan=5, sticky="w", pady=(10, 0))
+
+        self.advanced_frame = ttk.Frame(config_frame, padding=(16, 8, 0, 0))
+        ttk.Label(self.advanced_frame, text="Max players").grid(row=0, column=0, sticky="w")
+        maxplayers_entry = ttk.Entry(self.advanced_frame, textvariable=self.maxplayers_var, width=12)
+        maxplayers_entry.grid(row=0, column=1, sticky="w", padx=(8, 0))
+
+        ttk.Label(self.advanced_frame, text="Password (optional)").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        password_entry = ttk.Entry(self.advanced_frame, textvariable=self.server_password_var, width=28, show="*")
+        password_entry.grid(row=1, column=1, sticky="we", padx=(8, 0), pady=(8, 0))
+
+        ttk.Label(self.advanced_frame, text="Server title").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        server_name_entry = ttk.Entry(self.advanced_frame, textvariable=self.server_name_var, width=36)
+        server_name_entry.grid(row=2, column=1, sticky="we", padx=(8, 0), pady=(8, 0))
+
+        auto_start_check = ttk.Checkbutton(
+            self.advanced_frame,
+            text="Auto-start local server when launcher opens",
+            variable=self.auto_start_server_var,
+        )
+        auto_start_check.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        self.advanced_error_label = ttk.Label(
+            self.advanced_frame,
+            textvariable=self.advanced_error_var,
+            foreground="#b00020",
+            wraplength=520,
+        )
+        self.advanced_error_label.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        self.advanced_frame.columnconfigure(1, weight=1)
+
+        ToolTip(maxplayers_entry, "Maximum players accepted by the local server. Must be a number from 1 to 256.")
+        ToolTip(password_entry, "Optional join password. Leave blank for public access. Up to 64 characters.")
+        ToolTip(server_name_entry, "Display name shown in listings/logs. Use 3-80 characters.")
+        ToolTip(auto_start_check, "When enabled, launcher will attempt to start local server at startup.")
+
         config_frame.columnconfigure(1, weight=1)
         config_frame.columnconfigure(3, weight=2)
+        self._toggle_advanced_server_settings(force=self.advanced_visible_var.get())
         self._refresh_profile_controls()
 
         controls = ttk.Frame(self.wrapper, padding=(0, 10, 0, 4))
@@ -415,6 +507,10 @@ class LauncherApp:
 
         ttk.Label(status, text="Last error:").grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Label(status, textvariable=self.last_error_var).grid(row=1, column=1, columnspan=3, sticky="w", padx=(8, 0), pady=(8, 0))
+        ttk.Label(status, text="Server config:").grid(row=2, column=0, sticky="nw", pady=(8, 0))
+        ttk.Label(status, textvariable=self.server_summary_var, justify="left", wraplength=620).grid(
+            row=2, column=1, columnspan=3, sticky="w", padx=(8, 0), pady=(8, 0)
+        )
 
         logs = ttk.LabelFrame(self.wrapper, text="Server logs", padding=10)
         logs.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
@@ -424,13 +520,73 @@ class LauncherApp:
         self.log_text.configure(state=tk.DISABLED)
 
     def _bind_persistence_events(self) -> None:
-        for var in (self.nickname_var, self.host_var, self.port_var, self.gta_path_var, self.active_profile_name_var):
+        for var in (
+            self.nickname_var,
+            self.host_var,
+            self.port_var,
+            self.gta_path_var,
+            self.active_profile_name_var,
+            self.maxplayers_var,
+            self.server_password_var,
+            self.server_name_var,
+            self.auto_start_server_var,
+        ):
             var.trace_add("write", self._autosave)
+        for var in (self.maxplayers_var, self.server_password_var, self.server_name_var):
+            var.trace_add("write", self._validate_advanced_settings)
 
     def _autosave(self, *_args: object) -> None:
         self._sync_active_profile_from_fields()
         self.save_current_config()
         self._update_status()
+
+    def _toggle_advanced_server_settings(self, force: bool | None = None) -> None:
+        visible = self.advanced_visible_var.get() if force is None else bool(force)
+        if force is None:
+            visible = not visible
+        self.advanced_visible_var.set(visible)
+        if visible:
+            self.advanced_frame.grid(row=4, column=0, columnspan=5, sticky="we")
+            self.advanced_toggle_text_var.set("▼ Advanced Server Settings")
+        else:
+            self.advanced_frame.grid_forget()
+            self.advanced_toggle_text_var.set("▶ Advanced Server Settings")
+
+    def _validate_advanced_settings(self, *_args: object) -> bool:
+        errors: list[str] = []
+        try:
+            maxplayers = int(self.maxplayers_var.get().strip())
+            if maxplayers < 1 or maxplayers > 256:
+                errors.append("Max players must be between 1 and 256.")
+        except ValueError:
+            errors.append("Max players must be a number.")
+
+        password = self.server_password_var.get()
+        if len(password) > 64:
+            errors.append("Password can be at most 64 characters.")
+        if "\n" in password or "\r" in password:
+            errors.append("Password cannot include line breaks.")
+
+        server_name = self.server_name_var.get().strip()
+        if not server_name:
+            errors.append("Server title is required.")
+        elif len(server_name) < 3 or len(server_name) > 80:
+            errors.append("Server title must be 3 to 80 characters.")
+
+        self.advanced_error_var.set(" ".join(errors))
+        return not errors
+
+    def _load_server_options(self) -> None:
+        if not CONFIG_PATH.exists():
+            return
+        try:
+            data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        self.maxplayers_var.set(str(data.get("server_maxplayers", 32)))
+        self.server_password_var.set(str(data.get("server_password", "")))
+        self.server_name_var.set(str(data.get("server_name", "CoopAndreas Server")))
+        self.auto_start_server_var.set(bool(data.get("auto_start_server", False)))
 
     def _load_config(self) -> LauncherConfig:
         if not CONFIG_PATH.exists():
@@ -493,7 +649,16 @@ class LauncherApp:
                 active_profile_name=self.active_profile_name_var.get().strip() or "Default",
                 gta_path=self.gta_path_var.get().strip(),
             )
-            CONFIG_PATH.write_text(json.dumps(asdict(config), indent=2), encoding="utf-8")
+            payload = asdict(config)
+            payload.update(
+                {
+                    "server_maxplayers": self.maxplayers_var.get().strip() or "32",
+                    "server_password": self.server_password_var.get(),
+                    "server_name": self.server_name_var.get().strip() or "CoopAndreas Server",
+                    "auto_start_server": bool(self.auto_start_server_var.get()),
+                }
+            )
+            CONFIG_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         except Exception as exc:
             self._set_error(f"Save config failed: {exc}")
 
@@ -714,6 +879,13 @@ class LauncherApp:
             self._set_error(msg)
             messagebox.showerror("Invalid port", msg)
             return
+        if not self._validate_advanced_settings():
+            msg = self.advanced_error_var.get() or "Invalid advanced settings."
+            self._set_error(msg)
+            messagebox.showerror("Invalid advanced settings", msg)
+            if not self.advanced_visible_var.get():
+                self._toggle_advanced_server_settings(force=True)
+            return
 
         server_binary = self._resolve_server_binary()
         if not server_binary:
@@ -723,7 +895,15 @@ class LauncherApp:
             return
 
         try:
-            self._ensure_server_config(server_binary.parent, port)
+            applied = self._ensure_server_config(
+                server_binary.parent,
+                {
+                    "port": str(port),
+                    "maxplayers": self.maxplayers_var.get().strip(),
+                    "password": self.server_password_var.get(),
+                    "hostname": self.server_name_var.get().strip(),
+                },
+            )
             self.server_process = subprocess.Popen(
                 [str(server_binary)],
                 stdout=subprocess.PIPE,
@@ -732,6 +912,12 @@ class LauncherApp:
                 bufsize=1,
             )
             self._append_log(f"[info] server started ({profile.name} @ {profile.host}:{port}): {server_binary}")
+            self.server_summary_var.set(
+                f"host={profile.host}:{applied.get('port', str(port))}, "
+                f"maxplayers={applied.get('maxplayers', self.maxplayers_var.get().strip())}, "
+                f"password={'set' if applied.get('password') else 'none'}, "
+                f"title={applied.get('hostname', self.server_name_var.get().strip())}"
+            )
             self.last_error_var.set("None")
             self._start_log_stream(self.server_process.stdout, "stdout")
             self._start_log_stream(self.server_process.stderr, "stderr")
@@ -739,25 +925,38 @@ class LauncherApp:
         except Exception as exc:
             self._set_error(f"Failed to start server: {exc}")
 
-    def _ensure_server_config(self, server_dir: Path, port: int) -> None:
+    def _ensure_server_config(self, server_dir: Path, settings: dict[str, str]) -> dict[str, str]:
         config_path = server_dir / "server-config.ini"
         lines: list[str] = []
         if config_path.exists():
             lines = config_path.read_text(encoding="utf-8").splitlines()
+        managed = {key.lower(): value for key, value in settings.items()}
+        key_pattern = re.compile(r"^\s*([A-Za-z0-9_.-]+)\s*=\s*(.*)$")
+        seen: set[str] = set()
+        output_lines: list[str] = []
 
-        updated = False
-        for i, line in enumerate(lines):
-            if line.strip().lower().startswith("port"):
-                lines[i] = f"port = {port}"
-                updated = True
-                break
+        for line in lines:
+            match = key_pattern.match(line)
+            if not match:
+                output_lines.append(line)
+                continue
+            key = match.group(1).strip().lower()
+            if key not in managed:
+                output_lines.append(line)
+                continue
+            if key in seen:
+                continue
+            value = managed[key]
+            output_lines.append(f"{key} = {value}")
+            seen.add(key)
 
-        if not updated:
-            lines.insert(0, f"port = {port}")
-            if len(lines) == 1:
-                lines.append("maxplayers = 32")
+        missing = [key for key in managed if key not in seen]
+        if output_lines and output_lines[-1].strip():
+            output_lines.append("")
+        output_lines.extend(f"{key} = {managed[key]}" for key in missing)
 
-        config_path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+        config_path.write_text("\n".join(output_lines).rstrip() + "\n", encoding="utf-8")
+        return managed
 
     def _start_log_stream(self, stream, label: str) -> None:
         if stream is None:
