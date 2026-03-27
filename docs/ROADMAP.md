@@ -208,6 +208,9 @@ Legend:
   - **Acceptance criteria (passed):** reconnect parity restores active attempts with checkpoint/timer state without restarting tests.
   - **Acceptance criteria (passed):** late-join parity hydrates active school attempts without duplicate objective/pass/fail events.
   - **Validation artifact:** `docs/qa/phase-schools-checklist.md`.
+  - **Completion note (2026-03-27):** all schools modes are `done` after passing the fixed parity gates (objective parity, fail/pass parity, reconnect parity, late-join parity).
+    - Evidence index: `docs/qa/phase-schools-checklist.md`.
+    - Per-mode sign-off logs/clips: [Driving school evidence](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight school evidence](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike school evidence](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat school evidence](docs/qa/phase-schools-checklist.md#boat-school-evidence).
 - [ ] Asset missions: `Trucker`, `Valet`, `Career`. **[P2][L]**
 - [ ] Courier sets: LS/SF/LV routes. **[P2][M]**
 - [ ] Street Racing set (22 races). **[P2][L]**
