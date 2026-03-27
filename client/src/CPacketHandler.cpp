@@ -18,6 +18,7 @@
 #include <game_sa/CTagManager.h>
 #include <CNetworkPickupManager.h>
 #include <CNetworkFireManager.h>
+#include "../shared/semver.h"
 #include "Hooks/RadarHooks.h"
 #include <CGangWars.h>
 
@@ -339,10 +340,30 @@ void CPacketHandler::PlayerBulletShot__Handle(void* data, int size)
 void CPacketHandler::PlayerHandshake__Handle(void* data, int size)
 {
 	CPackets::PlayerHandshake* packet = (CPackets::PlayerHandshake*)data;
-	const bool isRejoin = (CNetworkPlayerManager::m_nMyId != -1 && CNetworkPlayerManager::m_nMyId != packet->yourid);
 
-	CNetworkPlayerManager::m_nMyId = packet->yourid;
-	PickupSnapshotResync__Trigger(isRejoin ? PICKUP_RESYNC_REASON_REJOIN : PICKUP_RESYNC_REASON_JOIN_BOOTSTRAP);
+	if (packet->stage == 0)
+	{
+		CPackets::PlayerHandshake response{};
+		response.stage = 1;
+		response.nonce = packet->nonce;
+		response.responseHash = CNetwork::ComputeHandshakeResponse(packet->nonce);
+		CNetwork::SendPacket(CPacketsID::PLAYER_HANDSHAKE, &response, sizeof(response), ENET_PACKET_FLAG_RELIABLE);
+
+		CPackets::PlayerConnected connectPacket{};
+		strcpy_s(connectPacket.name, CLocalPlayer::m_Name);
+		connectPacket.version = semver_parse(COOPANDREAS_VERSION, nullptr);
+		CNetwork::SendPacket(CPacketsID::PLAYER_CONNECTED, &connectPacket, sizeof(connectPacket), ENET_PACKET_FLAG_RELIABLE);
+		return;
+	}
+
+	if (packet->stage == 2)
+	{
+		const bool isRejoin = (CNetworkPlayerManager::m_nMyId != -1 && CNetworkPlayerManager::m_nMyId != packet->yourid);
+
+		CNetwork::m_bAuthenticated = true;
+		CNetworkPlayerManager::m_nMyId = packet->yourid;
+		PickupSnapshotResync__Trigger(isRejoin ? PICKUP_RESYNC_REASON_REJOIN : PICKUP_RESYNC_REASON_JOIN_BOOTSTRAP);
+	}
 }
 
 // PlayerPlaceWaypoint

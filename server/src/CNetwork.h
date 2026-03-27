@@ -6,6 +6,7 @@
 #define COOPANDREAS_VERSION "0.2.2-alpha"
 
 #include <cstddef>
+#include <cstdint>
 #include <unordered_map>
 #include "enet/enet.h"
 
@@ -27,9 +28,11 @@ class CNetwork
 		static void HandlePlayerConnected(ENetPeer* peer, void* data, int size);
 		~CNetwork();
 	private:
+		static uint32_t ComputeHandshakeResponse(uint32_t nonce);
 		static void HandlePeerConnected(ENetEvent& event);
 		static void HandlePlayerDisconnected(ENetEvent& event);
 		static void HandlePacketReceive(ENetEvent& event);
+		static void ProcessAuthenticationTimeouts(ENetHost* server);
 		static void AddListener(unsigned short id, void(*callback)(ENetPeer*, void*, int));
 
 	

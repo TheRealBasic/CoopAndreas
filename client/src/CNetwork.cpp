@@ -6,6 +6,7 @@
 ENetHost* CNetwork::m_pClient = nullptr;
 ENetPeer* CNetwork::m_pPeer = nullptr;
 bool CNetwork::m_bConnected = false;
+bool CNetwork::m_bAuthenticated = false;
 
 std::unordered_map<unsigned short, CPacketListener*> CNetwork::m_packetListeners;
 
@@ -53,6 +54,7 @@ DWORD WINAPI CNetwork::InitAsync(LPVOID)
 		if (enet_host_service(m_pClient, &event, 2000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT)
 		{
 			m_bConnected = true;
+			m_bAuthenticated = false;
 			CChat::AddMessage("{cecedb}[Network] {00ff00}Successfully {cecedb}connected to the server.");
 			CPatch::RevertTemporaryPatches();
 
@@ -109,6 +111,7 @@ void CNetwork::Disconnect()
 	enet_peer_reset(CNetwork::m_pPeer);*/
 
 	m_bConnected = false;
+	m_bAuthenticated = false;
 	CNetworkFireManager::Reset();
 	CNetworkPickupManager::Reset();
 }
@@ -209,6 +212,11 @@ void CNetwork::HandlePacketReceive(ENetEvent& event)
 	uint16_t packetid;
 	memcpy(&packetid, event.packet->data, sizeof(uint16_t));
 
+	if (!m_bAuthenticated && packetid != CPacketsID::PLAYER_HANDSHAKE && packetid != CPacketsID::PLAYER_DISCONNECTED)
+	{
+		return;
+	}
+
 	auto it = m_packetListeners.find(packetid);
 	if (it != m_packetListeners.end())
 	{
@@ -222,4 +230,30 @@ void CNetwork::AddListener(unsigned short id, void(*callback)(void*, int))
 {
 	CPacketListener* listener = new CPacketListener(id, callback);
 	m_packetListeners.insert({ id, listener });
+}
+
+uint32_t CNetwork::ComputeHandshakeResponse(uint32_t nonce)
+{
+	constexpr uint32_t kSeed = 0x811C9DC5u;
+	constexpr uint32_t kPrime = 0x01000193u;
+	const uint32_t packedVersion = semver_parse(COOPANDREAS_VERSION, nullptr);
+	uint32_t hash = kSeed;
+
+	auto mix = [&hash, kPrime](uint8_t value)
+	{
+		hash ^= value;
+		hash *= kPrime;
+	};
+
+	for (size_t i = 0; i < sizeof(nonce); ++i)
+	{
+		mix(static_cast<uint8_t>((nonce >> (i * 8)) & 0xFF));
+	}
+
+	for (size_t i = 0; i < sizeof(packedVersion); ++i)
+	{
+		mix(static_cast<uint8_t>((packedVersion >> (i * 8)) & 0xFF));
+	}
+
+	return hash;
 }

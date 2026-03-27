@@ -309,6 +309,9 @@ public:
 
 	struct PlayerHandshake
 	{
+		uint8_t stage;
+		uint32_t nonce;
+		uint32_t responseHash;
 		int yourid;
 	};
 
