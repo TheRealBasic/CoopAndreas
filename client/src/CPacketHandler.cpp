@@ -345,6 +345,8 @@ void CPacketHandler::PlayerHandshake__Handle(void* data, int size)
 	{
 		CPackets::PlayerHandshake response{};
 		response.stage = 1;
+		response.protocolVersion = PacketRegistry::PROTOCOL_VERSION;
+		response.capabilityBitmap = PacketRegistry::PROTOCOL_CAPABILITIES;
 		response.nonce = packet->nonce;
 		response.responseHash = CNetwork::ComputeHandshakeResponse(packet->nonce);
 		CNetwork::SendPacket(CPacketsID::PLAYER_HANDSHAKE, &response, sizeof(response), ENET_PACKET_FLAG_RELIABLE);
@@ -361,7 +363,11 @@ void CPacketHandler::PlayerHandshake__Handle(void* data, int size)
 		const bool isRejoin = (CNetworkPlayerManager::m_nMyId != -1 && CNetworkPlayerManager::m_nMyId != packet->yourid);
 
 		CNetwork::m_bAuthenticated = true;
+		CNetwork::ms_nNegotiatedProtocolVersion = packet->protocolVersion;
+		CNetwork::ms_nNegotiatedCapabilities = packet->capabilityBitmap & PacketRegistry::PROTOCOL_CAPABILITIES;
 		CNetworkPlayerManager::m_nMyId = packet->yourid;
+		std::cout << "[Network][Client] Handshake accepted protocol=" << CNetwork::ms_nNegotiatedProtocolVersion
+			<< " caps=0x" << std::hex << CNetwork::ms_nNegotiatedCapabilities << std::dec << "\n";
 		PickupSnapshotResync__Trigger(isRejoin ? PICKUP_RESYNC_REASON_REJOIN : PICKUP_RESYNC_REASON_JOIN_BOOTSTRAP);
 	}
 }

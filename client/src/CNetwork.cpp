@@ -13,6 +13,34 @@ std::unordered_map<unsigned short, std::unique_ptr<CPacketListener>> CNetwork::m
 char CNetwork::m_IpAddress[128 + 1];
 unsigned short CNetwork::m_nPort = Config::DEFAULT_PORT;
 
+namespace
+{
+	void LogListenerValidationReport()
+	{
+		std::unordered_set<unsigned short> registeredIds;
+		registeredIds.reserve(CNetwork::m_packetListeners.size());
+		for (const auto& [id, listener] : CNetwork::m_packetListeners)
+		{
+			registeredIds.insert(id);
+		}
+
+		const auto report = PacketRegistry::ValidateListeners(PacketRegistry::ReceiverRole::Client, registeredIds);
+		if (report.ok)
+		{
+			CChat::AddMessage("{cecedb}[Network] Packet registry validated (client listeners: %d/%d).",
+				static_cast<int>(report.registeredCount),
+				static_cast<int>(report.requiredCount));
+		}
+		else
+		{
+			CChat::AddMessage("{cecedb}[Network] {ff8800}Packet registry mismatch (missing=%d unexpected=%d).",
+				static_cast<int>(report.missingCount),
+				static_cast<int>(report.unexpectedCount));
+			std::cout << "[Network][Client] Packet registry details:\n" << report.details;
+		}
+	}
+}
+
 DWORD WINAPI CNetwork::InitAsync(LPVOID)
 {
 	assert(strcmp(m_IpAddress, "") != 0 && "Wrong IP passed");
@@ -222,12 +250,27 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, CPacketHandler::SubmissionMissionStateDelta__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPacketHandler::PlayerJetpackTransition__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_SNIPER_AIM_MARKER_STATE, CPacketHandler::PlayerSniperAimMarkerState__Handle);
+
+	LogListenerValidationReport();
 }
 
 void CNetwork::HandlePacketReceive(ENetEvent& event)
 {
 	uint16_t packetid;
 	memcpy(&packetid, event.packet->data, sizeof(uint16_t));
+	if (packetid >= PACKET_ID_MAX)
+	{
+		return;
+	}
+
+	const auto& contract = PacketRegistry::Contracts()[packetid];
+	const size_t payloadSize = event.packet->dataLength >= sizeof(uint16_t) ? (event.packet->dataLength - sizeof(uint16_t)) : 0;
+	if (payloadSize < contract.minPayloadSize)
+	{
+		std::cout << "[Network][Client] Dropping " << contract.name << " payload too small (" << payloadSize
+			<< " < " << contract.minPayloadSize << ")\n";
+		return;
+	}
 
 	if (!m_bAuthenticated && packetid != CPacketsID::PLAYER_HANDSHAKE && packetid != CPacketsID::PLAYER_DISCONNECTED)
 	{
