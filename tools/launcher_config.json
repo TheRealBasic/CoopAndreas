@@ -1,0 +1,22 @@
+{
+  "nickname": "Player",
+  "profiles": [
+    {
+      "name": "Localhost",
+      "host": "127.0.0.1",
+      "port": 6767
+    },
+    {
+      "name": "LAN Host",
+      "host": "192.168.1.25",
+      "port": 6767
+    },
+    {
+      "name": "Remote Test",
+      "host": "coop.example.net",
+      "port": 7777
+    }
+  ],
+  "active_profile_name": "Localhost",
+  "gta_path": ""
+}

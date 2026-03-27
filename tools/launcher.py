@@ -7,7 +7,7 @@ import json
 import socket
 import subprocess
 import threading
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -21,9 +21,18 @@ DEFAULT_PORT = 6767
 @dataclass
 class LauncherConfig:
     nickname: str = "Player"
-    host: str = DEFAULT_HOST
-    port: int = DEFAULT_PORT
+    profiles: list["ConnectionProfile"] = field(
+        default_factory=lambda: [ConnectionProfile(name="Default", host=DEFAULT_HOST, port=DEFAULT_PORT)]
+    )
+    active_profile_name: str = "Default"
     gta_path: str = ""
+
+
+@dataclass
+class ConnectionProfile:
+    name: str
+    host: str
+    port: int
 
 
 class SetupWizard:
@@ -317,10 +326,13 @@ class LauncherApp:
         self.server_reader_threads: list[threading.Thread] = []
 
         self.config = self._load_config()
+        self.profiles: list[ConnectionProfile] = list(self.config.profiles)
 
         self.nickname_var = tk.StringVar(value=self.config.nickname)
-        self.host_var = tk.StringVar(value=self.config.host)
-        self.port_var = tk.StringVar(value=str(self.config.port))
+        self.active_profile_name_var = tk.StringVar(value=self.config.active_profile_name)
+        active_profile = self._get_active_profile()
+        self.host_var = tk.StringVar(value=active_profile.host)
+        self.port_var = tk.StringVar(value=str(active_profile.port))
         self.gta_path_var = tk.StringVar(value=self.config.gta_path)
 
         self.server_running_var = tk.StringVar(value="No")
@@ -356,18 +368,35 @@ class LauncherApp:
         ttk.Label(config_frame, text="Nickname").grid(row=0, column=0, sticky="w")
         ttk.Entry(config_frame, textvariable=self.nickname_var, width=24).grid(row=0, column=1, sticky="we", padx=(8, 16))
 
-        ttk.Label(config_frame, text="Host / IP").grid(row=0, column=2, sticky="w")
-        ttk.Entry(config_frame, textvariable=self.host_var, width=20).grid(row=0, column=3, sticky="we", padx=(8, 0))
+        ttk.Label(config_frame, text="Profile").grid(row=0, column=2, sticky="w")
+        profile_row = ttk.Frame(config_frame)
+        profile_row.grid(row=0, column=3, columnspan=2, sticky="we", padx=(8, 0))
+        self.profile_combo = ttk.Combobox(
+            profile_row,
+            textvariable=self.active_profile_name_var,
+            state="readonly",
+            width=20,
+        )
+        self.profile_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.profile_combo.bind("<<ComboboxSelected>>", self._on_profile_selected)
+        ttk.Button(profile_row, text="Add", command=self._add_profile).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(profile_row, text="Edit", command=self._edit_profile).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(profile_row, text="Delete", command=self._delete_profile).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(profile_row, text="Duplicate", command=self._duplicate_profile).pack(side=tk.LEFT, padx=(6, 0))
 
-        ttk.Label(config_frame, text="Port").grid(row=1, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(config_frame, textvariable=self.port_var, width=10).grid(row=1, column=1, sticky="w", padx=(8, 16), pady=(8, 0))
+        ttk.Label(config_frame, text="Host / IP").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(config_frame, textvariable=self.host_var, width=24).grid(row=1, column=1, sticky="we", padx=(8, 16), pady=(8, 0))
 
-        ttk.Label(config_frame, text="GTA:SA path").grid(row=1, column=2, sticky="w", pady=(8, 0))
-        ttk.Entry(config_frame, textvariable=self.gta_path_var).grid(row=1, column=3, sticky="we", padx=(8, 8), pady=(8, 0))
-        ttk.Button(config_frame, text="Browse", command=self._browse_gta_path).grid(row=1, column=4, sticky="e", pady=(8, 0))
+        ttk.Label(config_frame, text="Port").grid(row=1, column=2, sticky="w", pady=(8, 0))
+        ttk.Entry(config_frame, textvariable=self.port_var, width=10).grid(row=1, column=3, sticky="w", padx=(8, 16), pady=(8, 0))
+
+        ttk.Label(config_frame, text="GTA:SA path").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(config_frame, textvariable=self.gta_path_var).grid(row=2, column=1, columnspan=3, sticky="we", padx=(8, 8), pady=(8, 0))
+        ttk.Button(config_frame, text="Browse", command=self._browse_gta_path).grid(row=2, column=4, sticky="e", pady=(8, 0))
 
         config_frame.columnconfigure(1, weight=1)
         config_frame.columnconfigure(3, weight=2)
+        self._refresh_profile_controls()
 
         controls = ttk.Frame(self.wrapper, padding=(0, 10, 0, 4))
         controls.pack(fill=tk.X)
@@ -395,10 +424,11 @@ class LauncherApp:
         self.log_text.configure(state=tk.DISABLED)
 
     def _bind_persistence_events(self) -> None:
-        for var in (self.nickname_var, self.host_var, self.port_var, self.gta_path_var):
+        for var in (self.nickname_var, self.host_var, self.port_var, self.gta_path_var, self.active_profile_name_var):
             var.trace_add("write", self._autosave)
 
     def _autosave(self, *_args: object) -> None:
+        self._sync_active_profile_from_fields()
         self.save_current_config()
         self._update_status()
 
@@ -407,10 +437,41 @@ class LauncherApp:
             return LauncherConfig()
         try:
             data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            profiles_data = data.get("profiles")
+            profiles: list[ConnectionProfile] = []
+            if isinstance(profiles_data, list):
+                for item in profiles_data:
+                    if not isinstance(item, dict):
+                        continue
+                    name = str(item.get("name", "")).strip()
+                    host = str(item.get("host", "")).strip()
+                    try:
+                        port = int(item.get("port", DEFAULT_PORT))
+                    except (TypeError, ValueError):
+                        continue
+                    if not name or not host or not (1 <= port <= 65535):
+                        continue
+                    profiles.append(ConnectionProfile(name=name, host=host, port=port))
+
+            # Backward compatibility: migrate legacy single host/port fields.
+            if not profiles:
+                legacy_host = str(data.get("host", DEFAULT_HOST)).strip() or DEFAULT_HOST
+                try:
+                    legacy_port = int(data.get("port", DEFAULT_PORT))
+                except (TypeError, ValueError):
+                    legacy_port = DEFAULT_PORT
+                if not (1 <= legacy_port <= 65535):
+                    legacy_port = DEFAULT_PORT
+                profiles = [ConnectionProfile(name="Default", host=legacy_host, port=legacy_port)]
+
+            active_name = str(data.get("active_profile_name", profiles[0].name)).strip()
+            if active_name not in {profile.name for profile in profiles}:
+                active_name = profiles[0].name
+
             return LauncherConfig(
                 nickname=str(data.get("nickname", "Player")),
-                host=str(data.get("host", DEFAULT_HOST)),
-                port=int(data.get("port", DEFAULT_PORT)),
+                profiles=profiles,
+                active_profile_name=active_name,
                 gta_path=str(data.get("gta_path", "")),
             )
         except Exception:
@@ -420,14 +481,16 @@ class LauncherApp:
         self.nickname_var.set(nickname)
         self.host_var.set(host)
         self.port_var.set(port_text)
+        self._sync_active_profile_from_fields()
         self.gta_path_var.set(gta_path)
 
     def save_current_config(self) -> None:
         try:
+            self._sync_active_profile_from_fields()
             config = LauncherConfig(
                 nickname=self.nickname_var.get().strip() or "Player",
-                host=self.host_var.get().strip() or DEFAULT_HOST,
-                port=self._read_port(or_default=True),
+                profiles=self._normalized_profiles(),
+                active_profile_name=self.active_profile_name_var.get().strip() or "Default",
                 gta_path=self.gta_path_var.get().strip(),
             )
             CONFIG_PATH.write_text(json.dumps(asdict(config), indent=2), encoding="utf-8")
@@ -442,6 +505,170 @@ class LauncherApp:
         if port < 1 or port > 65535:
             raise ValueError("Port must be between 1 and 65535")
         return port
+
+    def _normalized_profiles(self) -> list[ConnectionProfile]:
+        normalized = [p for p in self.profiles if p.name.strip()]
+        if not normalized:
+            normalized = [ConnectionProfile(name="Default", host=DEFAULT_HOST, port=DEFAULT_PORT)]
+        active_names = {profile.name for profile in normalized}
+        active_name = self.active_profile_name_var.get().strip()
+        if active_name not in active_names:
+            self.active_profile_name_var.set(normalized[0].name)
+        return normalized
+
+    def _get_active_profile(self) -> ConnectionProfile:
+        active_name = self.active_profile_name_var.get().strip() or "Default"
+        for profile in self.profiles:
+            if profile.name == active_name:
+                return profile
+        if not self.profiles:
+            default_profile = ConnectionProfile(name="Default", host=DEFAULT_HOST, port=DEFAULT_PORT)
+            self.profiles.append(default_profile)
+            self.active_profile_name_var.set(default_profile.name)
+            return default_profile
+        self.active_profile_name_var.set(self.profiles[0].name)
+        return self.profiles[0]
+
+    def _refresh_profile_controls(self) -> None:
+        profile_names = [profile.name for profile in self._normalized_profiles()]
+        self.profile_combo.configure(values=profile_names)
+        if self.active_profile_name_var.get() not in profile_names:
+            self.active_profile_name_var.set(profile_names[0])
+
+    def _sync_active_profile_from_fields(self) -> None:
+        try:
+            port = self._read_port(or_default=True)
+        except Exception:
+            return
+        profile = self._get_active_profile()
+        profile.host = self.host_var.get().strip() or DEFAULT_HOST
+        profile.port = port
+
+    def _on_profile_selected(self, _event: object | None = None) -> None:
+        profile = self._get_active_profile()
+        self.host_var.set(profile.host)
+        self.port_var.set(str(profile.port))
+        self.save_current_config()
+
+    def _validate_profile_values(
+        self,
+        name: str,
+        host: str,
+        port_text: str,
+        editing_original_name: str | None = None,
+    ) -> ValidationResult:
+        clean_name = name.strip()
+        clean_host = host.strip()
+        if not clean_name:
+            return ValidationResult(False, "Profile name is required.")
+        if not clean_host:
+            return ValidationResult(False, "Host is required.")
+        existing_names = {profile.name for profile in self.profiles}
+        if clean_name != (editing_original_name or "") and clean_name in existing_names:
+            return ValidationResult(False, f"Duplicate profile name: {clean_name}")
+        try:
+            port = int(port_text.strip())
+        except ValueError:
+            return ValidationResult(False, "Port must be a number.")
+        if port < 1 or port > 65535:
+            return ValidationResult(False, "Port must be between 1 and 65535.")
+        try:
+            socket.getaddrinfo(clean_host, None)
+        except socket.gaierror:
+            return ValidationResult(False, "Host must be a valid hostname or IP address.")
+        return ValidationResult(True)
+
+    def _profile_dialog(self, title: str, profile: ConnectionProfile | None = None) -> tuple[str, str, str] | None:
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+
+        name_var = tk.StringVar(value=profile.name if profile else "")
+        host_var = tk.StringVar(value=profile.host if profile else DEFAULT_HOST)
+        port_var = tk.StringVar(value=str(profile.port if profile else DEFAULT_PORT))
+        result: tuple[str, str, str] | None = None
+
+        frame = ttk.Frame(dialog, padding=12)
+        frame.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frame, text="Profile name").grid(row=0, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=name_var, width=28).grid(row=0, column=1, sticky="we", padx=(8, 0))
+        ttk.Label(frame, text="Host / IP").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(frame, textvariable=host_var, width=28).grid(row=1, column=1, sticky="we", padx=(8, 0), pady=(8, 0))
+        ttk.Label(frame, text="Port").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(frame, textvariable=port_var, width=12).grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
+        frame.columnconfigure(1, weight=1)
+
+        def _save() -> None:
+            nonlocal result
+            validation = self._validate_profile_values(
+                name_var.get(),
+                host_var.get(),
+                port_var.get(),
+                editing_original_name=profile.name if profile else None,
+            )
+            if not validation.ok:
+                messagebox.showerror("Invalid profile", validation.error)
+                return
+            result = (name_var.get().strip(), host_var.get().strip(), port_var.get().strip())
+            dialog.destroy()
+
+        actions = ttk.Frame(frame, padding=(0, 12, 0, 0))
+        actions.grid(row=3, column=0, columnspan=2, sticky="e")
+        ttk.Button(actions, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
+        ttk.Button(actions, text="Save", command=_save).pack(side=tk.RIGHT, padx=(0, 8))
+
+        dialog.wait_window()
+        return result
+
+    def _add_profile(self) -> None:
+        values = self._profile_dialog("Add profile")
+        if values is None:
+            return
+        name, host, port_text = values
+        self.profiles.append(ConnectionProfile(name=name, host=host, port=int(port_text)))
+        self.active_profile_name_var.set(name)
+        self._refresh_profile_controls()
+        self._on_profile_selected()
+
+    def _edit_profile(self) -> None:
+        profile = self._get_active_profile()
+        values = self._profile_dialog("Edit profile", profile=profile)
+        if values is None:
+            return
+        name, host, port_text = values
+        profile.name = name
+        profile.host = host
+        profile.port = int(port_text)
+        self.active_profile_name_var.set(name)
+        self._refresh_profile_controls()
+        self._on_profile_selected()
+
+    def _delete_profile(self) -> None:
+        profile = self._get_active_profile()
+        if len(self.profiles) <= 1:
+            messagebox.showerror("Cannot delete", "At least one profile is required.")
+            return
+        if not messagebox.askyesno("Delete profile", f"Delete profile '{profile.name}'?"):
+            return
+        self.profiles = [item for item in self.profiles if item.name != profile.name]
+        self.active_profile_name_var.set(self.profiles[0].name)
+        self._refresh_profile_controls()
+        self._on_profile_selected()
+
+    def _duplicate_profile(self) -> None:
+        source = self._get_active_profile()
+        existing_names = {profile.name for profile in self.profiles}
+        suffix = 2
+        candidate = f"{source.name} Copy"
+        while candidate in existing_names:
+            candidate = f"{source.name} Copy {suffix}"
+            suffix += 1
+        self.profiles.append(ConnectionProfile(name=candidate, host=source.host, port=source.port))
+        self.active_profile_name_var.set(candidate)
+        self._refresh_profile_controls()
+        self._on_profile_selected()
 
     def _browse_gta_path(self) -> None:
         selected = filedialog.askdirectory(title="Select GTA:SA directory")
@@ -475,11 +702,17 @@ class LauncherApp:
             self._set_error("Server is already running")
             return
 
+        profile = self._get_active_profile()
         try:
-            port = self._read_port()
+            port = int(self.port_var.get().strip())
         except Exception as exc:
             self._set_error(str(exc))
             messagebox.showerror("Invalid port", str(exc))
+            return
+        if port < 1 or port > 65535:
+            msg = "Port must be between 1 and 65535"
+            self._set_error(msg)
+            messagebox.showerror("Invalid port", msg)
             return
 
         server_binary = self._resolve_server_binary()
@@ -498,7 +731,7 @@ class LauncherApp:
                 text=True,
                 bufsize=1,
             )
-            self._append_log(f"[info] server started: {server_binary}")
+            self._append_log(f"[info] server started ({profile.name} @ {profile.host}:{port}): {server_binary}")
             self.last_error_var.set("None")
             self._start_log_stream(self.server_process.stdout, "stdout")
             self._start_log_stream(self.server_process.stderr, "stderr")
@@ -555,9 +788,10 @@ class LauncherApp:
             self._update_status()
 
     def _check_port_bound(self) -> bool:
-        host = self.host_var.get().strip() or DEFAULT_HOST
+        profile = self._get_active_profile()
+        host = profile.host.strip() or DEFAULT_HOST
         try:
-            port = self._read_port()
+            port = profile.port
         except Exception:
             return False
         try:
@@ -588,6 +822,10 @@ class LauncherApp:
 
         if port < 1 or port > 65535:
             return ValidationResult(False, "Port must be between 1 and 65535.")
+        try:
+            socket.getaddrinfo(clean_host, None)
+        except socket.gaierror:
+            return ValidationResult(False, "Host must be a valid hostname or IP address.")
         return ValidationResult(True)
 
     def validate_game_install(self, gta_path_text: str) -> GameValidationResult:
