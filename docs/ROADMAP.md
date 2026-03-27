@@ -228,6 +228,26 @@ Execution rule: implement **one phase at a time**. A phase is only marked `done`
 | Street races | Street Racing set (22 races) | `Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `task_car_drive_to_coord`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-street-races-checklist.md` |
 | Import/Export | Import/Export list sets and turn-ins | `Mission.LoadAndLaunchInternal`, `create_car`, `set_objective`, `set_player_money`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-import-export-checklist.md` |
 
+#### Schools execution checklist
+
+Use the fixed sync gates for every schools mode with no substitutions: `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore.
+
+1. **Shared sync primitives** (common schools state + restore plumbing)
+   - [ ] Driving — owner: _unassigned_; status: `not started`
+   - [ ] Flight — owner: _unassigned_; status: `not started`
+   - [ ] Bike — owner: _unassigned_; status: `not started`
+   - [ ] Boat — owner: _unassigned_; status: `not started`
+2. **Mode-specific script/opcode mapping** (`Mission.LoadAndLaunchInternal`, `set_player_control`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission`)
+   - [ ] Driving — owner: _unassigned_; status: `not started`
+   - [ ] Flight — owner: _unassigned_; status: `not started`
+   - [ ] Bike — owner: _unassigned_; status: `not started`
+   - [ ] Boat — owner: _unassigned_; status: `not started`
+3. **QA sign-off** (`docs/qa/phase-schools-checklist.md`)
+   - [ ] Driving — owner: _unassigned_; status: `not started`
+   - [ ] Flight — owner: _unassigned_; status: `not started`
+   - [ ] Bike — owner: _unassigned_; status: `not started`
+   - [ ] Boat — owner: _unassigned_; status: `not started`
+
 ### Progress tracking (per-mode)
 
 Allowed status values: `not started`, `in progress`, `done`.
