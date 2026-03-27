@@ -9,6 +9,7 @@ import socket
 import subprocess
 import threading
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -317,6 +318,16 @@ class GameValidationResult:
     missing: list[str]
 
 
+@dataclass
+class HealthIndicator:
+    key: str
+    title: str
+    state: str
+    detail: str
+    remediation: str
+    action_label: str
+
+
 class ToolTip:
     """Small hover tooltip helper for Tk widgets."""
 
@@ -381,9 +392,14 @@ class LauncherApp:
         self.port_bound_var = tk.StringVar(value="No")
         self.last_error_var = tk.StringVar(value="None")
         self.server_summary_var = tk.StringVar(value="Not started yet.")
+        self.diagnostics_summary_var = tk.StringVar(value="Diagnostics not run yet.")
         self.advanced_visible_var = tk.BooleanVar(value=False)
         self.advanced_toggle_text_var = tk.StringVar(value="▶ Advanced Server Settings")
         self.advanced_error_var = tk.StringVar(value="")
+        self.health_card_widgets: dict[str, dict[str, tk.Widget]] = {}
+        self.last_health_snapshot: dict[str, tuple[str, str, str, str]] = {}
+        self.last_diagnostics_timestamp: datetime | None = None
+        self.last_diagnostics_result: list[HealthIndicator] = []
 
         self._load_server_options()
 
@@ -416,7 +432,8 @@ class LauncherApp:
         config_frame.pack(fill=tk.X)
 
         ttk.Label(config_frame, text="Nickname").grid(row=0, column=0, sticky="w")
-        ttk.Entry(config_frame, textvariable=self.nickname_var, width=24).grid(row=0, column=1, sticky="we", padx=(8, 16))
+        self.nickname_entry = ttk.Entry(config_frame, textvariable=self.nickname_var, width=24)
+        self.nickname_entry.grid(row=0, column=1, sticky="we", padx=(8, 16))
 
         ttk.Label(config_frame, text="Profile").grid(row=0, column=2, sticky="w")
         profile_row = ttk.Frame(config_frame)
@@ -435,14 +452,18 @@ class LauncherApp:
         ttk.Button(profile_row, text="Duplicate", command=self._duplicate_profile).pack(side=tk.LEFT, padx=(6, 0))
 
         ttk.Label(config_frame, text="Host / IP").grid(row=1, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(config_frame, textvariable=self.host_var, width=24).grid(row=1, column=1, sticky="we", padx=(8, 16), pady=(8, 0))
+        self.host_entry = ttk.Entry(config_frame, textvariable=self.host_var, width=24)
+        self.host_entry.grid(row=1, column=1, sticky="we", padx=(8, 16), pady=(8, 0))
 
         ttk.Label(config_frame, text="Port").grid(row=1, column=2, sticky="w", pady=(8, 0))
-        ttk.Entry(config_frame, textvariable=self.port_var, width=10).grid(row=1, column=3, sticky="w", padx=(8, 16), pady=(8, 0))
+        self.port_entry = ttk.Entry(config_frame, textvariable=self.port_var, width=10)
+        self.port_entry.grid(row=1, column=3, sticky="w", padx=(8, 16), pady=(8, 0))
 
         ttk.Label(config_frame, text="GTA:SA path").grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(config_frame, textvariable=self.gta_path_var).grid(row=2, column=1, columnspan=3, sticky="we", padx=(8, 8), pady=(8, 0))
-        ttk.Button(config_frame, text="Browse", command=self._browse_gta_path).grid(row=2, column=4, sticky="e", pady=(8, 0))
+        self.gta_path_entry = ttk.Entry(config_frame, textvariable=self.gta_path_var)
+        self.gta_path_entry.grid(row=2, column=1, columnspan=3, sticky="we", padx=(8, 8), pady=(8, 0))
+        self.browse_gta_btn = ttk.Button(config_frame, text="Browse", command=self._browse_gta_path)
+        self.browse_gta_btn.grid(row=2, column=4, sticky="e", pady=(8, 0))
 
         advanced_toggle = ttk.Button(
             config_frame,
@@ -492,25 +513,43 @@ class LauncherApp:
 
         controls = ttk.Frame(self.wrapper, padding=(0, 10, 0, 4))
         controls.pack(fill=tk.X)
-        ttk.Button(controls, text="Start Local Server", command=self.start_server).pack(side=tk.LEFT)
+        self.start_server_btn = ttk.Button(controls, text="Start Local Server", command=self.start_server)
+        self.start_server_btn.pack(side=tk.LEFT)
         ttk.Button(controls, text="Stop Server", command=self.stop_server).pack(side=tk.LEFT, padx=8)
         ttk.Button(controls, text="Launch Game", command=self.launch_game).pack(side=tk.RIGHT)
 
         status = ttk.LabelFrame(self.wrapper, text="Status", padding=10)
         status.pack(fill=tk.X)
 
-        ttk.Label(status, text="Server running:").grid(row=0, column=0, sticky="w")
-        ttk.Label(status, textvariable=self.server_running_var).grid(row=0, column=1, sticky="w", padx=(8, 24))
+        header = ttk.Frame(status)
+        header.grid(row=0, column=0, sticky="we")
+        ttk.Label(header, text="Health indicators", font=("TkDefaultFont", 10, "bold")).pack(side=tk.LEFT)
+        ttk.Button(header, text="Run Diagnostics", command=self.run_diagnostics).pack(side=tk.RIGHT)
+        ttk.Label(header, textvariable=self.diagnostics_summary_var, foreground="#555555").pack(side=tk.RIGHT, padx=(0, 10))
 
-        ttk.Label(status, text="Port bound:").grid(row=0, column=2, sticky="w")
-        ttk.Label(status, textvariable=self.port_bound_var).grid(row=0, column=3, sticky="w", padx=(8, 24))
-
-        ttk.Label(status, text="Last error:").grid(row=1, column=0, sticky="w", pady=(8, 0))
-        ttk.Label(status, textvariable=self.last_error_var).grid(row=1, column=1, columnspan=3, sticky="w", padx=(8, 0), pady=(8, 0))
-        ttk.Label(status, text="Server config:").grid(row=2, column=0, sticky="nw", pady=(8, 0))
-        ttk.Label(status, textvariable=self.server_summary_var, justify="left", wraplength=620).grid(
-            row=2, column=1, columnspan=3, sticky="w", padx=(8, 0), pady=(8, 0)
-        )
+        cards = ttk.Frame(status)
+        cards.grid(row=1, column=0, sticky="we", pady=(8, 0))
+        for idx, key in enumerate(("config", "gta", "server", "network")):
+            card = tk.Frame(cards, borderwidth=1, relief="solid", padx=8, pady=8)
+            card.grid(row=idx // 2, column=idx % 2, sticky="nsew", padx=4, pady=4)
+            badge = tk.Label(card, text="● UNKNOWN", font=("TkDefaultFont", 9, "bold"), anchor="w")
+            badge.pack(anchor="w")
+            detail = tk.Label(card, text="", justify="left", wraplength=280, anchor="w")
+            detail.pack(anchor="w", pady=(4, 2))
+            remediation = tk.Label(card, text="", justify="left", wraplength=280, fg="#555555", anchor="w")
+            remediation.pack(anchor="w")
+            action_btn = ttk.Button(card, text="Fix", command=lambda k=key: self._run_health_action(k))
+            action_btn.pack(anchor="e", pady=(6, 0))
+            self.health_card_widgets[key] = {
+                "card": card,
+                "badge": badge,
+                "detail": detail,
+                "remediation": remediation,
+                "action": action_btn,
+            }
+        cards.columnconfigure(0, weight=1)
+        cards.columnconfigure(1, weight=1)
+        status.columnconfigure(0, weight=1)
 
         logs = ttk.LabelFrame(self.wrapper, text="Server logs", padding=10)
         logs.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
@@ -1085,7 +1124,96 @@ class LauncherApp:
         running = self.server_process is not None and self.server_process.poll() is None
         self.server_running_var.set("Yes" if running else "No")
         self.port_bound_var.set("Yes" if self._check_port_bound() else "No")
+        self._refresh_health_indicators()
         self.root.after(1000, self._update_status)
+
+    def _collect_health_indicators(self) -> list[HealthIndicator]:
+        conn = self.validate_connection_settings(self.nickname_var.get(), self.host_var.get(), self.port_var.get())
+        config_state = "ok" if conn.ok else "warn"
+        config_detail = "Connection/profile settings are complete." if conn.ok else (conn.error or "Configuration is incomplete.")
+        config_fix = "Everything configured." if conn.ok else "Set nickname, host, and port, then save."
+        config_action = "Review config" if conn.ok else "Fix config"
+
+        game = self.validate_game_install(self.gta_path_var.get())
+        game_state = "ok" if game.ok else "warn"
+        game_detail = "GTA install is valid." if game.ok else "Missing: " + ", ".join(game.missing)
+        game_fix = "No action needed." if game.ok else "Set GTA path and ensure required files exist."
+        game_action = "Open folder" if game.ok else "Set GTA path"
+
+        running = self.server_process is not None and self.server_process.poll() is None
+        server_state = "ok" if running else "warn"
+        server_detail = "Local server process is running." if running else "Local server process is stopped."
+        server_fix = "No action needed." if running else "Start local server."
+        server_action = "View logs" if running else "Start server"
+
+        reachable = self._check_port_bound()
+        network_state = "ok" if reachable else "warn"
+        network_detail = "Host/port accepts connections." if reachable else "Cannot reach active host/port."
+        network_fix = "No action needed." if reachable else "Verify host/port and start server."
+        network_action = "Retest" if reachable else "Check host/port"
+
+        return [
+            HealthIndicator("config", "Config completeness", config_state, config_detail, config_fix, config_action),
+            HealthIndicator("gta", "GTA install validity", game_state, game_detail, game_fix, game_action),
+            HealthIndicator("server", "Server process state", server_state, server_detail, server_fix, server_action),
+            HealthIndicator("network", "Network reachability", network_state, network_detail, network_fix, network_action),
+        ]
+
+    def _refresh_health_indicators(self, force: bool = False) -> None:
+        palette = {
+            "ok": ("● OK", "#e8f6ec", "#1a7f37"),
+            "warn": ("● WARNING", "#fff4e5", "#9a6700"),
+            "fail": ("● FAIL", "#fde8e8", "#b00020"),
+        }
+        indicators = self._collect_health_indicators()
+        for indicator in indicators:
+            snapshot = (indicator.state, indicator.title, indicator.detail, indicator.remediation)
+            if not force and self.last_health_snapshot.get(indicator.key) == snapshot:
+                continue
+            self.last_health_snapshot[indicator.key] = snapshot
+            widgets = self.health_card_widgets.get(indicator.key)
+            if not widgets:
+                continue
+            prefix, bg, fg = palette.get(indicator.state, palette["warn"])
+            widgets["card"].configure(background=bg)
+            widgets["badge"].configure(text=f"{prefix} {indicator.title}", bg=bg, fg=fg)
+            widgets["detail"].configure(text=indicator.detail, bg=bg)
+            widgets["remediation"].configure(text=f"Action: {indicator.remediation}", bg=bg)
+            widgets["action"].configure(text=indicator.action_label)
+
+    def _run_health_action(self, key: str) -> None:
+        if key == "config":
+            self.nickname_entry.focus_set()
+            self.nickname_entry.selection_range(0, tk.END)
+        elif key == "gta":
+            self.gta_path_entry.focus_set()
+            self.gta_path_entry.icursor(tk.END)
+        elif key == "server":
+            if self.server_process is None or self.server_process.poll() is not None:
+                self.start_server()
+            else:
+                self.log_text.focus_set()
+        elif key == "network":
+            self.host_entry.focus_set()
+            self.host_entry.selection_range(0, tk.END)
+
+    def run_diagnostics(self) -> None:
+        report = self._collect_health_indicators()
+        self.last_diagnostics_timestamp = datetime.now(timezone.utc)
+        self.last_diagnostics_result = report
+        warning_count = sum(1 for item in report if item.state != "ok")
+        stamp = self.last_diagnostics_timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+        if warning_count:
+            self.diagnostics_summary_var.set(f"Last diagnostics: {stamp} ({warning_count} warning(s))")
+        else:
+            self.diagnostics_summary_var.set(f"Last diagnostics: {stamp} (all healthy)")
+
+        self._append_log(f"[diag] Diagnostics report @ {stamp}")
+        for item in report:
+            self._append_log(f"[diag] {item.title}: {item.state.upper()} - {item.detail}")
+            self._append_log(f"[diag]   Remediation: {item.remediation}")
+        self._append_log("[diag] End diagnostics report")
+        self._refresh_health_indicators(force=True)
 
     def _on_close(self) -> None:
         self.save_current_config()
