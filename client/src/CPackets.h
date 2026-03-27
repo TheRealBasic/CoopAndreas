@@ -685,6 +685,10 @@ public:
 
 	struct MissionFlowSync
 	{
+		// Shared side-content payload used by mission/sync modules.
+		// Applies to school attempts, race-style content (launch/start + checkpoint progression),
+		// timer-driven side activities, and deterministic pass/fail replay.
+		// Server replays the latest payload with replay=1 for reconnect + late-join hydration.
 		uint8_t eventType = MISSION_FLOW_EVENT_NONE;
 		uint8_t messageType = 0; // mirrors AddMessageGXT::type
 		uint32_t time = 0;
@@ -696,13 +700,13 @@ public:
 		char gxt[8]{};
 		char cutsceneName[8]{};
 		uint16_t sourceOpcode = 0;
-		uint16_t missionId = 0;
-		int32_t timerMs = 0;
-		uint16_t checkpointIndex = 0;
-		uint8_t timerVisible = 0;
-		uint8_t timerFrozen = 0;
-		uint8_t passFailPending = 0; // 0 = none, 1 = pass, 2 = fail
-		uint8_t playerControlState = 0;
+		uint16_t missionId = 0;        // Launch/start identity (Mission.LoadAndLaunchInternal / race start script launch)
+		int32_t timerMs = 0;           // Canonical timer value in milliseconds
+		uint16_t checkpointIndex = 0;  // Monotonic progression index (checkpoint + objective updates)
+		uint8_t timerVisible = 0;      // 1 when on-screen timer should be visible
+		uint8_t timerFrozen = 0;       // 1 when on-screen timer is frozen
+		uint8_t passFailPending = 0;   // 0 = none, 1 = pass, 2 = fail (terminal outcome latch)
+		uint8_t playerControlState = 0;// set_player_control mirror for scripted transitions
 		char objective[8]{};
 	};
 
