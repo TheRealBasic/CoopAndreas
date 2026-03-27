@@ -3,6 +3,7 @@
 
 #include "CCutsceneMgr.h"
 #include "CNetwork.h"
+#include <limits>
 
 namespace
 {
@@ -411,6 +412,18 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
         if (text && text[0])
         {
             strncpy_s(ms_schoolAttemptState.objective, text, sizeof(ms_schoolAttemptState.objective));
+            ms_schoolAttemptState.checkpointIndex++;
+        }
+        break;
+    case 0x06D5: // checkpoint.create
+        if (ms_schoolAttemptState.checkpointIndex == 0)
+        {
+            ms_schoolAttemptState.checkpointIndex = 1;
+        }
+        break;
+    case 0x07F3: // checkpoint.set_coords
+        if (ms_schoolAttemptState.checkpointIndex < std::numeric_limits<uint16_t>::max())
+        {
             ms_schoolAttemptState.checkpointIndex++;
         }
         break;
