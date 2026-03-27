@@ -23,7 +23,9 @@
 #include "semver.h"
 #include "PlayerDisconnectReason.h"
 
-std::unordered_map<unsigned short, CPacketListener*> CNetwork::m_packetListeners;
+std::unordered_map<unsigned short, std::unique_ptr<CPacketListener>> CNetwork::m_packetListeners;
+ENetHost* CNetwork::m_pServer = nullptr;
+bool CNetwork::m_bRunning = false;
 
 namespace
 {
@@ -155,11 +157,13 @@ bool CNetwork::Init(unsigned short port)
             maxPlayers);
     }
 
-    ENetHost* server = enet_host_create(&address, effectiveMaxPlayers, 2, 0, 0); // create enet host
+    m_pServer = enet_host_create(&address, effectiveMaxPlayers, 2, 0, 0); // create enet host
 
-    if (server == NULL)
+    if (m_pServer == NULL)
     {
         printf("[ERROR] : ENET_UDP_SERVER_SOCKET FAILED TO CREATE\n");
+        m_packetListeners.clear();
+        enet_deinitialize();
         return false;
     }
 
@@ -167,12 +171,13 @@ bool CNetwork::Init(unsigned short port)
 
 
     ENetEvent event;
-    while (true) // waiting for event
+    m_bRunning = true;
+    while (m_bRunning) // waiting for event
     {
-        CNetwork::ProcessAuthenticationTimeouts(server);
+        CNetwork::ProcessAuthenticationTimeouts(m_pServer);
         CPickupManager::ProcessRespawns();
         CFireSyncManager::Process((uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
-        enet_host_service(server, &event, 1);
+        enet_host_service(m_pServer, &event, 1);
         switch (event.type)
         {
             case ENET_EVENT_TYPE_CONNECT:
@@ -194,14 +199,14 @@ bool CNetwork::Init(unsigned short port)
         }
     }
 
-    enet_host_destroy(server);
-    enet_deinitialize();
-    printf("[!] : Server Shutdown (ENET_DEINITIALIZE)\n");
+    CNetwork::Shutdown();
     return 0;
 }
 
 void CNetwork::InitListeners()
 {
+    m_packetListeners.clear();
+
     CNetwork::AddListener(CPacketsID::PLAYER_CONNECTED, CPlayerPackets::PlayerConnected::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_ONFOOT, CPlayerPackets::PlayerOnFoot::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_BULLET_SHOT, CPlayerPackets::PlayerBulletShot::Handle);
@@ -275,12 +280,10 @@ void CNetwork::InitListeners()
 void CNetwork::SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag)
 {
     size_t packetSize = sizeof(uint16_t) + dataSize;
-    char* packetData = new char[packetSize];
-    memcpy(packetData, &id, sizeof(uint16_t));
-    memcpy(packetData + sizeof(uint16_t), data, dataSize);
-    ENetPacket* packet = enet_packet_create(packetData, packetSize, flag);
-
-    delete[] packetData;
+    std::vector<uint8_t> packetData(packetSize);
+    memcpy(packetData.data(), &id, sizeof(uint16_t));
+    memcpy(packetData.data() + sizeof(uint16_t), data, dataSize);
+    ENetPacket* packet = enet_packet_create(packetData.data(), packetSize, flag);
 
     enet_peer_send(peer, 0, packet);
 }
@@ -288,12 +291,10 @@ void CNetwork::SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t 
 void CNetwork::SendPacketToAll(unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag, ENetPeer* dontShareWith)
 {
     size_t packetSize = sizeof(uint16_t) + dataSize;
-    char* packetData = new char[packetSize];
-    memcpy(packetData, &id, sizeof(uint16_t));
-    memcpy(packetData + sizeof(uint16_t), data, dataSize);
-    ENetPacket* packet = enet_packet_create(packetData, packetSize, flag);
-
-    delete[] packetData;
+    std::vector<uint8_t> packetData(packetSize);
+    memcpy(packetData.data(), &id, sizeof(uint16_t));
+    memcpy(packetData.data() + sizeof(uint16_t), data, dataSize);
+    ENetPacket* packet = enet_packet_create(packetData.data(), packetSize, flag);
 
     for (int i = 0; i != CPlayerManager::m_pPlayers.size(); i++)
     {
@@ -484,8 +485,24 @@ void CNetwork::HandlePacketReceive(ENetEvent& event)
 
 void CNetwork::AddListener(unsigned short id, void(*callback)(ENetPeer*, void*, int))
 {
-    CPacketListener* listener = new CPacketListener(id, callback);
-    m_packetListeners.insert({ id, listener });
+    m_packetListeners[id] = std::make_unique<CPacketListener>(id, callback);
+}
+
+void CNetwork::Shutdown()
+{
+    m_bRunning = false;
+    m_packetListeners.clear();
+    g_peerAuthStates.clear();
+    g_peerRateWindows.clear();
+
+    if (m_pServer != nullptr)
+    {
+        enet_host_destroy(m_pServer);
+        m_pServer = nullptr;
+    }
+
+    enet_deinitialize();
+    printf("[!] : Server Shutdown (ENET_DEINITIALIZE)\n");
 }
 
 uint32_t CNetwork::ComputeHandshakeResponse(uint32_t nonce)

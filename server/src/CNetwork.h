@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <unordered_map>
 #include "enet/enet.h"
 
@@ -19,7 +20,9 @@ class CNetwork
 	public:
 		CNetwork();
 		
-		static std::unordered_map<unsigned short, CPacketListener*> m_packetListeners;
+		static std::unordered_map<unsigned short, std::unique_ptr<CPacketListener>> m_packetListeners;
+		static ENetHost* m_pServer;
+		static bool m_bRunning;
 		static bool Init(unsigned short port);
 		static void InitListeners();
 		static void SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag = (ENetPacketFlag)0);
@@ -33,6 +36,7 @@ class CNetwork
 		static void HandlePlayerDisconnected(ENetEvent& event);
 		static void HandlePacketReceive(ENetEvent& event);
 		static void ProcessAuthenticationTimeouts(ENetHost* server);
+		static void Shutdown();
 		static void AddListener(unsigned short id, void(*callback)(ENetPeer*, void*, int));
 
 	

@@ -1,4 +1,7 @@
 #pragma once
+#include <memory>
+#include <unordered_map>
+
 class CPacketListener
 {
 public:
@@ -15,7 +18,7 @@ public:
 class CNetwork
 {
 public:
-	static std::unordered_map<unsigned short, CPacketListener*> m_packetListeners;
+	static std::unordered_map<unsigned short, std::unique_ptr<CPacketListener>> m_packetListeners;
 	static ENetHost* m_pClient;
 	static ENetPeer* m_pPeer;
 	static bool CNetwork::m_bConnected;
@@ -29,6 +32,7 @@ public:
 
 	static DWORD WINAPI InitAsync(LPVOID);
 	static void Disconnect();
+	static void Shutdown();
 	static void SendPacket(unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag = (ENetPacketFlag)0);
 	static void InitListeners();
 	static void HandlePacketReceive(ENetEvent& event);

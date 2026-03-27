@@ -8,7 +8,7 @@ ENetPeer* CNetwork::m_pPeer = nullptr;
 bool CNetwork::m_bConnected = false;
 bool CNetwork::m_bAuthenticated = false;
 
-std::unordered_map<unsigned short, CPacketListener*> CNetwork::m_packetListeners;
+std::unordered_map<unsigned short, std::unique_ptr<CPacketListener>> CNetwork::m_packetListeners;
 
 char CNetwork::m_IpAddress[128 + 1];
 unsigned short CNetwork::m_nPort = Config::DEFAULT_PORT;
@@ -106,9 +106,11 @@ void CNetwork::SendPacket(unsigned short id, void* data, size_t dataSize, ENetPa
 
 void CNetwork::Disconnect()
 {
-	/*enet_peer_disconnect_now(CNetwork::m_pPeer, 0);
-	enet_host_flush(CNetwork::m_pClient);
-	enet_peer_reset(CNetwork::m_pPeer);*/
+	if (m_pPeer != nullptr)
+	{
+		enet_peer_disconnect_now(m_pPeer, 0);
+		m_pPeer = nullptr;
+	}
 
 	m_bConnected = false;
 	m_bAuthenticated = false;
@@ -116,8 +118,23 @@ void CNetwork::Disconnect()
 	CNetworkPickupManager::Reset();
 }
 
+void CNetwork::Shutdown()
+{
+	CNetwork::Disconnect();
+	m_packetListeners.clear();
+
+	if (m_pClient != nullptr)
+	{
+		enet_host_destroy(m_pClient);
+		m_pClient = nullptr;
+		enet_deinitialize();
+	}
+}
+
 void CNetwork::InitListeners()
 {
+	m_packetListeners.clear();
+
 	CNetwork::AddListener(CPacketsID::PLAYER_ONFOOT, CPacketHandler::PlayerOnFoot__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_CONNECTED, CPacketHandler::PlayerConnected__Handle);
 	CNetwork::AddListener(CPacketsID::PLAYER_DISCONNECTED, CPacketHandler::PlayerDisconnected__Handle);
@@ -228,8 +245,7 @@ void CNetwork::HandlePacketReceive(ENetEvent& event)
 
 void CNetwork::AddListener(unsigned short id, void(*callback)(void*, int))
 {
-	CPacketListener* listener = new CPacketListener(id, callback);
-	m_packetListeners.insert({ id, listener });
+	m_packetListeners[id] = std::make_unique<CPacketListener>(id, callback);
 }
 
 uint32_t CNetwork::ComputeHandshakeResponse(uint32_t nonce)
