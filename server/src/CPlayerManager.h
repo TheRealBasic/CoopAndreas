@@ -1196,23 +1196,40 @@ public:
 	{
 		switch (opcode)
 		{
+		case 0x00BA: // Text.PrintBig
 		case 0x00BC: // Text.PrintNow
 		case 0x00BF: // Clock.GetTimeOfDay
 		case 0x00DF: // Char.IsInAnyCar
 		case 0x00FE: // Char.LocateAnyMeans3D
 		case 0x00FF: // Char.LocateOnFoot3D
+		case 0x014E: // Hud.DisplayOnscreenTimer
+		case 0x014F: // Hud.ClearOnscreenTimer
+		case 0x0151: // Hud.ClearOnscreenCounter
 		case 0x0164: // Blip.Remove
 		case 0x0256: // Player.IsPlaying
 		case 0x02A7: // Blip.AddSpriteForContactPoint
+		case 0x0318: // register_mission_passed
+		case 0x0396: // Hud.FreezeOnscreenTimer
+		case 0x03C3: // Hud.DisplayOnscreenTimerWithString
+		case 0x03C4: // Hud.DisplayOnscreenCounterWithString
 		case 0x03C0: // Char.StoreCarIsInNoSave
+		case 0x03E5: // Text.PrintHelp
 		case 0x03EE: // Player.CanStartMission
 		case 0x0417: // Mission.LoadAndLaunchInternal
+		case 0x045C: // fail_current_mission
+		case 0x04F7: // Hud.DisplayNthOnscreenCounterWithString
 		case 0x0629: // Stat.SetInt
 		case 0x0652: // Stat.GetInt
 		case 0x0811: // Char.GetCarIsUsing
+		case 0x0890: // Hud.SetTimerBeepCountdownTime
 		case 0x08EC: // Car.GetClass
+		case 0x08FB: // Checkpoint.SetType
 		case 0x0956: // Game.FindMaxNumberOfGroupMembers
+		case 0x0996: // Checkpoint.SetHeading
 		case 0x096E: // Car.IsLowRider
+		case 0x06D5: // Checkpoint.Create
+		case 0x06D6: // Checkpoint.Delete
+		case 0x07F3: // Checkpoint.SetCoords
 			return true;
 		default:
 			return false;
