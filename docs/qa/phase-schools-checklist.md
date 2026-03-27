@@ -37,3 +37,8 @@ Validate co-op parity for school modes: **Driving**, **Flight**, **Bike**, **Boa
 - Host + clients tested:
 - Clips/log references:
 - Notes / regressions:
+
+## Mode-specific evidence (Driving school)
+| Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Driving school tests (`Mission.LoadAndLaunchInternal(71)` from `TRACE`) | ☐ | ☐ | ☐ | ☐ |  |  |

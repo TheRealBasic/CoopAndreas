@@ -48,11 +48,19 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x00BA}, // print_big {key} [gxt_key] {time} [int] {style} [TextStyle]
     {0x00BC}, // print_now {key} [gxt_key] {time} [int] {drawImmediately} [bool]
     {0x00BE}, // clear_prints
+    {0x014E}, // display_onscreen_timer {var_timer} [global var int] {direction} [TimerDirection]
+    {0x014F}, // clear_onscreen_timer {var_timer} [global var int]
+    {0x0151}, // clear_onscreen_counter {var_counter} [global var int]
     {0x01E3}, // print_with_number_big {key} [gxt_key] {num} [int] {duration} [int] {style}[TextStyle]
     {0x0318}, // register_mission_passed {key} [gxt_key]
+    {0x0396}, // freeze_onscreen_timer {state} [bool]
+    {0x03C3}, // display_onscreen_timer_with_string {var_timer} [global var int] {direction} [TimerDirection] {text} [gxt_key]
+    {0x03C4}, // display_onscreen_counter_with_string {var_counter} [global var int] {display} [CounterDisplay] {text} [gxt_key]
     {0x045C}, // fail_current_mission
+    {0x04F7}, // display_nth_onscreen_counter_with_string {var_counter} [global var int] {display} [CounterDisplay] {slot} [int] {text} [gxt_key]
     {0x03E5}, // print_help {key} [gxt_key]
     {0x054C}, // load_mission_text {tableName} [string]
+    {0x0890}, // set_timer_beep_countdown_time {var_timer} [global var int] {timeInSec} [int]
     {0x0998}, // award_player_mission_respect {value} [int]
     
     // Population managment
@@ -89,7 +97,12 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x02A7}, // add_sprite_blip_for_contact_point {x} [float] {y} [float] {z} [float] {sprite} [int]
     {0x0629}, // set_int_stat {stat} [int] {value} [int]
     {0x0652}, // get_int_stat {stat} [int] [var int]
+    {0x06D5}, // [var handle: Checkpoint] = create_checkpoint {type} [CheckpointType] ...
+    {0x06D6}, // delete_checkpoint [Checkpoint]
+    {0x07F3}, // set_checkpoint_coords [Checkpoint] {x} [float] {y} [float] {z} [float]
+    {0x08FB}, // set_checkpoint_type [Checkpoint] {type} [CheckpointType]
     {0x0956}, // find_number_of_players_in_group [var int]
+    {0x0996}, // set_checkpoint_heading [Checkpoint] {heading} [float]
     {0x0417}, // start_mission {missionNumber} [int]
     {COMMAND_SET_TAG_STATUS_IN_AREA},
     {0x06F0, true, {eSyncedParamType::PED}}, // remove_char_from_group [Char]
