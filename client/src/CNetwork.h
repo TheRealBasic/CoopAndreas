@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <cstdint>
 #include <unordered_map>
 
 class CPacketListener
@@ -29,6 +30,8 @@ public:
 	static inline uint32_t ms_nBytesReceivedThisSecondCounter;
 	static inline uint32_t ms_nBytesSentThisSecond;
 	static inline uint32_t ms_nBytesSentThisSecondCounter;
+	static inline uint16_t ms_nNegotiatedProtocolVersion;
+	static inline uint64_t ms_nNegotiatedCapabilities;
 
 	static DWORD WINAPI InitAsync(LPVOID);
 	static void Disconnect();

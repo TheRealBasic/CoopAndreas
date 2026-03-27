@@ -39,6 +39,9 @@ namespace
     struct PeerAuthState
     {
         bool authenticated = false;
+        uint16_t clientProtocolVersion = 0;
+        uint64_t clientCapabilities = 0;
+        uint64_t negotiatedCapabilities = 0;
         uint32_t nonce = 0;
         std::chrono::steady_clock::time_point challengeSentAt = std::chrono::steady_clock::now();
     };
@@ -116,6 +119,31 @@ namespace
                 return "rate_limit";
             default:
                 return "unknown";
+        }
+    }
+
+    void LogListenerValidationReport()
+    {
+        std::unordered_set<unsigned short> registeredIds;
+        registeredIds.reserve(CNetwork::m_packetListeners.size());
+        for (const auto& [id, listener] : CNetwork::m_packetListeners)
+        {
+            registeredIds.insert(id);
+        }
+
+        const auto report = PacketRegistry::ValidateListeners(PacketRegistry::ReceiverRole::Server, registeredIds);
+        if (report.ok)
+        {
+            printf("[Network] Packet registry validated (server listeners: %zu/%zu)\n",
+                report.registeredCount,
+                report.requiredCount);
+        }
+        else
+        {
+            printf("[WARN] Packet registry mismatch (missing=%zu unexpected=%zu)\n",
+                report.missingCount,
+                report.unexpectedCount);
+            printf("[WARN] Details:\n%s", report.details.c_str());
         }
     }
 }
@@ -275,6 +303,8 @@ void CNetwork::InitListeners()
     CNetwork::AddListener(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, CPlayerPackets::SubmissionMissionStateDelta::Handle);
     CNetwork::AddListener(CPacketsID::PLAYER_JETPACK_TRANSITION, CPlayerPackets::PlayerJetpackTransition::Handle);
     CNetwork::AddListener(CPacketsID::CHEAT_EFFECT_TRIGGER, CPlayerPackets::CheatEffectTriggerPacket::Handle);
+
+    LogListenerValidationReport();
 }
 
 void CNetwork::SendPacket(ENetPeer* peer, unsigned short id, void* data, size_t dataSize, ENetPacketFlag flag)
@@ -340,6 +370,8 @@ void CNetwork::HandlePeerConnected(ENetEvent& event)
 
         CPlayerPackets::PlayerHandshake challenge{};
         challenge.stage = HANDSHAKE_STAGE_SERVER_CHALLENGE;
+        challenge.protocolVersion = PacketRegistry::PROTOCOL_VERSION;
+        challenge.capabilityBitmap = PacketRegistry::PROTOCOL_CAPABILITIES;
         challenge.nonce = authState.nonce;
         CNetwork::SendPacket(event.peer, CPacketsID::PLAYER_HANDSHAKE, &challenge, sizeof(challenge), ENET_PACKET_FLAG_RELIABLE);
     }
@@ -411,6 +443,21 @@ void CNetwork::HandlePacketReceive(ENetEvent& event)
 {
     uint16_t packetid;
     memcpy(&packetid, event.packet->data, 2);
+    if (packetid >= PACKET_ID_MAX)
+    {
+        return;
+    }
+
+    const auto& contract = PacketRegistry::Contracts()[packetid];
+    const size_t payloadSize = event.packet->dataLength >= sizeof(uint16_t) ? (event.packet->dataLength - sizeof(uint16_t)) : 0;
+    if (payloadSize < contract.minPayloadSize)
+    {
+        printf("[Network] Dropping %s payload too small (%zu < %u)\n",
+            contract.name,
+            payloadSize,
+            contract.minPayloadSize);
+        return;
+    }
 
     auto authIt = g_peerAuthStates.find(event.peer);
     if (authIt == g_peerAuthStates.end())
@@ -452,6 +499,20 @@ void CNetwork::HandlePacketReceive(ENetEvent& event)
             enet_peer_disconnect_later(event.peer, PLAYER_DISCONNECT_REASON_AUTH_FAILED);
             return;
         }
+
+        if (handshakePacket->protocolVersion == 0 || (handshakePacket->capabilityBitmap & PacketRegistry::CAP_BASELINE) == 0)
+        {
+            CPlayerPackets::PlayerDisconnected disconnectPacket{};
+            disconnectPacket.id = -1;
+            disconnectPacket.reason = PLAYER_DISCONNECT_REASON_AUTH_FAILED;
+            CNetwork::SendPacket(event.peer, CPacketsID::PLAYER_DISCONNECTED, &disconnectPacket, sizeof(disconnectPacket), ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_disconnect_later(event.peer, PLAYER_DISCONNECT_REASON_AUTH_FAILED);
+            return;
+        }
+
+        authState.clientProtocolVersion = handshakePacket->protocolVersion;
+        authState.clientCapabilities = handshakePacket->capabilityBitmap;
+        authState.negotiatedCapabilities = handshakePacket->capabilityBitmap & PacketRegistry::PROTOCOL_CAPABILITIES;
 
         authState.authenticated = true;
         return;
@@ -752,6 +813,22 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
 
     CPlayerPackets::PlayerHandshake handshakePacket{};
     handshakePacket.stage = HANDSHAKE_STAGE_SERVER_ACCEPTED;
+    auto authIt = g_peerAuthStates.find(peer);
+    if (authIt != g_peerAuthStates.end())
+    {
+        handshakePacket.protocolVersion = std::min<uint16_t>(PacketRegistry::PROTOCOL_VERSION, authIt->second.clientProtocolVersion);
+        handshakePacket.capabilityBitmap = authIt->second.negotiatedCapabilities;
+        printf("[Network] Handshake accepted peer=%i protocol=%u negotiatedCaps=0x%llx clientCaps=0x%llx\n",
+            freeId,
+            handshakePacket.protocolVersion,
+            static_cast<unsigned long long>(handshakePacket.capabilityBitmap),
+            static_cast<unsigned long long>(authIt->second.clientCapabilities));
+    }
+    else
+    {
+        handshakePacket.protocolVersion = PacketRegistry::PROTOCOL_VERSION;
+        handshakePacket.capabilityBitmap = PacketRegistry::PROTOCOL_CAPABILITIES;
+    }
     handshakePacket.yourid = freeId;
     CNetwork::SendPacket(peer, CPacketsID::PLAYER_HANDSHAKE, &handshakePacket, sizeof handshakePacket, ENET_PACKET_FLAG_RELIABLE);
 
