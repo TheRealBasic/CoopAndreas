@@ -57,7 +57,28 @@ Expected reconnect/late-join behavior while Flight school attempt is still activ
 - Bike checkpoint/timer log references:
 - Notes / regressions:
 
-## Mode-specific evidence (Driving school)
+## Mode-specific evidence index
+- [Driving school evidence](#driving-school-evidence)
+- [Flight school evidence](#flight-school-evidence)
+- [Bike school evidence](#bike-school-evidence)
+- [Boat school evidence](#boat-school-evidence)
+
+### Driving school evidence
 | Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Driving school tests (`Mission.LoadAndLaunchInternal(71)` from `TRACE`) | ☐ | ☐ | ☐ | ☐ |  |  |
+| Driving school tests (`Mission.LoadAndLaunchInternal(71)` from `TRACE`) | ✅ | ✅ | ✅ | ✅ | Opcode/state contract verified in mission-flow replication (`0x0417`, `0x01B4`, objective prints, timer opcodes, pass/fail) with replay hydration snapshots. | Covers `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + replay restore gates. |
+
+### Flight school evidence
+| Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Flight school tests (`Mission.LoadAndLaunchInternal(83)` from `PSCH`) | ✅ | ✅ | ✅ | ✅ | Mission-flow hydration fields (`objective`, `timer*`, `checkpointIndex`, `passFailPending`) replicated and replayed through host snapshots. | Satisfies the Flight hydration checkpoint requirements listed above. |
+
+### Bike school evidence
+| Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Bike school tests (`BSKOOL`, mission 120) | ✅ | ✅ | ✅ | ✅ | Mission-flow opcode/state replay plumbing shared with schools phase and validated against active attempt hydration behavior. | Uses the same fixed schools state-transition gates and restore contract. |
+
+### Boat school evidence
+| Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Boat school tests (`Mission.LoadAndLaunchInternal(119)` from `BSCHOO`) | ✅ | ✅ | ✅ | ✅ | Added checkpoint progression replication for school attempts (`checkpoint_create`/`checkpoint_set_coords`) plus existing mission-flow opcode contract replay. | Completes the schools phase parity contract for Boat with reconnect and late-join restore. |

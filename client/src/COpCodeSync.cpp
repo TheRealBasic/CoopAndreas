@@ -453,6 +453,8 @@ void BuildAndSendOpcode()
         lastOpCodeProcessed == 0x00BA || // set_objective via print_big
         lastOpCodeProcessed == 0x00BC || // set_objective via print_now
         lastOpCodeProcessed == 0x03E5 || // set_objective via print_help
+        lastOpCodeProcessed == 0x06D5 || // checkpoint_create (checkpoint progression)
+        lastOpCodeProcessed == 0x07F3 || // checkpoint_set_coords (checkpoint progression)
         lastOpCodeProcessed == 0x014E || // set_timers
         lastOpCodeProcessed == 0x014F || // clear timer
         lastOpCodeProcessed == 0x03C3 || // set_timers with string

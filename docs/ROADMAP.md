@@ -202,7 +202,12 @@ Legend:
 - [ ] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]**
 - [ ] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]**
 - [ ] Ammu-Nation challenge. **[P2][S]**
-- [ ] Schools: `Driving`, `Flight`, `Bike`, `Boat`. **[P2][L]**
+- [x] Schools: `Driving`, `Flight`, `Bike`, `Boat`. **[P2][L]** ✅ Completed (2026-03-27).
+  - **Acceptance criteria (passed):** objective parity for all four school modes using the fixed schools opcode/state-transition contract.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each school mode.
+  - **Acceptance criteria (passed):** reconnect parity restores active attempts with checkpoint/timer state without restarting tests.
+  - **Acceptance criteria (passed):** late-join parity hydrates active school attempts without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-schools-checklist.md`.
 - [ ] Asset missions: `Trucker`, `Valet`, `Career`. **[P2][L]**
 - [ ] Courier sets: LS/SF/LV routes. **[P2][M]**
 - [ ] Street Racing set (22 races). **[P2][L]**
@@ -233,20 +238,28 @@ Execution rule: implement **one phase at a time**. A phase is only marked `done`
 Use the fixed sync gates for every schools mode with no substitutions: `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore.
 
 1. **Shared sync primitives** (common schools state + restore plumbing)
-   - [ ] Driving — owner: _unassigned_; status: `not started`
-   - [ ] Flight — owner: _unassigned_; status: `not started`
-   - [ ] Bike — owner: _unassigned_; status: `not started`
-   - [ ] Boat — owner: _unassigned_; status: `not started`
+   - [x] Driving — owner: _unassigned_; status: `done`
+   - [x] Flight — owner: _unassigned_; status: `done`
+   - [x] Bike — owner: _unassigned_; status: `done`
+   - [x] Boat — owner: _unassigned_; status: `done`
 2. **Mode-specific script/opcode mapping** (`Mission.LoadAndLaunchInternal`, `set_player_control`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission`)
-   - [ ] Driving — owner: _unassigned_; status: `not started`
-   - [ ] Flight — owner: _unassigned_; status: `not started`
-   - [ ] Bike — owner: _unassigned_; status: `not started`
-   - [ ] Boat — owner: _unassigned_; status: `not started`
+   - [x] Driving — owner: _unassigned_; status: `done`
+   - [x] Flight — owner: _unassigned_; status: `done`
+   - [x] Bike — owner: _unassigned_; status: `done`
+   - [x] Boat — owner: _unassigned_; status: `done`
 3. **QA sign-off** (`docs/qa/phase-schools-checklist.md`)
-   - [ ] Driving — owner: _unassigned_; status: `not started`
-   - [ ] Flight — owner: _unassigned_; status: `not started`
-   - [ ] Bike — owner: _unassigned_; status: `not started`
-   - [ ] Boat — owner: _unassigned_; status: `not started`
+   - [x] Driving — owner: _unassigned_; status: `done`
+   - [x] Flight — owner: _unassigned_; status: `done`
+   - [x] Bike — owner: _unassigned_; status: `done`
+   - [x] Boat — owner: _unassigned_; status: `done`
+
+#### Schools phase completion note (2026-03-27)
+
+All four required schools parity gates are complete with checklist evidence:
+- objective parity — [Driving](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat](docs/qa/phase-schools-checklist.md#boat-school-evidence)
+- fail/pass parity — [Driving](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat](docs/qa/phase-schools-checklist.md#boat-school-evidence)
+- reconnect parity — [Driving](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat](docs/qa/phase-schools-checklist.md#boat-school-evidence)
+- late-join parity — [Driving](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat](docs/qa/phase-schools-checklist.md#boat-school-evidence)
 
 ### Progress tracking (per-mode)
 
@@ -254,10 +267,10 @@ Allowed status values: `not started`, `in progress`, `done`.
 
 | Phase | Mode | Status |
 | --- | --- | --- |
-| Schools | Driving school | not started |
-| Schools | Flight school | not started |
-| Schools | Bike school | not started |
-| Schools | Boat school | not started |
+| Schools | Driving school | done |
+| Schools | Flight school | done |
+| Schools | Bike school | done |
+| Schools | Boat school | done |
 | Stadium events | 8-Track | not started |
 | Stadium events | Blood Bowl | not started |
 | Stadium events | Dirt Track | not started |
