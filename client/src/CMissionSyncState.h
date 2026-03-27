@@ -27,6 +27,7 @@ public:
     static void HandleMissionFlagSync(bool onMission);
     static void EmitMissionFlowCutsceneTrigger(const char* cutsceneName, uint8_t currArea);
     static void EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message);
+    static void EmitMissionFlowOpcode(uint16_t opcode, const int* params, uint16_t paramCount, const char* text);
     static void HandleMissionFlowSync(const CPackets::MissionFlowSync& packet);
     static bool HandleNetworkSwitchWidescreen(bool enabled);
     static void ProcessSubmissionMissionSync();
