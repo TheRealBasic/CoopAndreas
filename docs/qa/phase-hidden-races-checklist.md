@@ -3,6 +3,8 @@
 ## Scope
 Validate co-op parity for hidden races: **BMX**, **NRG-500**, **Chiliad Challenge**.
 
+Shared payload contract reference: `docs/qa/side-content-mission-flow-contract.md`.
+
 ## Required opcode/command coverage
 - `Mission.LoadAndLaunchInternal`
 - `start_checkpoint_race`

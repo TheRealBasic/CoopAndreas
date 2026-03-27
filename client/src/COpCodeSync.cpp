@@ -447,14 +447,16 @@ void BuildAndSendOpcode()
 
     CNetwork::SendPacket(CPacketsID::OPCODE_SYNC, buffer.data(), dataSize, ENET_PACKET_FLAG_RELIABLE);
 
+    // Shared side-content mission flow path (schools/races/courier/submission-adjacent attempts).
+    // This feeds a single replayable payload used for reconnect + late-join hydration.
     const bool isMissionFlowStateOpcode =
         lastOpCodeProcessed == 0x0417 || // Mission.LoadAndLaunchInternal
         lastOpCodeProcessed == 0x01B4 || // set_player_control
         lastOpCodeProcessed == 0x00BA || // set_objective via print_big
         lastOpCodeProcessed == 0x00BC || // set_objective via print_now
         lastOpCodeProcessed == 0x03E5 || // set_objective via print_help
-        lastOpCodeProcessed == 0x06D5 || // checkpoint_create (checkpoint progression)
-        lastOpCodeProcessed == 0x07F3 || // checkpoint_set_coords (checkpoint progression)
+        lastOpCodeProcessed == 0x06D5 || // checkpoint_create (checkpoint progression, including race checkpoint setup)
+        lastOpCodeProcessed == 0x07F3 || // checkpoint_set_coords (checkpoint progression, including set_car_race_checkpoint flows)
         lastOpCodeProcessed == 0x014E || // set_timers
         lastOpCodeProcessed == 0x014F || // clear timer
         lastOpCodeProcessed == 0x03C3 || // set_timers with string

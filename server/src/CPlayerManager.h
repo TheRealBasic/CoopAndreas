@@ -175,6 +175,8 @@ public:
 
 	struct MissionFlowSyncState
 	{
+		// Cached shared side-content mission payload.
+		// Replayed to reconnecting/late-join peers so they hydrate launch/timer/checkpoint/pass-fail state instantly.
 		uint8_t eventType;
 		uint8_t messageType;
 		uint32_t time;
@@ -186,12 +188,12 @@ public:
 		char gxt[8];
 		char cutsceneName[8];
 		uint16_t sourceOpcode;
-		uint16_t missionId;
-		int32_t timerMs;
-		uint16_t checkpointIndex;
-		uint8_t timerVisible;
-		uint8_t timerFrozen;
-		uint8_t passFailPending;
+		uint16_t missionId;      // Launch/start identity (Mission.LoadAndLaunchInternal / race-start script launch)
+		int32_t timerMs;         // Canonical timer value in milliseconds
+		uint16_t checkpointIndex;// Monotonic checkpoint/objective progression index
+		uint8_t timerVisible;    // Timer HUD visibility
+		uint8_t timerFrozen;     // Timer HUD frozen state
+		uint8_t passFailPending; // 0 none, 1 pass, 2 fail
 		uint8_t playerControlState;
 		char objective[8];
 	};
@@ -1372,6 +1374,7 @@ public:
 
 	struct MissionFlowSync
 	{
+		// Wire payload for shared side-content mission parity (start, progression, timers, deterministic outcomes).
 		uint8_t eventType;
 		uint8_t messageType;
 		uint32_t time;
