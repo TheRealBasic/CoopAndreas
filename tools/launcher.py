@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import queue
 import re
 import socket
 import subprocess
@@ -328,6 +329,14 @@ class HealthIndicator:
     action_label: str
 
 
+@dataclass
+class LogEntry:
+    timestamp: datetime
+    level: str
+    source: str
+    message: str
+
+
 class ToolTip:
     """Small hover tooltip helper for Tk widgets."""
 
@@ -373,6 +382,11 @@ class LauncherApp:
 
         self.server_process: subprocess.Popen[str] | None = None
         self.server_reader_threads: list[threading.Thread] = []
+        self.log_entries: list[LogEntry] = []
+        self.log_filter_vars: dict[str, tk.BooleanVar] = {}
+        self.log_search_var = tk.StringVar(value="")
+        self._log_stream_queue: queue.SimpleQueue[tuple[str, str]] = queue.SimpleQueue()
+        self._log_render_scheduled = False
 
         self.config = self._load_config()
         self.profiles: list[ConnectionProfile] = list(self.config.profiles)
@@ -409,6 +423,7 @@ class LauncherApp:
         self._bind_persistence_events()
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.after(75, self._poll_log_queue)
         self._update_status()
         self._maybe_start_wizard()
         if self.auto_start_server_var.get():
@@ -554,9 +569,34 @@ class LauncherApp:
         logs = ttk.LabelFrame(self.wrapper, text="Server logs", padding=10)
         logs.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
 
+        toolbar = ttk.Frame(logs)
+        toolbar.pack(fill=tk.X, pady=(0, 6))
+
+        ttk.Label(toolbar, text="Levels:").pack(side=tk.LEFT)
+        for level in ("info", "warn", "error", "stdout", "stderr"):
+            var = tk.BooleanVar(value=True)
+            var.trace_add("write", lambda *_args: self._schedule_log_render())
+            self.log_filter_vars[level] = var
+            ttk.Checkbutton(toolbar, text=level.upper(), variable=var).pack(side=tk.LEFT, padx=(6, 0))
+
+        ttk.Label(toolbar, text="Search:").pack(side=tk.LEFT, padx=(12, 4))
+        search_entry = ttk.Entry(toolbar, textvariable=self.log_search_var, width=24)
+        search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.log_search_var.trace_add("write", lambda *_args: self._schedule_log_render())
+
+        ttk.Button(toolbar, text="Copy Last Error", command=self._copy_last_error).pack(side=tk.RIGHT)
+        ttk.Button(toolbar, text="Export Logs", command=self._export_logs).pack(side=tk.RIGHT, padx=(6, 0))
+        ttk.Button(toolbar, text="Clear", command=self._clear_logs).pack(side=tk.RIGHT, padx=(6, 0))
+
         self.log_text = tk.Text(logs, height=16, wrap="word")
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self.log_text.configure(state=tk.DISABLED)
+        self.log_text.tag_configure("level_info", foreground="#1f2933")
+        self.log_text.tag_configure("level_warn", foreground="#8a6d1d")
+        self.log_text.tag_configure("level_error", foreground="#b00020")
+        self.log_text.tag_configure("level_stdout", foreground="#005f8a")
+        self.log_text.tag_configure("level_stderr", foreground="#7f1d1d")
+        self.log_text.tag_configure("search_match", background="#fff59d")
 
     def _bind_persistence_events(self) -> None:
         for var in (
@@ -880,10 +920,122 @@ class LauncherApp:
             self.gta_path_var.set(selected)
 
     def _append_log(self, line: str) -> None:
+        entry = self._create_log_entry(line.rstrip("\n"), source_hint="app")
+        self.log_entries.append(entry)
+        self._schedule_log_render()
+
+    def _create_log_entry(self, line: str, source_hint: str = "app") -> LogEntry:
+        clean = line.rstrip("\n")
+        level = source_hint.lower()
+        message = clean
+        prefix = re.match(r"^\[([^\]]+)\]\s*(.*)$", clean)
+        if prefix:
+            label = prefix.group(1).strip().lower()
+            message = prefix.group(2)
+            if label in {"info", "warn", "warning", "error", "stdout", "stderr"}:
+                level = "warn" if label == "warning" else label
+            else:
+                level = "info"
+                source_hint = label
+        elif level not in {"info", "warn", "error", "stdout", "stderr"}:
+            level = "info"
+
+        return LogEntry(timestamp=datetime.now(), level=level, source=source_hint, message=message)
+
+    def _format_log_entry(self, entry: LogEntry) -> str:
+        stamp = entry.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        return f"[{stamp}] [{entry.level}] {entry.message}"
+
+    def _active_log_levels(self) -> set[str]:
+        return {level for level, var in self.log_filter_vars.items() if var.get()}
+
+    def _entry_matches_search(self, entry: LogEntry, search: str) -> bool:
+        if not search:
+            return True
+        haystack = f"{entry.level} {entry.source} {entry.message}".lower()
+        return search in haystack
+
+    def _schedule_log_render(self) -> None:
+        if self._log_render_scheduled:
+            return
+        self._log_render_scheduled = True
+        self.root.after(33, self._render_log_view)
+
+    def _render_log_view(self) -> None:
+        self._log_render_scheduled = False
+        allowed_levels = self._active_log_levels()
+        search = self.log_search_var.get().strip().lower()
+
         self.log_text.configure(state=tk.NORMAL)
-        self.log_text.insert(tk.END, line.rstrip("\n") + "\n")
+        self.log_text.delete("1.0", tk.END)
+        for entry in self.log_entries:
+            if entry.level not in allowed_levels:
+                continue
+            if not self._entry_matches_search(entry, search):
+                continue
+            text = self._format_log_entry(entry)
+            start = self.log_text.index(tk.END)
+            self.log_text.insert(tk.END, text + "\n")
+            self.log_text.tag_add(f"level_{entry.level}", start, f"{start} lineend")
+
+        self._apply_search_highlight(search)
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
+
+    def _apply_search_highlight(self, search: str) -> None:
+        self.log_text.tag_remove("search_match", "1.0", tk.END)
+        if not search:
+            return
+        start = "1.0"
+        while True:
+            pos = self.log_text.search(search, start, stopindex=tk.END, nocase=1)
+            if not pos:
+                break
+            end = f"{pos}+{len(search)}c"
+            self.log_text.tag_add("search_match", pos, end)
+            start = end
+
+    def _clear_logs(self) -> None:
+        self.log_entries.clear()
+        self._schedule_log_render()
+
+    def _export_logs(self) -> None:
+        target = filedialog.asksaveasfilename(
+            title="Export logs",
+            defaultextension=".log",
+            filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if not target:
+            return
+        try:
+            payload = "\n".join(self._format_log_entry(entry) for entry in self.log_entries) + "\n"
+            Path(target).write_text(payload, encoding="utf-8")
+            self._append_log(f"[info] exported logs to {target}")
+        except Exception as exc:
+            self._set_error(f"Failed to export logs: {exc}")
+
+    def _copy_last_error(self) -> None:
+        for entry in reversed(self.log_entries):
+            if entry.level in {"error", "stderr"}:
+                text = self._format_log_entry(entry)
+                self.root.clipboard_clear()
+                self.root.clipboard_append(text)
+                self._append_log("[info] copied last error to clipboard")
+                return
+        self._append_log("[warn] no error entries available to copy")
+
+    def _poll_log_queue(self) -> None:
+        drained = 0
+        while drained < 300:
+            try:
+                label, raw_line = self._log_stream_queue.get_nowait()
+            except queue.Empty:
+                break
+            self.log_entries.append(self._create_log_entry(f"[{label}] {raw_line}", source_hint=label))
+            drained += 1
+        if drained:
+            self._schedule_log_render()
+        self.root.after(75, self._poll_log_queue)
 
     def _set_error(self, message: str) -> None:
         self.last_error_var.set(message)
@@ -1003,7 +1155,7 @@ class LauncherApp:
 
         def _reader() -> None:
             for line in stream:
-                self.root.after(0, self._append_log, f"[{label}] {line.rstrip()}")
+                self._log_stream_queue.put((label, line.rstrip()))
 
         thread = threading.Thread(target=_reader, daemon=True)
         thread.start()
