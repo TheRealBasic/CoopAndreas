@@ -51,6 +51,10 @@ Expected reconnect/late-join behavior while Flight school attempt is still activ
 - Session build/hash:
 - Host + clients tested:
 - Clips/log references:
+- Bike session id + build hash:
+- Bike host + client matrix:
+- Bike checkpoint/timer clip references:
+- Bike checkpoint/timer log references:
 - Notes / regressions:
 
 ## Mode-specific evidence (Driving school)
