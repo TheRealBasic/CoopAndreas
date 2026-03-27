@@ -264,6 +264,26 @@ All four required schools parity gates are complete with checklist evidence:
 - reconnect parity — [Driving](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat](docs/qa/phase-schools-checklist.md#boat-school-evidence)
 - late-join parity — [Driving](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat](docs/qa/phase-schools-checklist.md#boat-school-evidence)
 
+#### Stadium events execution checklist
+
+Use the fixed stadium events sync gates for every mode with no substitutions: `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore.
+
+1. **Shared sync primitives** (common stadium event state + restore plumbing)
+   - [ ] 8-Track — owner: _unassigned_; status: `not started`
+   - [ ] Blood Bowl — owner: _unassigned_; status: `not started`
+   - [ ] Dirt Track — owner: _unassigned_; status: `not started`
+   - [ ] Kick Start — owner: _unassigned_; status: `not started`
+2. **Mode-specific script/opcode mapping** (`Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission`)
+   - [ ] 8-Track — owner: _unassigned_; status: `not started`
+   - [ ] Blood Bowl — owner: _unassigned_; status: `not started`
+   - [ ] Dirt Track — owner: _unassigned_; status: `not started`
+   - [ ] Kick Start — owner: _unassigned_; status: `not started`
+3. **QA sign-off** (`docs/qa/phase-stadium-events-checklist.md`)
+   - [ ] 8-Track — owner: _unassigned_; status: `not started`
+   - [ ] Blood Bowl — owner: _unassigned_; status: `not started`
+   - [ ] Dirt Track — owner: _unassigned_; status: `not started`
+   - [ ] Kick Start — owner: _unassigned_; status: `not started`
+
 ### Progress tracking (per-mode)
 
 Allowed status values: `not started`, `in progress`, `done`.
