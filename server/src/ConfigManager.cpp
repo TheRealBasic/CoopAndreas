@@ -34,6 +34,8 @@ void CConfigManager::CreateConfig()
 	file << "cutscene_skip_vote_ratio = 0.51\n";
 	file << "cutscene_skip_vote_min_players = 2\n";
 	file << "cutscene_skip_vote_lock_ms = 0\n";
+	file << "auth_strict_mode = 0\n";
+	file << "auth_timeout_ms = 5000\n";
 }
 
 uint16_t CConfigManager::GetConfigPort()
@@ -44,6 +46,16 @@ uint16_t CConfigManager::GetConfigPort()
 uint16_t CConfigManager::GetConfigMaxPlayers()
 {
 	return (uint16_t)ms_pReader->GetUnsigned("", "maxplayers", ms_umDefaultConfig.at("maxplayers"));
+}
+
+bool CConfigManager::GetAuthStrictMode()
+{
+	return ms_pReader->GetUnsigned("", "auth_strict_mode", 0) != 0;
+}
+
+uint16_t CConfigManager::GetAuthTimeoutMs()
+{
+	return (uint16_t)ms_pReader->GetUnsigned("", "auth_timeout_ms", 5000);
 }
 
 double CConfigManager::GetCutsceneSkipVoteThresholdRatio()

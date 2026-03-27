@@ -19,6 +19,7 @@ public:
 	static ENetHost* m_pClient;
 	static ENetPeer* m_pPeer;
 	static bool CNetwork::m_bConnected;
+	static bool CNetwork::m_bAuthenticated;
 	static char CNetwork::m_IpAddress[128 + 1];
 	static unsigned short CNetwork::m_nPort;
 	static inline uint32_t ms_nBytesReceivedThisSecond;
@@ -32,6 +33,7 @@ public:
 	static void InitListeners();
 	static void HandlePacketReceive(ENetEvent& event);
 	static void AddListener(unsigned short id, void(*callback)(void*, int));
+	static uint32_t ComputeHandshakeResponse(uint32_t nonce);
 	static bool IsValidIP(const char* ip)
 	{
 		ENetAddress temp;

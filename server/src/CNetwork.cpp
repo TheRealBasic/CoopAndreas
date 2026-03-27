@@ -4,8 +4,10 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <chrono>
 #include <cstring>
+#include <random>
 
 #include "CPacketListener.h"
 #include "CPacket.h"
@@ -22,6 +24,99 @@
 #include "PlayerDisconnectReason.h"
 
 std::unordered_map<unsigned short, CPacketListener*> CNetwork::m_packetListeners;
+
+namespace
+{
+    enum eHandshakeStage : uint8_t
+    {
+        HANDSHAKE_STAGE_SERVER_CHALLENGE = 0,
+        HANDSHAKE_STAGE_CLIENT_RESPONSE = 1,
+        HANDSHAKE_STAGE_SERVER_ACCEPTED = 2
+    };
+
+    struct PeerAuthState
+    {
+        bool authenticated = false;
+        uint32_t nonce = 0;
+        std::chrono::steady_clock::time_point challengeSentAt = std::chrono::steady_clock::now();
+    };
+
+    struct PacketRateWindow
+    {
+        uint32_t count = 0;
+        std::chrono::steady_clock::time_point windowStart = std::chrono::steady_clock::now();
+    };
+
+    static std::unordered_map<ENetPeer*, PeerAuthState> g_peerAuthStates;
+    static std::unordered_map<ENetPeer*, std::unordered_map<uint16_t, PacketRateWindow>> g_peerRateWindows;
+
+    static std::mt19937 g_nonceRng(std::random_device{}());
+
+    uint32_t GenerateHandshakeNonce()
+    {
+        return std::uniform_int_distribution<uint32_t>(1, UINT32_MAX)(g_nonceRng);
+    }
+
+    uint16_t GetPacketRateLimitPerSecond(uint16_t packetId)
+    {
+        switch (packetId)
+        {
+            case CPacketsID::PLAYER_ONFOOT:
+            case CPacketsID::VEHICLE_DRIVER_UPDATE:
+            case CPacketsID::VEHICLE_PASSENGER_UPDATE:
+            case CPacketsID::PED_ONFOOT:
+            case CPacketsID::PED_DRIVER_UPDATE:
+            case CPacketsID::PED_PASSENGER_UPDATE:
+            case CPacketsID::PLAYER_AIM_SYNC:
+            case CPacketsID::PLAYER_KEY_SYNC:
+            case CPacketsID::MASS_PACKET_SEQUENCE:
+                return 120;
+            default:
+                return 0;
+        }
+    }
+
+    bool IsRateLimited(ENetPeer* peer, uint16_t packetId)
+    {
+        const uint16_t perSecondLimit = GetPacketRateLimitPerSecond(packetId);
+        if (perSecondLimit == 0)
+        {
+            return false;
+        }
+
+        auto& peerWindows = g_peerRateWindows[peer];
+        auto& window = peerWindows[packetId];
+        const auto now = std::chrono::steady_clock::now();
+
+        if (now - window.windowStart >= std::chrono::seconds(1))
+        {
+            window.windowStart = now;
+            window.count = 0;
+        }
+
+        window.count++;
+        return window.count > perSecondLimit;
+    }
+
+    const char* DisconnectReasonToString(uint32_t reason)
+    {
+        switch (reason)
+        {
+            case PLAYER_DISCONNECT_REASON_VERSION_MISMATCH:
+                return "version_mismatch";
+            case PLAYER_DISCONNECT_REASON_NAME_TAKEN:
+                return "name_taken";
+            case PLAYER_DISCONNECT_REASON_AUTH_TIMEOUT:
+                return "auth_timeout";
+            case PLAYER_DISCONNECT_REASON_AUTH_FAILED:
+                return "auth_failed";
+            case PLAYER_DISCONNECT_REASON_RATE_LIMIT:
+                return "rate_limit";
+            default:
+                return "unknown";
+        }
+    }
+}
 
 bool CNetwork::Init(unsigned short port)
 {
@@ -74,6 +169,7 @@ bool CNetwork::Init(unsigned short port)
     ENetEvent event;
     while (true) // waiting for event
     {
+        CNetwork::ProcessAuthenticationTimeouts(server);
         CPickupManager::ProcessRespawns();
         CFireSyncManager::Process((uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
         enet_host_service(server, &event, 1);
@@ -232,10 +328,39 @@ void CNetwork::HandlePeerConnected(ENetEvent& event)
 
     // set player disconnection timeout
     enet_peer_timeout(event.peer, 10000, 6000, 10000); //timeoutLimit, timeoutMinimum, timeoutMaximum
+
+    PeerAuthState authState{};
+    authState.authenticated = !CConfigManager::GetAuthStrictMode();
+    authState.challengeSentAt = std::chrono::steady_clock::now();
+
+    if (!authState.authenticated)
+    {
+        authState.nonce = GenerateHandshakeNonce();
+
+        CPlayerPackets::PlayerHandshake challenge{};
+        challenge.stage = HANDSHAKE_STAGE_SERVER_CHALLENGE;
+        challenge.nonce = authState.nonce;
+        CNetwork::SendPacket(event.peer, CPacketsID::PLAYER_HANDSHAKE, &challenge, sizeof(challenge), ENET_PACKET_FLAG_RELIABLE);
+    }
+
+    g_peerAuthStates[event.peer] = authState;
 }
 
 void CNetwork::HandlePlayerDisconnected(ENetEvent& event)
 {
+    const uint32_t disconnectReason = event.data;
+    printf("[Network] : Peer %i.%i.%i.%i:%u disconnected (reason=%s/%u)\n",
+        event.peer->address.host & 0xFF,
+        (event.peer->address.host >> 8) & 0xFF,
+        (event.peer->address.host >> 16) & 0xFF,
+        (event.peer->address.host >> 24) & 0xFF,
+        event.peer->address.port,
+        DisconnectReasonToString(disconnectReason),
+        disconnectReason);
+
+    g_peerAuthStates.erase(event.peer);
+    g_peerRateWindows.erase(event.peer);
+
     // disconnect player
 
     // find player instance by enetpeer
@@ -286,6 +411,61 @@ void CNetwork::HandlePacketReceive(ENetEvent& event)
     uint16_t packetid;
     memcpy(&packetid, event.packet->data, 2);
 
+    auto authIt = g_peerAuthStates.find(event.peer);
+    if (authIt == g_peerAuthStates.end())
+    {
+        return;
+    }
+
+    PeerAuthState& authState = authIt->second;
+
+    if (!authState.authenticated)
+    {
+        if (packetid != CPacketsID::PLAYER_HANDSHAKE)
+        {
+            return;
+        }
+
+        if (event.packet->dataLength < (2 + sizeof(CPlayerPackets::PlayerHandshake)))
+        {
+            return;
+        }
+
+        auto* handshakePacket = reinterpret_cast<CPlayerPackets::PlayerHandshake*>(event.packet->data + 2);
+        if (handshakePacket->stage != HANDSHAKE_STAGE_CLIENT_RESPONSE || handshakePacket->nonce != authState.nonce)
+        {
+            CPlayerPackets::PlayerDisconnected disconnectPacket{};
+            disconnectPacket.id = -1;
+            disconnectPacket.reason = PLAYER_DISCONNECT_REASON_AUTH_FAILED;
+            CNetwork::SendPacket(event.peer, CPacketsID::PLAYER_DISCONNECTED, &disconnectPacket, sizeof(disconnectPacket), ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_disconnect_later(event.peer, PLAYER_DISCONNECT_REASON_AUTH_FAILED);
+            return;
+        }
+
+        if (handshakePacket->responseHash != CNetwork::ComputeHandshakeResponse(authState.nonce))
+        {
+            CPlayerPackets::PlayerDisconnected disconnectPacket{};
+            disconnectPacket.id = -1;
+            disconnectPacket.reason = PLAYER_DISCONNECT_REASON_AUTH_FAILED;
+            CNetwork::SendPacket(event.peer, CPacketsID::PLAYER_DISCONNECTED, &disconnectPacket, sizeof(disconnectPacket), ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_disconnect_later(event.peer, PLAYER_DISCONNECT_REASON_AUTH_FAILED);
+            return;
+        }
+
+        authState.authenticated = true;
+        return;
+    }
+
+    if (IsRateLimited(event.peer, packetid))
+    {
+        CPlayerPackets::PlayerDisconnected disconnectPacket{};
+        disconnectPacket.id = -1;
+        disconnectPacket.reason = PLAYER_DISCONNECT_REASON_RATE_LIMIT;
+        CNetwork::SendPacket(event.peer, CPacketsID::PLAYER_DISCONNECTED, &disconnectPacket, sizeof(disconnectPacket), ENET_PACKET_FLAG_RELIABLE);
+        enet_peer_disconnect_later(event.peer, PLAYER_DISCONNECT_REASON_RATE_LIMIT);
+        return;
+    }
+
     if (packetid == CPacketsID::MASS_PACKET_SEQUENCE)
     {
         CNetwork::SendPacketRawToAll(event.packet->data, event.packet->dataLength, (ENetPacketFlag)event.packet->flags, event.peer);
@@ -306,6 +486,67 @@ void CNetwork::AddListener(unsigned short id, void(*callback)(ENetPeer*, void*, 
 {
     CPacketListener* listener = new CPacketListener(id, callback);
     m_packetListeners.insert({ id, listener });
+}
+
+uint32_t CNetwork::ComputeHandshakeResponse(uint32_t nonce)
+{
+    constexpr uint32_t kSeed = 0x811C9DC5u;
+    constexpr uint32_t kPrime = 0x01000193u;
+    uint32_t hash = kSeed;
+    const uint32_t packedVersion = semver_parse(COOPANDREAS_VERSION, nullptr);
+
+    auto mix = [&hash, kPrime](uint8_t value)
+    {
+        hash ^= value;
+        hash *= kPrime;
+    };
+
+    for (size_t i = 0; i < sizeof(nonce); ++i)
+    {
+        mix(static_cast<uint8_t>((nonce >> (i * 8)) & 0xFF));
+    }
+
+    for (size_t i = 0; i < sizeof(packedVersion); ++i)
+    {
+        mix(static_cast<uint8_t>((packedVersion >> (i * 8)) & 0xFF));
+    }
+
+    return hash;
+}
+
+void CNetwork::ProcessAuthenticationTimeouts(ENetHost* server)
+{
+    if (!CConfigManager::GetAuthStrictMode())
+    {
+        return;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    const auto timeout = std::chrono::milliseconds(CConfigManager::GetAuthTimeoutMs());
+
+    for (size_t i = 0; i < server->peerCount; ++i)
+    {
+        ENetPeer* peer = &server->peers[i];
+        if (peer->state != ENET_PEER_STATE_CONNECTED)
+        {
+            continue;
+        }
+
+        auto authIt = g_peerAuthStates.find(peer);
+        if (authIt == g_peerAuthStates.end() || authIt->second.authenticated)
+        {
+            continue;
+        }
+
+        if (now - authIt->second.challengeSentAt >= timeout)
+        {
+            CPlayerPackets::PlayerDisconnected disconnectPacket{};
+            disconnectPacket.id = -1;
+            disconnectPacket.reason = PLAYER_DISCONNECT_REASON_AUTH_TIMEOUT;
+            CNetwork::SendPacket(peer, CPacketsID::PLAYER_DISCONNECTED, &disconnectPacket, sizeof(disconnectPacket), ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_disconnect_later(peer, PLAYER_DISCONNECT_REASON_AUTH_TIMEOUT);
+        }
+    }
 }
 
 void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
@@ -492,7 +733,9 @@ void CNetwork::HandlePlayerConnected(ENetPeer* peer, void* data, int size)
 
     CFireSyncManager::SendSnapshotTo(peer, player->m_vecPosition);
 
-    CPlayerPackets::PlayerHandshake handshakePacket = { freeId };
+    CPlayerPackets::PlayerHandshake handshakePacket{};
+    handshakePacket.stage = HANDSHAKE_STAGE_SERVER_ACCEPTED;
+    handshakePacket.yourid = freeId;
     CNetwork::SendPacket(peer, CPacketsID::PLAYER_HANDSHAKE, &handshakePacket, sizeof handshakePacket, ENET_PACKET_FLAG_RELIABLE);
 
     CPlayerManager::AssignHostToFirstPlayer();
