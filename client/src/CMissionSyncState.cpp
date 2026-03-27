@@ -29,6 +29,7 @@ namespace
     uint32_t ms_nLastAppliedWidescreenEventId = 0;
     bool ms_bLastAppliedWidescreenValue = false;
     uint32_t ms_nMissionFlowSequence = 0;
+    uint32_t ms_nLastReceivedMissionFlowSequence = 0;
     uint32_t ms_submissionStateVersion = 0;
     uint32_t ms_submissionSnapshotVersion = 0;
     bool ms_submissionSnapshotInProgress = false;
@@ -45,6 +46,22 @@ namespace
     };
 
     SchoolAttemptState ms_schoolAttemptState{};
+
+    bool TrySetTerminalOutcome(uint8_t outcome)
+    {
+        if (outcome != 1 && outcome != 2)
+        {
+            return false;
+        }
+
+        if (ms_schoolAttemptState.passFailPending != 0)
+        {
+            return false;
+        }
+
+        ms_schoolAttemptState.passFailPending = outcome;
+        return true;
+    }
 
     struct SubmissionState
     {
@@ -195,6 +212,7 @@ void CMissionSyncState::Init()
     ms_nLastAppliedWidescreenEventId = 0;
     ms_bLastAppliedWidescreenValue = false;
     ms_nMissionFlowSequence = 0;
+    ms_nLastReceivedMissionFlowSequence = 0;
     ms_submissionStateVersion = 0;
     ms_submissionSnapshotVersion = 0;
     ms_submissionSnapshotInProgress = false;
@@ -324,10 +342,18 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     CPackets::MissionFlowSync packet{};
     if (opcode == 0x0318)
     {
+        if (!TrySetTerminalOutcome(1))
+        {
+            return;
+        }
         packet.eventType = CPackets::MISSION_FLOW_EVENT_PASS;
     }
     else if (opcode == 0x045C)
     {
+        if (!TrySetTerminalOutcome(2))
+        {
+            return;
+        }
         packet.eventType = CPackets::MISSION_FLOW_EVENT_FAIL;
     }
     else
@@ -361,6 +387,7 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
         return;
     }
 
+    bool shouldEmit = true;
     switch (opcode)
     {
     case 0x0417: // Mission.LoadAndLaunchInternal / start_mission
@@ -410,13 +437,18 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
         }
         break;
     case 0x0318: // register_mission_passed
-        ms_schoolAttemptState.passFailPending = 1;
+        shouldEmit = TrySetTerminalOutcome(1);
         break;
     case 0x045C: // fail_current_mission
-        ms_schoolAttemptState.passFailPending = 2;
+        shouldEmit = TrySetTerminalOutcome(2);
         break;
     default:
         break;
+    }
+
+    if (!shouldEmit)
+    {
+        return;
     }
 
     CPackets::MissionFlowSync packet{};
@@ -443,7 +475,40 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         return;
     }
 
+    if (packet.sequence != 0 && packet.sequence <= ms_nLastReceivedMissionFlowSequence)
+    {
+        return;
+    }
+
+    ms_nLastReceivedMissionFlowSequence = packet.sequence;
     HandleMissionFlagSync(packet.onMission != 0);
+
+    const bool newAttempt = packet.sourceOpcode == 0x0417
+        || (packet.missionId != 0 && packet.missionId != ms_schoolAttemptState.missionId);
+    if (newAttempt)
+    {
+        ms_schoolAttemptState = {};
+    }
+
+    ms_schoolAttemptState.missionId = packet.missionId;
+    ms_schoolAttemptState.timerMs = std::max(packet.timerMs, 0);
+    ms_schoolAttemptState.checkpointIndex = packet.checkpointIndex;
+    ms_schoolAttemptState.timerVisible = packet.timerVisible;
+    ms_schoolAttemptState.timerFrozen = packet.timerFrozen;
+    ms_schoolAttemptState.playerControlState = packet.playerControlState;
+    if (packet.objective[0])
+    {
+        strncpy_s(ms_schoolAttemptState.objective, packet.objective, sizeof(ms_schoolAttemptState.objective));
+    }
+    else
+    {
+        memset(ms_schoolAttemptState.objective, 0, sizeof(ms_schoolAttemptState.objective));
+    }
+
+    if (ms_schoolAttemptState.passFailPending == 0)
+    {
+        ms_schoolAttemptState.passFailPending = packet.passFailPending;
+    }
 
     if (!packet.replay)
     {
