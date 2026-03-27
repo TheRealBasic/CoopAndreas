@@ -679,7 +679,8 @@ public:
 		MISSION_FLOW_EVENT_CUTSCENE_TRIGGER = 1,
 		MISSION_FLOW_EVENT_OBJECTIVE = 2,
 		MISSION_FLOW_EVENT_FAIL = 3,
-		MISSION_FLOW_EVENT_PASS = 4
+		MISSION_FLOW_EVENT_PASS = 4,
+		MISSION_FLOW_EVENT_STATE_UPDATE = 5
 	};
 
 	struct MissionFlowSync
@@ -694,6 +695,15 @@ public:
 		uint32_t sequence = 0;
 		char gxt[8]{};
 		char cutsceneName[8]{};
+		uint16_t sourceOpcode = 0;
+		uint16_t missionId = 0;
+		int32_t timerMs = 0;
+		uint16_t checkpointIndex = 0;
+		uint8_t timerVisible = 0;
+		uint8_t timerFrozen = 0;
+		uint8_t passFailPending = 0; // 0 = none, 1 = pass, 2 = fail
+		uint8_t playerControlState = 0;
+		char objective[8]{};
 	};
 
 	struct UpdateEntityBlip

@@ -32,6 +32,19 @@ namespace
     uint32_t ms_submissionStateVersion = 0;
     uint32_t ms_submissionSnapshotVersion = 0;
     bool ms_submissionSnapshotInProgress = false;
+    struct SchoolAttemptState
+    {
+        uint16_t missionId = 0;
+        int32_t timerMs = 0;
+        uint16_t checkpointIndex = 0;
+        uint8_t timerVisible = 0;
+        uint8_t timerFrozen = 0;
+        uint8_t passFailPending = 0; // 0 = none, 1 = pass, 2 = fail
+        uint8_t playerControlState = 0;
+        char objective[8]{};
+    };
+
+    SchoolAttemptState ms_schoolAttemptState{};
 
     struct SubmissionState
     {
@@ -186,6 +199,7 @@ void CMissionSyncState::Init()
     ms_submissionSnapshotVersion = 0;
     ms_submissionSnapshotInProgress = false;
     ms_submissionStates.clear();
+    ms_schoolAttemptState = {};
 }
 
 bool CMissionSyncState::IsProcessingTaskSequence()
@@ -288,6 +302,14 @@ void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName,
     packet.currArea = currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = ++ms_nMissionFlowSequence;
+    packet.missionId = ms_schoolAttemptState.missionId;
+    packet.timerMs = ms_schoolAttemptState.timerMs;
+    packet.checkpointIndex = ms_schoolAttemptState.checkpointIndex;
+    packet.timerVisible = ms_schoolAttemptState.timerVisible;
+    packet.timerFrozen = ms_schoolAttemptState.timerFrozen;
+    packet.passFailPending = ms_schoolAttemptState.passFailPending;
+    packet.playerControlState = ms_schoolAttemptState.playerControlState;
+    strncpy_s(packet.objective, ms_schoolAttemptState.objective, sizeof(packet.objective));
     strncpy_s(packet.cutsceneName, cutsceneName ? cutsceneName : "", sizeof(packet.cutsceneName));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
@@ -319,7 +341,98 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = ++ms_nMissionFlowSequence;
+    packet.sourceOpcode = opcode;
+    packet.missionId = ms_schoolAttemptState.missionId;
+    packet.timerMs = ms_schoolAttemptState.timerMs;
+    packet.checkpointIndex = ms_schoolAttemptState.checkpointIndex;
+    packet.timerVisible = ms_schoolAttemptState.timerVisible;
+    packet.timerFrozen = ms_schoolAttemptState.timerFrozen;
+    packet.passFailPending = ms_schoolAttemptState.passFailPending;
+    packet.playerControlState = ms_schoolAttemptState.playerControlState;
+    strncpy_s(packet.objective, ms_schoolAttemptState.objective, sizeof(packet.objective));
     strncpy_s(packet.gxt, message.gxt ? message.gxt : "", sizeof(packet.gxt));
+    CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+}
+
+void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params, uint16_t paramCount, const char* text)
+{
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        return;
+    }
+
+    switch (opcode)
+    {
+    case 0x0417: // Mission.LoadAndLaunchInternal / start_mission
+        ms_schoolAttemptState.missionId = (params && paramCount > 0) ? static_cast<uint16_t>(std::max(params[0], 0)) : 0;
+        ms_schoolAttemptState.checkpointIndex = 0;
+        ms_schoolAttemptState.timerVisible = 0;
+        ms_schoolAttemptState.timerFrozen = 0;
+        ms_schoolAttemptState.timerMs = 0;
+        ms_schoolAttemptState.passFailPending = 0;
+        memset(ms_schoolAttemptState.objective, 0, sizeof(ms_schoolAttemptState.objective));
+        break;
+    case 0x01B4: // set_player_control
+        if (params && paramCount > 1)
+        {
+            ms_schoolAttemptState.playerControlState = params[1] ? 1 : 0;
+        }
+        break;
+    case 0x00BA: // print_big
+    case 0x00BC: // print_now
+    case 0x03E5: // print_help
+        if (text && text[0])
+        {
+            strncpy_s(ms_schoolAttemptState.objective, text, sizeof(ms_schoolAttemptState.objective));
+            ms_schoolAttemptState.checkpointIndex++;
+        }
+        break;
+    case 0x014E: // display_onscreen_timer
+    case 0x03C3: // display_onscreen_timer_with_string
+        ms_schoolAttemptState.timerVisible = 1;
+        ms_schoolAttemptState.timerFrozen = 0;
+        break;
+    case 0x014F: // clear_onscreen_timer
+        ms_schoolAttemptState.timerVisible = 0;
+        ms_schoolAttemptState.timerFrozen = 0;
+        ms_schoolAttemptState.timerMs = 0;
+        break;
+    case 0x0396: // freeze_onscreen_timer
+        if (params && paramCount > 0)
+        {
+            ms_schoolAttemptState.timerFrozen = params[0] ? 1 : 0;
+        }
+        break;
+    case 0x0890: // set_timer_beep_countdown_time
+        if (params && paramCount > 1)
+        {
+            ms_schoolAttemptState.timerMs = std::max(params[1], 0) * 1000;
+        }
+        break;
+    case 0x0318: // register_mission_passed
+        ms_schoolAttemptState.passFailPending = 1;
+        break;
+    case 0x045C: // fail_current_mission
+        ms_schoolAttemptState.passFailPending = 2;
+        break;
+    default:
+        break;
+    }
+
+    CPackets::MissionFlowSync packet{};
+    packet.eventType = CPackets::MISSION_FLOW_EVENT_STATE_UPDATE;
+    packet.currArea = (uint8_t)CGame::currArea;
+    packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
+    packet.sequence = ++ms_nMissionFlowSequence;
+    packet.sourceOpcode = opcode;
+    packet.missionId = ms_schoolAttemptState.missionId;
+    packet.timerMs = ms_schoolAttemptState.timerMs;
+    packet.checkpointIndex = ms_schoolAttemptState.checkpointIndex;
+    packet.timerVisible = ms_schoolAttemptState.timerVisible;
+    packet.timerFrozen = ms_schoolAttemptState.timerFrozen;
+    packet.passFailPending = ms_schoolAttemptState.passFailPending;
+    packet.playerControlState = ms_schoolAttemptState.playerControlState;
+    strncpy_s(packet.objective, ms_schoolAttemptState.objective, sizeof(packet.objective));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
 
@@ -341,6 +454,12 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         || packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL
         || packet.eventType == CPackets::MISSION_FLOW_EVENT_PASS)
     {
+        if ((packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL || packet.eventType == CPackets::MISSION_FLOW_EVENT_PASS)
+            && packet.passFailPending == 0)
+        {
+            return;
+        }
+
         char gxt[9];
         strncpy_s(gxt, packet.gxt, 8);
         gxt[8] = '\0';

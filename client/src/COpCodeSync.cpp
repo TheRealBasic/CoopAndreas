@@ -447,6 +447,32 @@ void BuildAndSendOpcode()
 
     CNetwork::SendPacket(CPacketsID::OPCODE_SYNC, buffer.data(), dataSize, ENET_PACKET_FLAG_RELIABLE);
 
+    const bool isMissionFlowStateOpcode =
+        lastOpCodeProcessed == 0x0417 || // Mission.LoadAndLaunchInternal
+        lastOpCodeProcessed == 0x01B4 || // set_player_control
+        lastOpCodeProcessed == 0x00BA || // set_objective via print_big
+        lastOpCodeProcessed == 0x00BC || // set_objective via print_now
+        lastOpCodeProcessed == 0x03E5 || // set_objective via print_help
+        lastOpCodeProcessed == 0x014E || // set_timers
+        lastOpCodeProcessed == 0x014F || // clear timer
+        lastOpCodeProcessed == 0x03C3 || // set_timers with string
+        lastOpCodeProcessed == 0x0396 || // freeze timer
+        lastOpCodeProcessed == 0x0890 || // timer countdown seconds
+        lastOpCodeProcessed == 0x0318 || // register_mission_passed
+        lastOpCodeProcessed == 0x045C;   // fail_current_mission
+
+    if (isMissionFlowStateOpcode)
+    {
+        int opcodeParams[NUM_SYNCED_PARAMS]{};
+        for (uint16_t i = 0; i < scriptParamCount && i < NUM_SYNCED_PARAMS; ++i)
+        {
+            opcodeParams[i] = scriptParamsBuffer[i].value;
+        }
+
+        const char* textParam = (textParamCount > 0) ? textParamBuffer[0] : nullptr;
+        CMissionSyncState::EmitMissionFlowOpcode((uint16_t)lastOpCodeProcessed, opcodeParams, scriptParamCount, textParam);
+    }
+
     if (textParamCount > 0)
     {
         if (lastOpCodeProcessed == 0x00BA || lastOpCodeProcessed == 0x00BC || lastOpCodeProcessed == 0x0318 || lastOpCodeProcessed == 0x03E5)

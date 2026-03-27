@@ -185,6 +185,15 @@ public:
 		uint32_t sequence;
 		char gxt[8];
 		char cutsceneName[8];
+		uint16_t sourceOpcode;
+		uint16_t missionId;
+		int32_t timerMs;
+		uint16_t checkpointIndex;
+		uint8_t timerVisible;
+		uint8_t timerFrozen;
+		uint8_t passFailPending;
+		uint8_t playerControlState;
+		char objective[8];
 	};
 
 	static inline MissionFlowSyncState ms_lastMissionFlowSync{};
@@ -1373,6 +1382,15 @@ public:
 		uint32_t sequence;
 		char gxt[8];
 		char cutsceneName[8];
+		uint16_t sourceOpcode;
+		uint16_t missionId;
+		int32_t timerMs;
+		uint16_t checkpointIndex;
+		uint8_t timerVisible;
+		uint8_t timerFrozen;
+		uint8_t passFailPending;
+		uint8_t playerControlState;
+		char objective[8];
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
@@ -1401,6 +1419,15 @@ public:
 				ms_lastMissionFlowSync.sequence = packet->sequence;
 				memcpy(ms_lastMissionFlowSync.gxt, packet->gxt, sizeof(packet->gxt));
 				memcpy(ms_lastMissionFlowSync.cutsceneName, packet->cutsceneName, sizeof(packet->cutsceneName));
+				ms_lastMissionFlowSync.sourceOpcode = packet->sourceOpcode;
+				ms_lastMissionFlowSync.missionId = packet->missionId;
+				ms_lastMissionFlowSync.timerMs = packet->timerMs;
+				ms_lastMissionFlowSync.checkpointIndex = packet->checkpointIndex;
+				ms_lastMissionFlowSync.timerVisible = packet->timerVisible;
+				ms_lastMissionFlowSync.timerFrozen = packet->timerFrozen;
+				ms_lastMissionFlowSync.passFailPending = packet->passFailPending;
+				ms_lastMissionFlowSync.playerControlState = packet->playerControlState;
+				memcpy(ms_lastMissionFlowSync.objective, packet->objective, sizeof(packet->objective));
 				CNetwork::SendPacketToAll(CPacketsID::MISSION_FLOW_SYNC, packet, sizeof(MissionFlowSync), ENET_PACKET_FLAG_RELIABLE, peer);
 			}
 		}
