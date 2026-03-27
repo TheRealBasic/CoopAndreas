@@ -33,6 +33,19 @@
 #include <semver.h>
 
 namespace {
+    struct LocalPlayerContext {
+        CPlayerPed* player{};
+        uint32_t tickCount{};
+    };
+
+    enum class TickSkipReason : uint8_t {
+        LocalPlayerMissing,
+        LocalPlayerInvalid,
+        LocalPlayerIntelligenceMissing,
+        LocalPlayerUnavailable,
+        Count
+    };
+
     unsigned int g_lastOnFootSyncTickRate = 0;
     unsigned int g_lastDriverSyncTickRate = 0;
     unsigned int g_lastIdleVehicleSyncTickRate = 0;
@@ -53,6 +66,63 @@ namespace {
         case CFrameStageProfiler::Stage::HudDebugDraw: return "hud";
         default: return "unknown";
         }
+    }
+
+#if DEBUG
+    std::array<uint64_t, static_cast<size_t>(TickSkipReason::Count)> g_tickSkipCounters{};
+
+    void RecordTickSkip(TickSkipReason reason) {
+        ++g_tickSkipCounters[static_cast<size_t>(reason)];
+    }
+
+    const char* TickSkipReasonName(TickSkipReason reason) {
+        switch (reason) {
+        case TickSkipReason::LocalPlayerMissing: return "ctx.missing";
+        case TickSkipReason::LocalPlayerInvalid: return "ctx.invalid";
+        case TickSkipReason::LocalPlayerIntelligenceMissing: return "ctx.intel";
+        case TickSkipReason::LocalPlayerUnavailable: return "ctx.unavailable";
+        default: return "ctx.unknown";
+        }
+    }
+#else
+    void RecordTickSkip(TickSkipReason) {
+    }
+#endif
+
+    bool IsLocalPlayerUnavailableForSync(const CPlayerPed* player) {
+        return !player
+            || player->m_fHealth <= 0.0f
+            || player->m_ePedState == PEDSTATE_ARRESTED
+            || player->m_ePedState == PEDSTATE_DEAD
+            || (player->m_ePedState == PEDSTATE_DIE && player->m_nPedFlags.bIsDyingStuck)
+            || CCutsceneMgr::ms_running;
+    }
+
+    bool TryGetLocalPlayerContext(LocalPlayerContext& outContext) {
+        CPlayerPed* localPlayer = FindPlayerPed(0);
+        if (!localPlayer) {
+            RecordTickSkip(TickSkipReason::LocalPlayerMissing);
+            return false;
+        }
+
+        if (!CUtil::IsValidEntityPtr(localPlayer)) {
+            RecordTickSkip(TickSkipReason::LocalPlayerInvalid);
+            return false;
+        }
+
+        if (!localPlayer->m_pIntelligence) {
+            RecordTickSkip(TickSkipReason::LocalPlayerIntelligenceMissing);
+            return false;
+        }
+
+        if (IsLocalPlayerUnavailableForSync(localPlayer)) {
+            RecordTickSkip(TickSkipReason::LocalPlayerUnavailable);
+            return false;
+        }
+
+        outContext.player = localPlayer;
+        outContext.tickCount = GetTickCount();
+        return true;
     }
 }
 
@@ -239,9 +309,11 @@ void CSyncEmitCoordinator::ProcessConnectedFrame() {
     ProcessMissionSyncState();
     ProcessMissionFlagSync();
 
-    const uint32_t tickCount = GetTickCount();
-    CPlayerPed* localPlayer = FindPlayerPed(0);
-    ProcessLocalSyncEmit(localPlayer, tickCount);
+    LocalPlayerContext localContext{};
+    if (TryGetLocalPlayerContext(localContext))
+    {
+        ProcessLocalSyncEmit(localContext.player, localContext.tickCount);
+    }
 
     if (GetAsyncKeyState(VK_F7) && GetAsyncKeyState(VK_F10) && GetAsyncKeyState(VK_NUMPAD1))
     {
@@ -313,7 +385,12 @@ void CHudDebugDrawCoordinator::Process() {
     if (GetAsyncKeyState(VK_F9))
     {
         char buffer[320];
-        sprintf(buffer, "IsHost=%d | Game/Network: Peds %d/%d | Cars %d/%d | Recv %d %.2f KB/S | Sent %d %.2f KB/S | EnEx %d", CLocalPlayer::m_bIsHost, CPools::ms_pPedPool->GetNoOfUsedSpaces(), CNetworkPedManager::m_pPeds.size(), CPools::ms_pVehiclePool->GetNoOfUsedSpaces(), CNetworkVehicleManager::m_pVehicles.size(), CNetwork::m_pClient->totalReceivedPackets, CNetwork::ms_nBytesReceivedThisSecond / 1024.0f, CNetwork::m_pClient->totalSentPackets, CNetwork::ms_nBytesSentThisSecond / 1024.0f, CEntryExitManager::mp_poolEntryExits->GetNoOfUsedSpaces());
+        const int gamePedCount = CPools::ms_pPedPool ? CPools::ms_pPedPool->GetNoOfUsedSpaces() : -1;
+        const int gameVehicleCount = CPools::ms_pVehiclePool ? CPools::ms_pVehiclePool->GetNoOfUsedSpaces() : -1;
+        const int entryExitCount = CEntryExitManager::mp_poolEntryExits ? CEntryExitManager::mp_poolEntryExits->GetNoOfUsedSpaces() : -1;
+        const unsigned int totalReceivedPackets = CNetwork::m_pClient ? CNetwork::m_pClient->totalReceivedPackets : 0;
+        const unsigned int totalSentPackets = CNetwork::m_pClient ? CNetwork::m_pClient->totalSentPackets : 0;
+        sprintf(buffer, "IsHost=%d | Game/Network: Peds %d/%d | Cars %d/%d | Recv %u %.2f KB/S | Sent %u %.2f KB/S | EnEx %d", CLocalPlayer::m_bIsHost, gamePedCount, CNetworkPedManager::m_pPeds.size(), gameVehicleCount, CNetworkVehicleManager::m_pVehicles.size(), totalReceivedPackets, CNetwork::ms_nBytesReceivedThisSecond / 1024.0f, totalSentPackets, CNetwork::ms_nBytesSentThisSecond / 1024.0f, entryExitCount);
         CDXFont::Draw(100, 10, buffer, D3DCOLOR_ARGB(255, 255, 255, 255));
 
         sprintf(buffer, "Interp delay=%ums | Snapshots P:%zu Ped:%zu Veh:%zu | Corrections P:%zu Ped:%zu Veh:%zu",
@@ -340,6 +417,16 @@ void CHudDebugDrawCoordinator::Process() {
             CDXFont::Draw(100, line, buffer, D3DCOLOR_ARGB(255, 130, 220, 255));
             line += 18;
         }
+
+#if DEBUG
+        for (size_t i = 0; i < static_cast<size_t>(TickSkipReason::Count); ++i)
+        {
+            const auto reason = static_cast<TickSkipReason>(i);
+            sprintf(buffer, "TickSkip[%s]=%llu", TickSkipReasonName(reason), g_tickSkipCounters[i]);
+            CDXFont::Draw(100, line, buffer, D3DCOLOR_ARGB(255, 255, 180, 120));
+            line += 18;
+        }
+#endif
     }
 
     CFrameStageProfiler::Get().Record(CFrameStageProfiler::Stage::HudDebugDraw, GetTickCount() - stageStart);
