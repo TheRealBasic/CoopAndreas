@@ -4,6 +4,23 @@ Scope: initial mission implementation tickets for storyline missions that reuse 
 
 Template reference for sync gates: `docs/qa/storyline-mission-template.md`.
 
+Wave A scope (selected from roadmap not-started early missions): `Nines And AK's`, `Drive-By`, `Sweet's Girl`, `Cesar Vialpando`.
+
+## Wave A implementation pipeline contract
+
+For each Wave A mission, implementation must progress in this strict order:
+
+1. `command mapping`
+2. `actor registry hookup`
+3. `objective/checkpoint integration`
+4. `cutscene/control sync`
+5. `pass/fail adjudication`
+
+Mission-specific edge-case handlers may only be added after shared primitives in
+`COpCodeSync`, `CMissionSyncState`, `CTaskSequenceSync`, and mission runtime snapshot replay are exhausted.
+Each mission can be promoted to `functional` only when all core gameplay gates in
+`docs/qa/storyline-wave-mission-evidence.md` are `pass` (`start/cutscene`, `objective`, `fail`, `pass`, `reconnect`, `late-join`).
+
 ## Nines And AK's (`scm/scripts/SWEET.txt`)
 
 Status: `in progress` (blocking mapping + QA scenario list documented)
@@ -51,6 +68,54 @@ Status: `in progress` (blocking mapping + QA scenario list documented)
 - `DBY-05` Pass parity: all required enemies eliminated -> single terminal pass event.
 - `DBY-06` Reconnect: reconnect peer restores current route node, wave index, and vehicle condition.
 - `DBY-07` Late-join: late peer hydrates to active wave with correct kill quota progress.
+
+## Sweet's Girl (`scm/scripts/SWEET.txt`)
+
+Status: `in progress` (Wave A pipeline stages 1-5 implemented; functional gate pending QA pass on all six core gameplay gates)
+
+### Pipeline execution ledger
+- [x] **command mapping** — `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, and `task_enter_car_as_driver` mapped to authoritative mission-flow/task paths.
+- [x] **actor registry hookup** — rider/pursuer actor handles registered via deferred entity resolution so reconnect and late-join replay can resolve canonical net ids before apply.
+- [x] **objective/checkpoint integration** — objective phase progression and checkpoint index propagation wired through mission-flow emit/apply paths.
+- [x] **cutscene/control sync** — intro/control lock + unlock transitions integrated with mission attempt state and replay suppression for observers.
+- [x] **pass/fail adjudication** — fail and pass terminal latches wired to authoritative mission outcome handling with once-only replay semantics.
+
+### Shared-first edge-case policy
+- Shared primitive coverage used first for unresolved entity ordering, replay idempotency, and stale-epoch packet rejection.
+- Mission-specific edge handlers added only for **Sweet's Girl**-specific sequence branches that remain after shared path validation (escort actor escapes while vehicle seat assignment is unresolved).
+
+### QA scenarios
+- `SGR-01` Start/cutscene: intro and initial control lock replicate once across peers.
+- `SGR-02` Objective progression: escort objective and follow-up protect/flee objectives advance in identical order.
+- `SGR-03` Registry/seat parity: fleeing actor seat ownership resolves deterministically under join/reconnect pressure.
+- `SGR-04` Fail parity: protected actor death or host fail trigger emits one fail outcome.
+- `SGR-05` Pass parity: mission completion and reward path emit one pass outcome.
+- `SGR-06` Reconnect: reconnecting peer resumes active objective phase with consistent actor/vehicle bindings.
+- `SGR-07` Late-join: late peer hydrates active stage without replaying intro/control transitions.
+
+## Cesar Vialpando (`scm/scripts/SWEET.txt`)
+
+Status: `in progress` (Wave A pipeline stages 1-5 implemented; functional gate pending QA pass on all six core gameplay gates)
+
+### Pipeline execution ledger
+- [x] **command mapping** — `Mission.LoadAndLaunchInternal`, `task_car_drive_wander`, and `set_objective` mapped to mission-flow and task-sequence sync surfaces.
+- [x] **actor registry hookup** — race participant actor/vehicle handles tied to mission entity registry with deferred resolve retries.
+- [x] **objective/checkpoint integration** — lowrider phase objective progression + checkpoint updates emitted through monotonic mission-flow state.
+- [x] **cutscene/control sync** — intro setup + control handoff synchronized with replay-safe stage restoration.
+- [x] **pass/fail adjudication** — score/result terminal branch synchronized using authoritative pass/fail latches.
+
+### Shared-first edge-case policy
+- Shared mission-flow/objective replay and task deferral primitives used for most recovery and hydration paths.
+- Mission-specific edge handlers added only after shared coverage for **Cesar Vialpando** rhythm-window edge cases (late join during active minigame scoring tick, and reconnect during control handoff boundary).
+
+### QA scenarios
+- `CVP-01` Start/cutscene: launch and intro flow replicate without duplicate mission start.
+- `CVP-02` Objective/checkpoint progression: lowrider objective + checkpoint/rhythm phase updates remain deterministic.
+- `CVP-03` Control sync parity: player control handoff and return are aligned across peers.
+- `CVP-04` Fail parity: scripted fail branch emits once and clears active state consistently.
+- `CVP-05` Pass parity: completion and reward emit once across peers.
+- `CVP-06` Reconnect: reconnecting peer restores active scoring/objective state without restarting.
+- `CVP-07` Late-join: late peer hydrates in-progress attempt with current objective and control state.
 
 ## Running Dog (`scm/scripts/SMOKE.txt`)
 
