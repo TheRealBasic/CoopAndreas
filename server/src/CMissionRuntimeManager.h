@@ -37,6 +37,7 @@ public:
     static bool HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static bool HandleCheckpointRemove(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static bool HandleMissionEvent(EventKind eventKind, CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
+    static void HandleOpcodeRegistrySync(const void* data, int size);
     static void SendSnapshotTo(ENetPeer* peer);
     static uint32_t HandleHostMigration(int newHostPlayerId);
     static uint32_t GetMissionEpoch();

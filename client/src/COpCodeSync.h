@@ -37,14 +37,16 @@ struct SSyncedOpCode
     eSyncedParamType m_aParamTypes[4] = { eSyncedParamType::NONE, eSyncedParamType::NONE, eSyncedParamType::NONE, eSyncedParamType::NONE };
 };
 
+#pragma pack(push, 1)
 struct OpcodeSyncHeader
 {
     uint16_t opcode;
-    uint16_t missionInstanceId;
-    uint32_t scriptIdentifier;
-    uint8_t intParamCount : 4;
-    uint8_t stringParamCount : 4;
+    uint32_t missionEpoch;
+    uint32_t scriptLocalIdentifier;
+    uint8_t intParamCount;
+    uint8_t stringParamCount;
 };
+#pragma pack(pop)
 
 struct OpcodeParameter
 {
@@ -62,6 +64,16 @@ struct OpcodeParameter
 class COpCodeSync
 {
 public:
+    struct RegistrySnapshotEntry
+    {
+        uint32_t missionEpoch = 0;
+        uint32_t scriptLocalIdentifier = 0;
+        uint16_t opcode = 0;
+        uint8_t slot = 0;
+        eSyncedParamType entityType = eSyncedParamType::NONE;
+        int networkId = -1;
+    };
+
 	static inline bool ms_bSyncingEnabled = true;
 	static inline std::vector<CRunningScript*> ms_vSyncedScripts;
     static inline OpcodeParameter scriptParamsBuffer[NUM_SYNCED_PARAMS];
@@ -70,6 +82,9 @@ public:
 	static void Init();
 	static void HandlePacket(const uint8_t* buffer, int bufferSize);
     static void ProcessDeferredPackets();
+    static std::vector<RegistrySnapshotEntry> ExportRegistrySnapshotEntries(uint32_t missionEpoch);
+    static void ImportRegistrySnapshotEntry(const RegistrySnapshotEntry& entry);
+    static void ClearRegistryForEpoch(uint32_t missionEpoch);
 	static std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize);
 	static bool COpCodeSync::IsOpcodeSyncable(int opcode, int* opcodeIdx = nullptr, bool ignoreOpCodeSync = false);
 };

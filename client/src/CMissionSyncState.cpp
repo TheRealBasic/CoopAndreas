@@ -4,6 +4,7 @@
 #include "CCutsceneMgr.h"
 #include "CNetwork.h"
 #include "ObjectiveSyncState.h"
+#include "COpCodeSync.h"
 #include <vector>
 
 namespace
@@ -812,6 +813,20 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotActor(const CPackets::Missio
     }
 
     ms_runtimeSnapshotActors.push_back(packet);
+
+    if (packet.missionEpoch != 0
+        && packet.scriptLocalIdentifier != 0
+        && packet.actorNetworkId >= 0)
+    {
+        COpCodeSync::RegistrySnapshotEntry entry{};
+        entry.missionEpoch = packet.missionEpoch;
+        entry.scriptLocalIdentifier = packet.scriptLocalIdentifier;
+        entry.opcode = packet.sourceOpcode;
+        entry.slot = packet.sourceSlot;
+        entry.entityType = static_cast<eSyncedParamType>(packet.actorType);
+        entry.networkId = packet.actorNetworkId;
+        COpCodeSync::ImportRegistrySnapshotEntry(entry);
+    }
 }
 
 void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionRuntimeSnapshotEnd& packet)
@@ -880,6 +895,7 @@ void CMissionSyncState::SetMissionAuthorityMetadata(uint32_t missionEpoch, uint3
 
     if (missionEpoch > ms_missionEpoch)
     {
+        COpCodeSync::ClearRegistryForEpoch(ms_missionEpoch);
         ms_missionEpoch = missionEpoch;
         ms_nLastReceivedMissionFlowSequence = 0;
         ms_nLastReceivedMissionEventSequence = sequenceId;
