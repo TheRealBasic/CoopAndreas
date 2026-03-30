@@ -415,6 +415,10 @@ namespace
         packet.targetEntityNetworkId = state.targetEntityNetworkId;
         packet.targetEntityType = state.targetEntityType;
         packet.targetStateSequence = state.targetStateSequence;
+        packet.stealthState = state.stealthState;
+        packet.detectionSourceMask = state.detectionSourceMask;
+        packet.stealthStateSequence = state.stealthStateSequence;
+        packet.objectiveModifierFlags = state.objectiveModifierFlags;
         packet.terminalTieBreaker =
             state.passFailPending == 2 ? 3 :
             (state.passFailPending == 1 ? 2 : 0);
@@ -709,6 +713,18 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     packet.eventType = ms_sideContentAttemptState.targetStateSequence != previousTargetStateSequence
         ? CPackets::MISSION_FLOW_EVENT_TARGET_STATE
         : CPackets::MISSION_FLOW_EVENT_STATE_UPDATE;
+    if (opcode == 0x0753)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_STEALTH_VISION;
+    }
+    else if (opcode == 0x0610)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_STEALTH_HEARING;
+    }
+    else if (opcode == 0x0147)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_STEALTH_ALARM;
+    }
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = NextMissionEventSequenceId();
@@ -852,6 +868,10 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         ms_sideContentAttemptState.targetStateSequence = packet.targetStateSequence;
         ms_lastAppliedTargetStateSequence = packet.targetStateSequence;
     }
+    ms_sideContentAttemptState.stealthState = packet.stealthState;
+    ms_sideContentAttemptState.detectionSourceMask = packet.detectionSourceMask;
+    ms_sideContentAttemptState.stealthStateSequence = packet.stealthStateSequence;
+    ms_sideContentAttemptState.objectiveModifierFlags = packet.objectiveModifierFlags;
     ApplyInboundObjectiveTextState(ms_sideContentAttemptState, packet);
 
     CPackets::ReplicatedCheckpointState authoritativeCheckpoint{};
@@ -1028,6 +1048,10 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.targetEntityNetworkId = ms_runtimeSnapshotState.targetEntityNetworkId;
     ms_sideContentAttemptState.targetEntityType = ms_runtimeSnapshotState.targetEntityType;
     ms_sideContentAttemptState.targetStateSequence = ms_runtimeSnapshotState.targetStateSequence;
+    ms_sideContentAttemptState.stealthState = ms_runtimeSnapshotState.stealthState;
+    ms_sideContentAttemptState.detectionSourceMask = ms_runtimeSnapshotState.detectionSourceMask;
+    ms_sideContentAttemptState.stealthStateSequence = ms_runtimeSnapshotState.stealthStateSequence;
+    ms_sideContentAttemptState.objectiveModifierFlags = ms_runtimeSnapshotState.objectiveModifierFlags;
     ms_lastAppliedTargetStateSequence = ms_runtimeSnapshotState.targetStateSequence;
     ms_sideContentAttemptState.objectiveTextToken = ms_runtimeSnapshotState.objectiveTextToken;
     ms_sideContentAttemptState.objectiveTextSemantics = ms_runtimeSnapshotState.objectiveTextSemantics;

@@ -361,6 +361,10 @@ public:
 		int32_t targetEntityNetworkId;
 		uint8_t targetEntityType;
 		uint16_t targetStateSequence;
+		uint8_t stealthState;
+		uint8_t detectionSourceMask;
+		uint16_t stealthStateSequence;
+		uint8_t objectiveModifierFlags;
 		uint8_t terminalTieBreaker;
 	};
 
@@ -439,6 +443,10 @@ public:
 		int32_t targetEntityNetworkId;
 		uint8_t targetEntityType;
 		uint16_t targetStateSequence;
+		uint8_t stealthState;
+		uint8_t detectionSourceMask;
+		uint16_t stealthStateSequence;
+		uint8_t objectiveModifierFlags;
 		uint8_t terminalTieBreaker;
 	};
 

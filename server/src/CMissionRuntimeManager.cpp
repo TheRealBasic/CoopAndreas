@@ -14,6 +14,9 @@ namespace
     using RuntimeState = CMissionRuntimeManager::RuntimeState;
     constexpr uint8_t MISSION_FLOW_EVENT_PARTICIPANT_DEATH = 8;
     constexpr uint8_t MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED = 9;
+    constexpr uint8_t MISSION_FLOW_EVENT_STEALTH_VISION = 13;
+    constexpr uint8_t MISSION_FLOW_EVENT_STEALTH_HEARING = 14;
+    constexpr uint8_t MISSION_FLOW_EVENT_STEALTH_ALARM = 15;
 
     RuntimeState g_runtimeState = RuntimeState::Idle;
     CMissionRuntimeManager::MissionFlowPayload g_lastFlow{};
@@ -118,6 +121,77 @@ namespace
         return g_terminalOutcomeCommitted
             && (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS
                 || g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL);
+    }
+
+    bool ApplyStealthTransitionAuthoritative(
+        uint8_t nextState,
+        uint8_t sourceMask,
+        uint8_t* stateOut = nullptr,
+        uint8_t* sourceMaskOut = nullptr,
+        uint16_t* sequenceOut = nullptr,
+        uint8_t* modifierFlagsOut = nullptr)
+    {
+        ObjectiveSync::State candidate = g_objectiveState;
+        if (!ObjectiveSync::ApplyStealthStateTransition(candidate, nextState, sourceMask))
+        {
+            if (stateOut) *stateOut = g_objectiveState.stealthState;
+            if (sourceMaskOut) *sourceMaskOut = g_objectiveState.detectionSourceMask;
+            if (sequenceOut) *sequenceOut = g_objectiveState.stealthStateSequence;
+            if (modifierFlagsOut) *modifierFlagsOut = g_objectiveState.objectiveModifierFlags;
+            return false;
+        }
+
+        g_objectiveState.stealthState = candidate.stealthState;
+        g_objectiveState.detectionSourceMask = candidate.detectionSourceMask;
+        g_objectiveState.stealthStateSequence = candidate.stealthStateSequence;
+        g_objectiveState.objectiveModifierFlags = candidate.objectiveModifierFlags;
+
+        if (stateOut) *stateOut = g_objectiveState.stealthState;
+        if (sourceMaskOut) *sourceMaskOut = g_objectiveState.detectionSourceMask;
+        if (sequenceOut) *sequenceOut = g_objectiveState.stealthStateSequence;
+        if (modifierFlagsOut) *modifierFlagsOut = g_objectiveState.objectiveModifierFlags;
+        return true;
+    }
+
+    void ApplyStealthFromEvent(const CMissionRuntimeManager::MissionFlowPayload& packet)
+    {
+        if (packet.passFailPending == 2 || packet.eventType == 3)
+        {
+            ApplyStealthTransitionAuthoritative(ObjectiveSync::State::STEALTH_STATE_FAILED, ObjectiveSync::State::DETECTION_SOURCE_NONE);
+            return;
+        }
+
+        if (packet.eventType == MISSION_FLOW_EVENT_STEALTH_VISION || packet.sourceOpcode == 0x0753)
+        {
+            const uint8_t nextStealthState =
+                packet.stealthState >= ObjectiveSync::State::STEALTH_STATE_ALERTED
+                ? ObjectiveSync::State::STEALTH_STATE_ALERTED
+                : ObjectiveSync::State::STEALTH_STATE_SUSPICIOUS;
+            ApplyStealthTransitionAuthoritative(nextStealthState, ObjectiveSync::State::DETECTION_SOURCE_NPC_VISION);
+            return;
+        }
+
+        if (packet.eventType == MISSION_FLOW_EVENT_STEALTH_HEARING || packet.sourceOpcode == 0x0610)
+        {
+            const uint8_t nextStealthState =
+                packet.stealthState >= ObjectiveSync::State::STEALTH_STATE_ALERTED
+                ? ObjectiveSync::State::STEALTH_STATE_ALERTED
+                : ObjectiveSync::State::STEALTH_STATE_SUSPICIOUS;
+            ApplyStealthTransitionAuthoritative(nextStealthState, ObjectiveSync::State::DETECTION_SOURCE_NPC_HEARING);
+            return;
+        }
+
+        if (packet.eventType == MISSION_FLOW_EVENT_STEALTH_ALARM || packet.sourceOpcode == 0x0147)
+        {
+            ApplyStealthTransitionAuthoritative(ObjectiveSync::State::STEALTH_STATE_ALERTED, ObjectiveSync::State::DETECTION_SOURCE_SCRIPTED_ALARM);
+            return;
+        }
+
+        // Keep authoritative side synchronized if no transition source fired.
+        g_objectiveState.stealthState = packet.stealthState;
+        g_objectiveState.detectionSourceMask = packet.detectionSourceMask;
+        g_objectiveState.stealthStateSequence = packet.stealthStateSequence;
+        g_objectiveState.objectiveModifierFlags = packet.objectiveModifierFlags;
     }
 
     bool Transition(RuntimeState next)
@@ -625,6 +699,10 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.targetEntityNetworkId = packet->targetEntityNetworkId;
         g_objectiveState.targetEntityType = packet->targetEntityType;
         g_objectiveState.targetStateSequence = packet->targetStateSequence;
+        g_objectiveState.stealthState = packet->stealthState;
+        g_objectiveState.detectionSourceMask = packet->detectionSourceMask;
+        g_objectiveState.stealthStateSequence = packet->stealthStateSequence;
+        g_objectiveState.objectiveModifierFlags = packet->objectiveModifierFlags;
         std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
         if (packet->sourceOpcode == 0x0417 || (packet->missionId != 0 && packet->missionId != g_lastFlow.missionId))
@@ -667,6 +745,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         {
             PromoteTargetLifecycle(ObjectiveSync::State::TARGET_LIFECYCLE_ESCAPED);
         }
+        ApplyStealthFromEvent(*packet);
 
         if (g_hasFlow)
         {
@@ -729,6 +808,10 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->targetEntityNetworkId = g_objectiveState.targetEntityNetworkId;
     packet->targetEntityType = g_objectiveState.targetEntityType;
     packet->targetStateSequence = g_objectiveState.targetStateSequence;
+    packet->stealthState = g_objectiveState.stealthState;
+    packet->detectionSourceMask = g_objectiveState.detectionSourceMask;
+    packet->stealthStateSequence = g_objectiveState.stealthStateSequence;
+    packet->objectiveModifierFlags = g_objectiveState.objectiveModifierFlags;
     WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
@@ -881,6 +964,10 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     snapshotState.targetEntityNetworkId = g_objectiveState.targetEntityNetworkId;
     snapshotState.targetEntityType = g_objectiveState.targetEntityType;
     snapshotState.targetStateSequence = g_objectiveState.targetStateSequence;
+    snapshotState.stealthState = g_objectiveState.stealthState;
+    snapshotState.detectionSourceMask = g_objectiveState.detectionSourceMask;
+    snapshotState.stealthStateSequence = g_objectiveState.stealthStateSequence;
+    snapshotState.objectiveModifierFlags = g_objectiveState.objectiveModifierFlags;
     snapshotState.terminalTieBreaker = g_lastFlow.terminalTieBreaker;
     CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_STATE, &snapshotState, sizeof(snapshotState), ENET_PACKET_FLAG_RELIABLE);
 

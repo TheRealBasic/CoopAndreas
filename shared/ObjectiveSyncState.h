@@ -57,6 +57,27 @@ namespace ObjectiveSync
             TARGET_LIFECYCLE_DEAD = 4,
             TARGET_LIFECYCLE_ESCAPED = 5
         };
+        enum : uint8_t
+        {
+            STEALTH_STATE_UNDETECTED = 0,
+            STEALTH_STATE_SUSPICIOUS = 1,
+            STEALTH_STATE_ALERTED = 2,
+            STEALTH_STATE_FAILED = 3
+        };
+        enum : uint8_t
+        {
+            DETECTION_SOURCE_NONE = 0,
+            DETECTION_SOURCE_NPC_VISION = 1 << 0,
+            DETECTION_SOURCE_NPC_HEARING = 1 << 1,
+            DETECTION_SOURCE_SCRIPTED_ALARM = 1 << 2
+        };
+        enum : uint8_t
+        {
+            OBJECTIVE_MODIFIER_NONE = 0,
+            OBJECTIVE_MODIFIER_STEALTH_COMPROMISED = 1 << 0,
+            OBJECTIVE_MODIFIER_STEALTH_ALERTED = 1 << 1,
+            OBJECTIVE_MODIFIER_STEALTH_FAILED = 1 << 2
+        };
 
         uint16_t missionId = 0;
         int32_t timerMs = 0;
@@ -93,6 +114,10 @@ namespace ObjectiveSync
         int32_t targetEntityNetworkId = -1;
         uint8_t targetEntityType = 0;
         uint16_t targetStateSequence = 0;
+        uint8_t stealthState = STEALTH_STATE_UNDETECTED;
+        uint8_t detectionSourceMask = DETECTION_SOURCE_NONE;
+        uint16_t stealthStateSequence = 0;
+        uint8_t objectiveModifierFlags = OBJECTIVE_MODIFIER_NONE;
     };
 
     struct ApplyResult
@@ -186,6 +211,48 @@ namespace ObjectiveSync
         }
 
         state.timerVisible = nextVisible;
+        return true;
+    }
+
+    inline bool ApplyStealthStateTransition(State& state, uint8_t nextState, uint8_t sourceMask)
+    {
+        nextState = static_cast<uint8_t>(std::clamp<int>(nextState, State::STEALTH_STATE_UNDETECTED, State::STEALTH_STATE_FAILED));
+        sourceMask &= static_cast<uint8_t>(State::DETECTION_SOURCE_NPC_VISION
+            | State::DETECTION_SOURCE_NPC_HEARING
+            | State::DETECTION_SOURCE_SCRIPTED_ALARM);
+
+        if (state.stealthState == nextState)
+        {
+            if (sourceMask == 0 || (state.detectionSourceMask & sourceMask) == sourceMask)
+            {
+                return false;
+            }
+
+            state.detectionSourceMask |= sourceMask;
+            state.objectiveModifierFlags =
+                state.stealthState == State::STEALTH_STATE_FAILED ? State::OBJECTIVE_MODIFIER_STEALTH_FAILED :
+                state.stealthState == State::STEALTH_STATE_ALERTED ? (State::OBJECTIVE_MODIFIER_STEALTH_COMPROMISED | State::OBJECTIVE_MODIFIER_STEALTH_ALERTED) :
+                state.stealthState == State::STEALTH_STATE_SUSPICIOUS ? State::OBJECTIVE_MODIFIER_STEALTH_COMPROMISED :
+                State::OBJECTIVE_MODIFIER_NONE;
+            return true;
+        }
+
+        if (nextState < state.stealthState)
+        {
+            return false;
+        }
+
+        state.stealthState = nextState;
+        state.detectionSourceMask |= sourceMask;
+        state.objectiveModifierFlags =
+            state.stealthState == State::STEALTH_STATE_FAILED ? State::OBJECTIVE_MODIFIER_STEALTH_FAILED :
+            state.stealthState == State::STEALTH_STATE_ALERTED ? (State::OBJECTIVE_MODIFIER_STEALTH_COMPROMISED | State::OBJECTIVE_MODIFIER_STEALTH_ALERTED) :
+            state.stealthState == State::STEALTH_STATE_SUSPICIOUS ? State::OBJECTIVE_MODIFIER_STEALTH_COMPROMISED :
+            State::OBJECTIVE_MODIFIER_NONE;
+        if (state.stealthStateSequence < UINT16_MAX)
+        {
+            ++state.stealthStateSequence;
+        }
         return true;
     }
 
@@ -440,6 +507,41 @@ namespace ObjectiveSync
                 }
             }
             break;
+        case 0x0610: // set_hearing_range
+            if (ApplyStealthStateTransition(state, State::STEALTH_STATE_SUSPICIOUS, State::DETECTION_SOURCE_NPC_HEARING))
+            {
+                result.changed = true;
+                result.progressionChanged = true;
+            }
+            break;
+        case 0x0753: // set_alertness
+            if (params && paramCount > 1)
+            {
+                const int alertness = std::max(params[1], 0);
+                uint8_t nextStealthState = State::STEALTH_STATE_UNDETECTED;
+                if (alertness >= 2)
+                {
+                    nextStealthState = State::STEALTH_STATE_ALERTED;
+                }
+                else if (alertness >= 1)
+                {
+                    nextStealthState = State::STEALTH_STATE_SUSPICIOUS;
+                }
+
+                if (ApplyStealthStateTransition(state, nextStealthState, State::DETECTION_SOURCE_NPC_VISION))
+                {
+                    result.changed = true;
+                    result.progressionChanged = true;
+                }
+            }
+            break;
+        case 0x0147: // give_car_alarm
+            if (ApplyStealthStateTransition(state, State::STEALTH_STATE_ALERTED, State::DETECTION_SOURCE_SCRIPTED_ALARM))
+            {
+                result.changed = true;
+                result.progressionChanged = true;
+            }
+            break;
         case 0x0318: // mission_passed
             if (state.passFailPending == 0)
             {
@@ -466,6 +568,7 @@ namespace ObjectiveSync
                 state.passFailPending = 2;
                 state.pursuitState = State::PURSUIT_STATE_FAILED;
                 state.destroyEscapeState = State::DESTROY_ESCAPE_STATE_FAILED;
+                ApplyStealthStateTransition(state, State::STEALTH_STATE_FAILED, State::DETECTION_SOURCE_NONE);
                 result.changed = true;
                 result.progressionChanged = true;
             }
