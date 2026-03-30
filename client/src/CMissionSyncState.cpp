@@ -58,6 +58,7 @@ namespace
     // - timerVisible/timerFrozen/timerMs: HUD timer parity for timer-driven side content.
     // - passFailPending: deterministic terminal outcome latch (1 pass / 2 fail) to avoid duplicate outcomes.
     // - playerControlState: replicated player-control gate for scripted start/end transitions.
+    // - movementLocked/aimingLocked/firingLocked/cameraLocked/hudHidden: mission-scoped control constraints.
     //
     // Server stores and replays the latest MissionFlowSync payload so reconnecting and late-join peers
     // immediately hydrate this state without waiting for another opcode edge.
@@ -253,6 +254,7 @@ namespace
         }
 
         const bool movementLocked = state.movementLocked != 0;
+        const bool aimingLocked = state.aimingLocked != 0;
         const bool firingLocked = state.firingLocked != 0;
         const bool hudHidden = state.hudHidden != 0;
 
@@ -260,8 +262,8 @@ namespace
         pad->bDisablePlayerDuck = movementLocked ? 1 : 0;
         pad->bDisablePlayerCycleWeapon = movementLocked ? 1 : 0;
         pad->bDisablePlayerJump = movementLocked ? 1 : 0;
-        pad->bDisablePlayerFireWeapon = firingLocked ? 1 : 0;
-        pad->bDisablePlayerFireWeaponWithL1 = firingLocked ? 1 : 0;
+        pad->bDisablePlayerFireWeapon = (firingLocked || aimingLocked) ? 1 : 0;
+        pad->bDisablePlayerFireWeaponWithL1 = (firingLocked || aimingLocked) ? 1 : 0;
         pad->bDisablePlayerDisplayVitalStats = hudHidden ? 1 : 0;
     }
 
@@ -269,6 +271,12 @@ namespace
     {
         CNetworkCheckpoint::Remove();
         CNetworkEntityBlip::ClearEntityBlips();
+        ms_sideContentAttemptState.playerControlState = 1;
+        ms_sideContentAttemptState.movementLocked = 0;
+        ms_sideContentAttemptState.aimingLocked = 0;
+        ms_sideContentAttemptState.firingLocked = 0;
+        ms_sideContentAttemptState.cameraLocked = 0;
+        ms_sideContentAttemptState.hudHidden = 0;
 
         CPad* pad = CPad::GetPad(0);
         if (pad)
@@ -360,6 +368,7 @@ namespace
         packet.passFailPending = state.passFailPending;
         packet.playerControlState = state.playerControlState;
         packet.movementLocked = state.movementLocked;
+        packet.aimingLocked = state.aimingLocked;
         packet.firingLocked = state.firingLocked;
         packet.cameraLocked = state.cameraLocked;
         packet.hudHidden = state.hudHidden;
@@ -706,6 +715,7 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.timerDirection = packet.timerDirection;
     ms_sideContentAttemptState.playerControlState = packet.playerControlState;
     ms_sideContentAttemptState.movementLocked = packet.movementLocked;
+    ms_sideContentAttemptState.aimingLocked = packet.aimingLocked;
     ms_sideContentAttemptState.firingLocked = packet.firingLocked;
     ms_sideContentAttemptState.cameraLocked = packet.cameraLocked;
     ms_sideContentAttemptState.hudHidden = packet.hudHidden;
@@ -863,6 +873,12 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.timerDirection = ms_runtimeSnapshotState.timerDirection;
     ms_sideContentAttemptState.checkpointIndex = ms_runtimeSnapshotState.checkpointIndex;
     ms_sideContentAttemptState.checkpointCount = ms_runtimeSnapshotState.checkpointCount;
+    ms_sideContentAttemptState.playerControlState = ms_runtimeSnapshotState.playerControlState;
+    ms_sideContentAttemptState.movementLocked = ms_runtimeSnapshotState.movementLocked;
+    ms_sideContentAttemptState.aimingLocked = ms_runtimeSnapshotState.aimingLocked;
+    ms_sideContentAttemptState.firingLocked = ms_runtimeSnapshotState.firingLocked;
+    ms_sideContentAttemptState.cameraLocked = ms_runtimeSnapshotState.cameraLocked;
+    ms_sideContentAttemptState.hudHidden = ms_runtimeSnapshotState.hudHidden;
     ms_sideContentAttemptState.passFailPending = ms_runtimeSnapshotState.passFailPending;
     ms_sideContentAttemptState.cutscenePhase = ms_runtimeSnapshotState.cutscenePhase;
     ms_sideContentAttemptState.cutsceneSessionToken = ms_runtimeSnapshotState.cutsceneSessionToken;
@@ -889,6 +905,7 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     terminalView.runtimeSessionToken = ms_runtimeSnapshotState.runtimeSessionToken;
     terminalView.passFailPending = ms_runtimeSnapshotState.passFailPending;
     ApplyAdjudicatedTerminalState(terminalView);
+    ApplyReplicatedControlLocks(ms_sideContentAttemptState);
 
     ms_runtimeSnapshotHydrated = true;
     ms_runtimeSnapshotInProgress = false;

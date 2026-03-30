@@ -327,6 +327,7 @@ public:
 		uint8_t passFailPending;
 		uint8_t playerControlState;
 		uint8_t movementLocked;
+		uint8_t aimingLocked;
 		uint8_t firingLocked;
 		uint8_t cameraLocked;
 		uint8_t hudHidden;
@@ -389,6 +390,12 @@ public:
 		uint8_t timerDirection;
 		uint16_t checkpointIndex;
 		uint16_t checkpointCount;
+		uint8_t playerControlState;
+		uint8_t movementLocked;
+		uint8_t aimingLocked;
+		uint8_t firingLocked;
+		uint8_t cameraLocked;
+		uint8_t hudHidden;
 		uint16_t objectiveVersion;
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
