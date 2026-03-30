@@ -46,6 +46,7 @@ namespace
     bool ms_runtimeSnapshotInProgress = false;
     bool ms_runtimeSnapshotHydrated = false;
     uint32_t ms_runtimeSnapshotVersion = 0;
+    uint16_t ms_lastAppliedTargetStateSequence = 0;
     uint8_t ms_runtimeSnapshotExpectedActorCount = 0;
     std::vector<CPackets::MissionRuntimeSnapshotActor> ms_runtimeSnapshotActors{};
     CPackets::MissionRuntimeSnapshotState ms_runtimeSnapshotState{};
@@ -409,6 +410,11 @@ namespace
         packet.pursuitState = state.pursuitState;
         packet.destroyEscapeState = state.destroyEscapeState;
         packet.vehicleTaskSequence = state.vehicleTaskSequence;
+        packet.targetObjectiveType = state.targetObjectiveType;
+        packet.targetLifecycleState = state.targetLifecycleState;
+        packet.targetEntityNetworkId = state.targetEntityNetworkId;
+        packet.targetEntityType = state.targetEntityType;
+        packet.targetStateSequence = state.targetStateSequence;
         packet.terminalTieBreaker =
             state.passFailPending == 2 ? 3 :
             (state.passFailPending == 1 ? 2 : 0);
@@ -474,6 +480,7 @@ void CMissionSyncState::Init()
     ms_runtimeSnapshotInProgress = false;
     ms_runtimeSnapshotHydrated = false;
     ms_runtimeSnapshotVersion = 0;
+    ms_lastAppliedTargetStateSequence = 0;
     ms_runtimeSnapshotExpectedActorCount = 0;
     ms_runtimeSnapshotActors.clear();
     ms_runtimeSnapshotState = {};
@@ -691,6 +698,7 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
         return;
     }
 
+    const uint16_t previousTargetStateSequence = ms_sideContentAttemptState.targetStateSequence;
     const ObjectiveSync::ApplyResult applyResult = ObjectiveSync::ApplyOpcode(ms_sideContentAttemptState, opcode, params, paramCount, text);
     if (!applyResult.changed)
     {
@@ -698,7 +706,9 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     }
 
     CPackets::MissionFlowSync packet{};
-    packet.eventType = CPackets::MISSION_FLOW_EVENT_STATE_UPDATE;
+    packet.eventType = ms_sideContentAttemptState.targetStateSequence != previousTargetStateSequence
+        ? CPackets::MISSION_FLOW_EVENT_TARGET_STATE
+        : CPackets::MISSION_FLOW_EVENT_STATE_UPDATE;
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = NextMissionEventSequenceId();
@@ -800,6 +810,7 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     if (newAttempt)
     {
         ms_sideContentAttemptState = {};
+        ms_lastAppliedTargetStateSequence = 0;
         const MissionRuntimePolicy policy = ResolveMissionRuntimePolicy(packet.missionId);
         ms_sideContentAttemptState.respawnEligible = policy.respawnEligible;
         ms_sideContentAttemptState.missionFailThreshold = policy.missionFailThreshold;
@@ -832,6 +843,15 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.pursuitState = packet.pursuitState;
     ms_sideContentAttemptState.destroyEscapeState = packet.destroyEscapeState;
     ms_sideContentAttemptState.vehicleTaskSequence = packet.vehicleTaskSequence;
+    if (packet.targetStateSequence > ms_lastAppliedTargetStateSequence)
+    {
+        ms_sideContentAttemptState.targetObjectiveType = packet.targetObjectiveType;
+        ms_sideContentAttemptState.targetLifecycleState = packet.targetLifecycleState;
+        ms_sideContentAttemptState.targetEntityNetworkId = packet.targetEntityNetworkId;
+        ms_sideContentAttemptState.targetEntityType = packet.targetEntityType;
+        ms_sideContentAttemptState.targetStateSequence = packet.targetStateSequence;
+        ms_lastAppliedTargetStateSequence = packet.targetStateSequence;
+    }
     ApplyInboundObjectiveTextState(ms_sideContentAttemptState, packet);
 
     CPackets::ReplicatedCheckpointState authoritativeCheckpoint{};
@@ -1003,6 +1023,12 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.pursuitState = ms_runtimeSnapshotState.pursuitState;
     ms_sideContentAttemptState.destroyEscapeState = ms_runtimeSnapshotState.destroyEscapeState;
     ms_sideContentAttemptState.vehicleTaskSequence = ms_runtimeSnapshotState.vehicleTaskSequence;
+    ms_sideContentAttemptState.targetObjectiveType = ms_runtimeSnapshotState.targetObjectiveType;
+    ms_sideContentAttemptState.targetLifecycleState = ms_runtimeSnapshotState.targetLifecycleState;
+    ms_sideContentAttemptState.targetEntityNetworkId = ms_runtimeSnapshotState.targetEntityNetworkId;
+    ms_sideContentAttemptState.targetEntityType = ms_runtimeSnapshotState.targetEntityType;
+    ms_sideContentAttemptState.targetStateSequence = ms_runtimeSnapshotState.targetStateSequence;
+    ms_lastAppliedTargetStateSequence = ms_runtimeSnapshotState.targetStateSequence;
     ms_sideContentAttemptState.objectiveTextToken = ms_runtimeSnapshotState.objectiveTextToken;
     ms_sideContentAttemptState.objectiveTextSemantics = ms_runtimeSnapshotState.objectiveTextSemantics;
     std::memcpy(ms_sideContentAttemptState.objective, ms_runtimeSnapshotState.objective, sizeof(ms_sideContentAttemptState.objective));

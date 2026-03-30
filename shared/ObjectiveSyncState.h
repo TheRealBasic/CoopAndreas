@@ -41,6 +41,22 @@ namespace ObjectiveSync
             DESTROY_ESCAPE_STATE_ESCAPED = 4,
             DESTROY_ESCAPE_STATE_FAILED = 5
         };
+        enum : uint8_t
+        {
+            TARGET_OBJECTIVE_NONE = 0,
+            TARGET_OBJECTIVE_KILL = 1,
+            TARGET_OBJECTIVE_FLEE = 2,
+            TARGET_OBJECTIVE_PROTECT = 3
+        };
+        enum : uint8_t
+        {
+            TARGET_LIFECYCLE_NONE = 0,
+            TARGET_LIFECYCLE_SPAWN = 1,
+            TARGET_LIFECYCLE_ACTIVE = 2,
+            TARGET_LIFECYCLE_DOWNED = 3,
+            TARGET_LIFECYCLE_DEAD = 4,
+            TARGET_LIFECYCLE_ESCAPED = 5
+        };
 
         uint16_t missionId = 0;
         int32_t timerMs = 0;
@@ -72,6 +88,11 @@ namespace ObjectiveSync
         uint8_t pursuitState = PURSUIT_STATE_NONE;
         uint8_t destroyEscapeState = DESTROY_ESCAPE_STATE_NONE;
         uint16_t vehicleTaskSequence = 0;
+        uint8_t targetObjectiveType = TARGET_OBJECTIVE_NONE;
+        uint8_t targetLifecycleState = TARGET_LIFECYCLE_NONE;
+        int32_t targetEntityNetworkId = -1;
+        uint8_t targetEntityType = 0;
+        uint16_t targetStateSequence = 0;
     };
 
     struct ApplyResult
@@ -171,9 +192,50 @@ namespace ObjectiveSync
     inline ApplyResult ApplyOpcode(State& state, uint16_t opcode, const int* params, uint16_t paramCount, const char* text)
     {
         ApplyResult result{};
+        auto promoteTargetState = [&](uint8_t objectiveType, uint8_t lifecycleState, uint8_t entityType, int32_t entityNetworkId)
+        {
+            const bool changed = state.targetObjectiveType != objectiveType
+                || state.targetLifecycleState != lifecycleState
+                || state.targetEntityType != entityType
+                || state.targetEntityNetworkId != entityNetworkId;
+            if (!changed)
+            {
+                return;
+            }
+
+            state.targetObjectiveType = objectiveType;
+            state.targetLifecycleState = lifecycleState;
+            state.targetEntityType = entityType;
+            state.targetEntityNetworkId = entityNetworkId;
+            if (state.targetStateSequence < UINT16_MAX)
+            {
+                ++state.targetStateSequence;
+            }
+            result.changed = true;
+            result.progressionChanged = true;
+        };
 
         switch (opcode)
         {
+        case 0x05E2: // task_kill_char_on_foot
+        case 0x0634: // task_kill_char_on_foot_while_ducking
+            if (params && paramCount > 1)
+            {
+                promoteTargetState(State::TARGET_OBJECTIVE_KILL, State::TARGET_LIFECYCLE_ACTIVE, 1, params[1]);
+            }
+            break;
+        case 0x0603: // task_go_to_coord_any_means
+            if (params && paramCount > 0)
+            {
+                promoteTargetState(State::TARGET_OBJECTIVE_FLEE, State::TARGET_LIFECYCLE_ACTIVE, 1, params[0]);
+            }
+            break;
+        case 0x05BF: // task_look_at_char
+            if (params && paramCount > 1)
+            {
+                promoteTargetState(State::TARGET_OBJECTIVE_PROTECT, State::TARGET_LIFECYCLE_ACTIVE, 1, params[1]);
+            }
+            break;
         case 0x05CA: // task_enter_car_as_passenger
         case 0x05CB: // task_enter_car_as_driver
             if (state.vehicleTaskState != State::VEHICLE_TASK_ENTER_VEHICLE)
