@@ -40,6 +40,8 @@ struct SSyncedOpCode
 struct OpcodeSyncHeader
 {
     uint16_t opcode;
+    uint16_t missionInstanceId;
+    uint32_t scriptIdentifier;
     uint8_t intParamCount : 4;
     uint8_t stringParamCount : 4;
 };
