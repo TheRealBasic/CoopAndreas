@@ -20,6 +20,7 @@
 #include "ConfigManager.h"
 #include "CPickupManager.h"
 #include "CFireSyncManager.h"
+#include "CMissionRuntimeManager.h"
 
 class CPlayerManager
 {
@@ -82,6 +83,17 @@ public:
 			if (player && player->m_pPeer)
 			{
 				SendSubmissionMissionStateSnapshot(player->m_pPeer);
+			}
+		}
+	}
+
+	static void BroadcastMissionRuntimeStateResync()
+	{
+		for (auto* player : CPlayerManager::m_pPlayers)
+		{
+			if (player && player->m_pPeer)
+			{
+				CMissionRuntimeManager::SendSnapshotTo(player->m_pPeer);
 			}
 		}
 	}
@@ -171,34 +183,6 @@ public:
 	static inline uint32_t ms_propertySnapshotVersion = 0;
 	static inline std::unordered_map<uint8_t, SubmissionMissionState> ms_submissionMissionStates{};
 	static inline uint32_t ms_submissionMissionSnapshotVersion = 0;
-	static inline uint8_t ms_lastOnMissionFlag = 0;
-
-	struct MissionFlowSyncState
-	{
-		// Cached shared side-content mission payload.
-		// Replayed to reconnecting/late-join peers so they hydrate launch/timer/checkpoint/pass-fail state instantly.
-		uint8_t eventType;
-		uint8_t messageType;
-		uint32_t time;
-		uint8_t flag;
-		uint8_t currArea;
-		uint8_t onMission;
-		uint8_t replay;
-		uint32_t sequence;
-		char gxt[8];
-		char cutsceneName[8];
-		uint16_t sourceOpcode;
-		uint16_t missionId;      // Launch/start identity (Mission.LoadAndLaunchInternal / race-start script launch)
-		int32_t timerMs;         // Canonical timer value in milliseconds
-		uint16_t checkpointIndex;// Monotonic checkpoint/objective progression index
-		uint8_t timerVisible;    // Timer HUD visibility
-		uint8_t timerFrozen;     // Timer HUD frozen state
-		uint8_t passFailPending; // 0 none, 1 pass, 2 fail
-		uint8_t playerControlState;
-		char objective[8];
-	};
-
-	static inline MissionFlowSyncState ms_lastMissionFlowSync{};
 
 	static void RefreshActiveMapPinsSnapshot()
 	{
@@ -255,26 +239,7 @@ public:
 
 	static void SendMissionStateSnapshot(ENetPeer* peer)
 	{
-		if (!peer)
-		{
-			return;
-		}
-
-		struct OnMissionFlagSnapshotPacket
-		{
-			uint8_t bOnMission : 1;
-		} onMissionPacket{};
-		onMissionPacket.bOnMission = ms_lastOnMissionFlag != 0;
-		CNetwork::SendPacket(peer, CPacketsID::ON_MISSION_FLAG_SYNC, &onMissionPacket, sizeof(onMissionPacket), ENET_PACKET_FLAG_RELIABLE);
-
-		if (ms_lastMissionFlowSync.sequence == 0)
-		{
-			return;
-		}
-
-		MissionFlowSyncState replayPacket = ms_lastMissionFlowSync;
-		replayPacket.replay = 1;
-		CNetwork::SendPacket(peer, CPacketsID::MISSION_FLOW_SYNC, &replayPacket, sizeof(replayPacket), ENET_PACKET_FLAG_RELIABLE);
+		CMissionRuntimeManager::SendSnapshotTo(peer);
 	}
 
 	static void SendPropertyStateSnapshot(ENetPeer* peer)
@@ -1366,78 +1331,17 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			if (auto player = CPlayerManager::GetPlayer(peer))
-			{
-				if (player->m_bIsHost)
-				{
-					ms_lastOnMissionFlag = ((OnMissionFlagSync*)data)->bOnMission ? 1 : 0;
-					CNetwork::SendPacketToAll(CPacketsID::ON_MISSION_FLAG_SYNC, data, sizeof(OnMissionFlagSync), ENET_PACKET_FLAG_RELIABLE, peer);
-				}
-			}
+			CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
 	struct MissionFlowSync
 	{
-		// Wire payload for shared side-content mission parity (start, progression, timers, deterministic outcomes).
-		uint8_t eventType;
-		uint8_t messageType;
-		uint32_t time;
-		uint8_t flag;
-		uint8_t currArea;
-		uint8_t onMission;
-		uint8_t replay;
-		uint32_t sequence;
-		char gxt[8];
-		char cutsceneName[8];
-		uint16_t sourceOpcode;
-		uint16_t missionId;
-		int32_t timerMs;
-		uint16_t checkpointIndex;
-		uint8_t timerVisible;
-		uint8_t timerFrozen;
-		uint8_t passFailPending;
-		uint8_t playerControlState;
-		char objective[8];
+		CMissionRuntimeManager::MissionFlowPayload payload;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			if (size < (int)sizeof(MissionFlowSync))
-			{
-				return;
-			}
-
-			if (auto player = CPlayerManager::GetPlayer(peer))
-			{
-				if (!player->m_bIsHost)
-				{
-					return;
-				}
-
-				MissionFlowSync* packet = (MissionFlowSync*)data;
-				packet->replay = 0;
-				ms_lastOnMissionFlag = packet->onMission ? 1 : 0;
-				ms_lastMissionFlowSync.eventType = packet->eventType;
-				ms_lastMissionFlowSync.messageType = packet->messageType;
-				ms_lastMissionFlowSync.time = packet->time;
-				ms_lastMissionFlowSync.flag = packet->flag;
-				ms_lastMissionFlowSync.currArea = packet->currArea;
-				ms_lastMissionFlowSync.onMission = packet->onMission;
-				ms_lastMissionFlowSync.replay = 0;
-				ms_lastMissionFlowSync.sequence = packet->sequence;
-				memcpy(ms_lastMissionFlowSync.gxt, packet->gxt, sizeof(packet->gxt));
-				memcpy(ms_lastMissionFlowSync.cutsceneName, packet->cutsceneName, sizeof(packet->cutsceneName));
-				ms_lastMissionFlowSync.sourceOpcode = packet->sourceOpcode;
-				ms_lastMissionFlowSync.missionId = packet->missionId;
-				ms_lastMissionFlowSync.timerMs = packet->timerMs;
-				ms_lastMissionFlowSync.checkpointIndex = packet->checkpointIndex;
-				ms_lastMissionFlowSync.timerVisible = packet->timerVisible;
-				ms_lastMissionFlowSync.timerFrozen = packet->timerFrozen;
-				ms_lastMissionFlowSync.passFailPending = packet->passFailPending;
-				ms_lastMissionFlowSync.playerControlState = packet->playerControlState;
-				memcpy(ms_lastMissionFlowSync.objective, packet->objective, sizeof(packet->objective));
-				CNetwork::SendPacketToAll(CPacketsID::MISSION_FLOW_SYNC, packet, sizeof(MissionFlowSync), ENET_PACKET_FLAG_RELIABLE, peer);
-			}
+			CMissionRuntimeManager::HandleMissionFlowSync(CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
@@ -1583,45 +1487,21 @@ public:
 
 	struct UpdateCheckpoint
 	{
-		int playerid;
-		CVector position;
-		CVector radius;
+		CMissionRuntimeManager::CheckpointPayload payload;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			if (auto player = CPlayerManager::GetPlayer(peer))
-			{
-				if (player->m_bIsHost)
-				{
-					UpdateCheckpoint* packet = (UpdateCheckpoint*)data;
-
-					if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid))
-					{
-						CNetwork::SendPacket(targetPlayer->m_pPeer, CPacketsID::UPDATE_CHECKPOINT, data, sizeof(UpdateCheckpoint), ENET_PACKET_FLAG_RELIABLE);
-					}
-				}
-			}
+			CMissionRuntimeManager::HandleCheckpointUpdate(CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
 	struct RemoveCheckpoint
 	{
-		int playerid;
+		CMissionRuntimeManager::CheckpointRemovePayload payload;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			if (auto player = CPlayerManager::GetPlayer(peer))
-			{
-				if (player->m_bIsHost)
-				{
-					RemoveCheckpoint* packet = (RemoveCheckpoint*)data;
-
-					if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid))
-					{
-						CNetwork::SendPacket(targetPlayer->m_pPeer, CPacketsID::REMOVE_CHECKPOINT, data, sizeof(RemoveCheckpoint), ENET_PACKET_FLAG_RELIABLE);
-					}
-				}
-			}
+			CMissionRuntimeManager::HandleCheckpointRemove(CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
