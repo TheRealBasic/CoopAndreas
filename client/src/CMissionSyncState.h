@@ -25,6 +25,8 @@ public:
     static void ProcessWidescreenPolicy();
 
     static void HandleMissionFlagSync(bool onMission);
+    static void SetMissionAuthorityEpoch(uint32_t missionEpoch);
+    static uint32_t GetMissionAuthorityEpoch();
     static void EmitMissionFlowCutscenePhase(uint8_t phase, const char* cutsceneName, uint8_t currArea, uint32_t cutsceneSessionToken);
     static void EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message);
     static void EmitMissionFlowOpcode(uint16_t opcode, const int* params, uint16_t paramCount, const char* text);

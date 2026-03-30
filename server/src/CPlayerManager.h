@@ -853,6 +853,7 @@ public:
 	struct PlayerSetHost
 	{
 		int playerid;
+		uint32_t missionEpoch;
 	};
 
 	struct AddExplosion
@@ -1328,6 +1329,7 @@ public:
 	struct OnMissionFlagSync
 	{
 		uint8_t bOnMission : 1;
+		uint32_t missionEpoch;
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{

@@ -26,7 +26,28 @@ namespace
     uint16_t g_objectiveVersion = 0;
     uint16_t g_checkpointVersion = 0;
     uint32_t g_runtimeSessionToken = 0;
+    uint32_t g_missionEpoch = 1;
+    int g_missionAuthorityPlayerId = -1;
     ObjectiveSync::State g_objectiveState{};
+    
+    struct MigrationSnapshot
+    {
+        RuntimeState runtimeState = RuntimeState::Idle;
+        CMissionRuntimeManager::MissionFlowPayload lastFlow{};
+        CMissionRuntimeManager::CheckpointPayload lastCheckpoint{};
+        bool hasFlow = false;
+        bool hasCheckpoint = false;
+        bool isOnMission = false;
+        bool terminalEventSeen = false;
+        uint8_t terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
+        uint8_t terminalSourceEventType = 0;
+        uint16_t terminalSourceOpcode = 0;
+        uint32_t terminalSourceSequence = 0;
+        uint16_t objectiveVersion = 0;
+        uint16_t checkpointVersion = 0;
+        uint32_t runtimeSessionToken = 0;
+        ObjectiveSync::State objectiveState{};
+    };
 
     bool IsTerminal(RuntimeState state)
     {
@@ -162,6 +183,46 @@ namespace
         packet.terminalSourceOpcode = g_terminalSourceOpcode;
         packet.terminalSourceSequence = g_terminalSourceSequence;
     }
+
+    MigrationSnapshot BuildMigrationSnapshot()
+    {
+        MigrationSnapshot snapshot{};
+        snapshot.runtimeState = g_runtimeState;
+        snapshot.lastFlow = g_lastFlow;
+        snapshot.lastCheckpoint = g_lastCheckpoint;
+        snapshot.hasFlow = g_hasFlow;
+        snapshot.hasCheckpoint = g_hasCheckpoint;
+        snapshot.isOnMission = g_isOnMission;
+        snapshot.terminalEventSeen = g_terminalEventSeen;
+        snapshot.terminalReasonCode = g_terminalReasonCode;
+        snapshot.terminalSourceEventType = g_terminalSourceEventType;
+        snapshot.terminalSourceOpcode = g_terminalSourceOpcode;
+        snapshot.terminalSourceSequence = g_terminalSourceSequence;
+        snapshot.objectiveVersion = g_objectiveVersion;
+        snapshot.checkpointVersion = g_checkpointVersion;
+        snapshot.runtimeSessionToken = g_runtimeSessionToken;
+        snapshot.objectiveState = g_objectiveState;
+        return snapshot;
+    }
+
+    void RestoreMigrationSnapshot(const MigrationSnapshot& snapshot)
+    {
+        g_runtimeState = snapshot.runtimeState;
+        g_lastFlow = snapshot.lastFlow;
+        g_lastCheckpoint = snapshot.lastCheckpoint;
+        g_hasFlow = snapshot.hasFlow;
+        g_hasCheckpoint = snapshot.hasCheckpoint;
+        g_isOnMission = snapshot.isOnMission;
+        g_terminalEventSeen = snapshot.terminalEventSeen;
+        g_terminalReasonCode = snapshot.terminalReasonCode;
+        g_terminalSourceEventType = snapshot.terminalSourceEventType;
+        g_terminalSourceOpcode = snapshot.terminalSourceOpcode;
+        g_terminalSourceSequence = snapshot.terminalSourceSequence;
+        g_objectiveVersion = snapshot.objectiveVersion;
+        g_checkpointVersion = snapshot.checkpointVersion;
+        g_runtimeSessionToken = snapshot.runtimeSessionToken;
+        g_objectiveState = snapshot.objectiveState;
+    }
 }
 
 bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size)
@@ -172,6 +233,16 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
     }
 
     auto* packet = (const OnMissionFlagPayload*)data;
+    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
+    {
+        return false;
+    }
+
+    if (packet->missionEpoch != g_missionEpoch)
+    {
+        return false;
+    }
+
     const bool nextOnMission = packet->bOnMission != 0;
 
     if (nextOnMission)
@@ -213,6 +284,16 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     }
 
     auto* packet = (MissionFlowPayload*)data;
+    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
+    {
+        return false;
+    }
+
+    if (packet->missionEpoch != g_missionEpoch)
+    {
+        return false;
+    }
+
     if (packet->sequence <= g_lastSequence)
     {
         return false;
@@ -269,6 +350,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     g_lastFlow.runtimeState = static_cast<uint8_t>(g_runtimeState);
     g_lastFlow.objectiveVersion = g_objectiveVersion;
     g_lastFlow.checkpointVersion = g_checkpointVersion;
+    g_lastFlow.missionEpoch = g_missionEpoch;
     WriteTerminalMetadata(g_lastFlow);
 
     if (g_runtimeSessionToken == 0 || (g_hasFlow && packet->missionId != previousMissionId))
@@ -282,6 +364,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->objectiveVersion = g_objectiveVersion;
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
+    packet->missionEpoch = g_missionEpoch;
     WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
@@ -302,6 +385,16 @@ bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetP
     }
 
     auto* packet = (CheckpointPayload*)data;
+    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
+    {
+        return false;
+    }
+
+    if (packet->missionEpoch != g_missionEpoch)
+    {
+        return false;
+    }
+
     if (packet->checkpointIndex < g_lastCheckpoint.checkpointIndex)
     {
         return false;
@@ -311,10 +404,12 @@ bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetP
     g_lastCheckpoint = *packet;
     g_lastCheckpoint.checkpointVersion = g_checkpointVersion;
     g_lastCheckpoint.runtimeSessionToken = g_runtimeSessionToken;
+    g_lastCheckpoint.missionEpoch = g_missionEpoch;
     g_hasCheckpoint = true;
 
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
+    packet->missionEpoch = g_missionEpoch;
     CNetwork::SendPacketToAll(CPacketsID::UPDATE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
     return true;
 }
@@ -327,9 +422,20 @@ bool CMissionRuntimeManager::HandleCheckpointRemove(CPlayer* sourcePlayer, ENetP
     }
 
     auto* packet = (CheckpointRemovePayload*)data;
+    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
+    {
+        return false;
+    }
+
+    if (packet->missionEpoch != g_missionEpoch)
+    {
+        return false;
+    }
+
     ++g_checkpointVersion;
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
+    packet->missionEpoch = g_missionEpoch;
     g_hasCheckpoint = false;
 
     CNetwork::SendPacketToAll(CPacketsID::REMOVE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
@@ -345,6 +451,7 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
 
     OnMissionFlagPayload onMissionPacket{};
     onMissionPacket.bOnMission = g_isOnMission ? 1 : 0;
+    onMissionPacket.missionEpoch = g_missionEpoch;
     CNetwork::SendPacket(peer, CPacketsID::ON_MISSION_FLAG_SYNC, &onMissionPacket, sizeof(onMissionPacket), ENET_PACKET_FLAG_RELIABLE);
 
     if (g_hasFlow)
@@ -355,6 +462,7 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
         replayPacket.objectiveVersion = g_objectiveVersion;
         replayPacket.checkpointVersion = g_checkpointVersion;
         replayPacket.runtimeSessionToken = g_runtimeSessionToken;
+        replayPacket.missionEpoch = g_missionEpoch;
         WriteTerminalMetadata(replayPacket);
         CNetwork::SendPacket(peer, CPacketsID::MISSION_FLOW_SYNC, &replayPacket, sizeof(replayPacket), ENET_PACKET_FLAG_RELIABLE);
     }
@@ -364,8 +472,40 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
         CheckpointPayload checkpointPacket = g_lastCheckpoint;
         checkpointPacket.checkpointVersion = g_checkpointVersion;
         checkpointPacket.runtimeSessionToken = g_runtimeSessionToken;
+        checkpointPacket.missionEpoch = g_missionEpoch;
         CNetwork::SendPacket(peer, CPacketsID::UPDATE_CHECKPOINT, &checkpointPacket, sizeof(checkpointPacket), ENET_PACKET_FLAG_RELIABLE);
     }
+}
+
+uint32_t CMissionRuntimeManager::HandleHostMigration(int newHostPlayerId)
+{
+    const MigrationSnapshot snapshot = BuildMigrationSnapshot();
+    ++g_missionEpoch;
+    g_missionAuthorityPlayerId = newHostPlayerId;
+    g_lastSequence = 0;
+
+    if (snapshot.hasFlow || snapshot.hasCheckpoint || snapshot.isOnMission)
+    {
+        RestoreMigrationSnapshot(snapshot);
+        g_lastSequence = 0;
+        if (g_hasFlow)
+        {
+            g_lastFlow.sequence = 0;
+            g_lastFlow.runtimeState = static_cast<uint8_t>(g_runtimeState);
+            g_lastFlow.objectiveVersion = g_objectiveVersion;
+            g_lastFlow.checkpointVersion = g_checkpointVersion;
+            g_lastFlow.runtimeSessionToken = g_runtimeSessionToken;
+            g_lastFlow.missionEpoch = g_missionEpoch;
+            WriteTerminalMetadata(g_lastFlow);
+        }
+    }
+
+    return g_missionEpoch;
+}
+
+uint32_t CMissionRuntimeManager::GetMissionEpoch()
+{
+    return g_missionEpoch;
 }
 
 void CMissionRuntimeManager::Teardown()
@@ -381,6 +521,8 @@ void CMissionRuntimeManager::Teardown()
     g_objectiveVersion = 0;
     g_checkpointVersion = 0;
     ++g_runtimeSessionToken;
+    ++g_missionEpoch;
+    g_missionAuthorityPlayerId = -1;
     g_objectiveState = {};
     g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
     g_terminalSourceEventType = 0;

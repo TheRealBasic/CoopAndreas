@@ -29,5 +29,7 @@ public:
     static bool HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static bool HandleCheckpointRemove(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static void SendSnapshotTo(ENetPeer* peer);
+    static uint32_t HandleHostMigration(int newHostPlayerId);
+    static uint32_t GetMissionEpoch();
     static void Teardown();
 };

@@ -86,7 +86,9 @@ void CPlayerManager::AssignHostToFirstPlayer()
 	CPlayerPackets::ResetCutsceneVoteStateForHostMigration();
 	player->m_bIsHost = true;
 
-	CPlayerPackets::PlayerSetHost setHostPacket = { player->m_iPlayerId };
+	CPlayerPackets::PlayerSetHost setHostPacket{};
+	setHostPacket.playerid = player->m_iPlayerId;
+	setHostPacket.missionEpoch = CMissionRuntimeManager::HandleHostMigration(player->m_iPlayerId);
 	CNetwork::SendPacketToAll(CPacketsID::PLAYER_SET_HOST, &setHostPacket, sizeof(setHostPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
 	CPlayerPackets::BroadcastPickupBootstrapResync();
 	CPlayerPackets::BroadcastPropertyStateResync();

@@ -398,6 +398,7 @@ void CPacketHandler::PlayerSetHost__Handle(void* data, int size)
 	if (packet->playerid == CNetworkPlayerManager::m_nMyId)
 	{
 		CLocalPlayer::m_bIsHost = true;
+		CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
 
 		CPatch::RevertTemporaryPatchesForHost();
 
@@ -414,6 +415,7 @@ void CPacketHandler::PlayerSetHost__Handle(void* data, int size)
 	CChat::AddMessage("[Player] " + std::string(player->GetName()) + " is now the host");
 
 	CLocalPlayer::m_bIsHost = false;
+	CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
 	CPacketHandler::PickupSnapshotResync__Trigger(PICKUP_RESYNC_REASON_HOST_MIGRATION);
 }
 
@@ -1841,10 +1843,11 @@ void CPacketHandler::OpCodeSync__Handle(void* data, int size)
 
 void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 {
+	CPackets::OnMissionFlagSync* packet = (CPackets::OnMissionFlagSync*)data;
+	CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
 	if (CLocalPlayer::m_bIsHost)
 		return;
 
-	CPackets::OnMissionFlagSync* packet = (CPackets::OnMissionFlagSync*)data;
 	CMissionSyncState::HandleMissionFlagSync(packet->bOnMission);
 
 	if (CTheScripts::OnAMissionFlag)
@@ -1860,12 +1863,7 @@ void CPacketHandler::MissionFlowSync__Handle(void* data, int size)
 		return;
 
 	CPackets::MissionFlowSync* packet = (CPackets::MissionFlowSync*)data;
-	if (CLocalPlayer::m_bIsHost)
-	{
-		CMissionSyncState::ApplyAdjudicatedTerminalState(*packet);
-		return;
-	}
-
+	CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
 	CMissionSyncState::HandleMissionFlowSync(*packet);
 }
 
@@ -1878,6 +1876,7 @@ void CPacketHandler::OnMissionFlagSync__Trigger()
 	{
 		CPackets::OnMissionFlagSync packet{};
 		packet.bOnMission = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
+		packet.missionEpoch = CMissionSyncState::GetMissionAuthorityEpoch();
 		CNetwork::SendPacket(CPacketsID::ON_MISSION_FLAG_SYNC, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
 	}
 }
