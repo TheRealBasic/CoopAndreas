@@ -638,6 +638,7 @@ public:
 		uint8_t passFailPending = 0;      // 0 = none, 1 = pass, 2 = fail (terminal outcome latch)
 		uint8_t playerControlState = 0;   // set_player_control mirror for scripted transitions
 		uint8_t movementLocked = 0;       // 1 = movement/gameplay locomotion lock is active
+		uint8_t aimingLocked = 0;         // 1 = scripted aiming lock is active
 		uint8_t firingLocked = 0;         // 1 = scripted firing lock is active
 		uint8_t cameraLocked = 0;         // 1 = scripted camera control lock is active
 		uint8_t hudHidden = 0;            // 1 = scripted HUD hide lock is active
@@ -748,6 +749,12 @@ public:
 		uint8_t timerDirection = 0;
 		uint16_t checkpointIndex = 0;
 		uint16_t checkpointCount = 0;
+		uint8_t playerControlState = 0;
+		uint8_t movementLocked = 0;
+		uint8_t aimingLocked = 0;
+		uint8_t firingLocked = 0;
+		uint8_t cameraLocked = 0;
+		uint8_t hudHidden = 0;
 		uint16_t objectiveVersion = 0;
 		uint16_t checkpointVersion = 0;
 		uint32_t runtimeSessionToken = 0;

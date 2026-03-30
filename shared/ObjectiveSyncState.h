@@ -26,6 +26,7 @@ namespace ObjectiveSync
         uint8_t passFailPending = 0;
         uint8_t playerControlState = 0;
         uint8_t movementLocked = 0;
+        uint8_t aimingLocked = 0;
         uint8_t firingLocked = 0;
         uint8_t cameraLocked = 0;
         uint8_t hudHidden = 0;
@@ -158,6 +159,13 @@ namespace ObjectiveSync
                 if (state.movementLocked != nextMovementLocked)
                 {
                     state.movementLocked = nextMovementLocked;
+                    result.changed = true;
+                }
+
+                const uint8_t nextAimingLocked = nextState ? 0 : 1;
+                if (state.aimingLocked != nextAimingLocked)
+                {
+                    state.aimingLocked = nextAimingLocked;
                     result.changed = true;
                 }
             }

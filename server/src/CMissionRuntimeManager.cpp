@@ -209,9 +209,21 @@ namespace
         g_runtimeState = RuntimeState::Teardown;
         g_isOnMission = false;
         g_hasCheckpoint = false;
+        g_objectiveState.playerControlState = 1;
+        g_objectiveState.movementLocked = 0;
+        g_objectiveState.aimingLocked = 0;
+        g_objectiveState.firingLocked = 0;
+        g_objectiveState.cameraLocked = 0;
+        g_objectiveState.hudHidden = 0;
 
         packet.onMission = 0;
         packet.passFailPending = 0;
+        packet.playerControlState = g_objectiveState.playerControlState;
+        packet.movementLocked = g_objectiveState.movementLocked;
+        packet.aimingLocked = g_objectiveState.aimingLocked;
+        packet.firingLocked = g_objectiveState.firingLocked;
+        packet.cameraLocked = g_objectiveState.cameraLocked;
+        packet.hudHidden = g_objectiveState.hudHidden;
         packet.runtimeState = static_cast<uint8_t>(g_runtimeState);
         packet.terminalReasonCode = g_terminalReasonCode;
         packet.terminalSourceEventType = g_terminalSourceEventType;
@@ -237,6 +249,12 @@ namespace
         g_runtimeState = RuntimeState::Teardown;
         g_isOnMission = false;
         g_hasCheckpoint = false;
+        g_objectiveState.playerControlState = 1;
+        g_objectiveState.movementLocked = 0;
+        g_objectiveState.aimingLocked = 0;
+        g_objectiveState.firingLocked = 0;
+        g_objectiveState.cameraLocked = 0;
+        g_objectiveState.hudHidden = 0;
     }
 
     void WriteTerminalMetadata(CMissionRuntimeManager::MissionFlowPayload& packet)
@@ -489,6 +507,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.passFailPending = packet->passFailPending;
         g_objectiveState.playerControlState = packet->playerControlState;
         g_objectiveState.movementLocked = packet->movementLocked;
+        g_objectiveState.aimingLocked = packet->aimingLocked;
         g_objectiveState.firingLocked = packet->firingLocked;
         g_objectiveState.cameraLocked = packet->cameraLocked;
         g_objectiveState.hudHidden = packet->hudHidden;
@@ -663,6 +682,12 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     snapshotState.timerDirection = g_objectiveState.timerDirection;
     snapshotState.checkpointIndex = g_objectiveState.checkpointIndex;
     snapshotState.checkpointCount = g_objectiveState.checkpointCount;
+    snapshotState.playerControlState = g_objectiveState.playerControlState;
+    snapshotState.movementLocked = g_objectiveState.movementLocked;
+    snapshotState.aimingLocked = g_objectiveState.aimingLocked;
+    snapshotState.firingLocked = g_objectiveState.firingLocked;
+    snapshotState.cameraLocked = g_objectiveState.cameraLocked;
+    snapshotState.hudHidden = g_objectiveState.hudHidden;
     snapshotState.objectiveVersion = g_objectiveVersion;
     snapshotState.checkpointVersion = g_checkpointVersion;
     snapshotState.runtimeSessionToken = g_runtimeSessionToken;
