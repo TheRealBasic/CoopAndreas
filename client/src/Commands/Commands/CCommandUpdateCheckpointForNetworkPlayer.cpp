@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CCommandUpdateCheckpointForNetworkPlayer.h"
+#include "CMissionSyncState.h"
 
 void CCommandUpdateCheckpointForNetworkPlayer::Process(CRunningScript* script)
 {
@@ -10,5 +11,7 @@ void CCommandUpdateCheckpointForNetworkPlayer::Process(CRunningScript* script)
 	packet.playerid = CNetworkPlayerManager::GetPlayer(CPools::GetPed(ScriptParams[6]))->m_iPlayerId;
 	packet.position = *(CVector*)&ScriptParams[0];
 	packet.radius = *(CVector*)&ScriptParams[3];
+	packet.missionEpoch = CMissionSyncState::GetMissionAuthorityEpoch();
+	packet.sequenceId = CMissionSyncState::NextMissionEventSequenceId();
 	CNetwork::SendPacket(CPacketsID::UPDATE_CHECKPOINT, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
 }

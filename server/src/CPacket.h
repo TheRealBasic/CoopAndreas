@@ -269,6 +269,7 @@ public:
 	{
 		uint8_t bOnMission : 1;
 		uint32_t missionEpoch;
+		uint32_t sequenceId;
 	};
 
 	struct MissionFlowSync
@@ -306,6 +307,7 @@ public:
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
 		uint32_t missionEpoch;
+		uint32_t sequenceId;
 		uint8_t terminalReasonCode;
 		uint8_t terminalSourceEventType;
 		uint16_t terminalSourceOpcode;
@@ -321,6 +323,7 @@ public:
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
 		uint32_t missionEpoch;
+		uint32_t sequenceId;
 	};
 
 	struct RemoveCheckpoint
@@ -329,6 +332,7 @@ public:
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
 		uint32_t missionEpoch;
+		uint32_t sequenceId;
 	};
 	#pragma pack()
 };

@@ -40,5 +40,6 @@ public:
     static void SendSnapshotTo(ENetPeer* peer);
     static uint32_t HandleHostMigration(int newHostPlayerId);
     static uint32_t GetMissionEpoch();
+    static uint32_t GetLastSequenceId();
     static void Teardown();
 };

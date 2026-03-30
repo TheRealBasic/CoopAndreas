@@ -398,7 +398,7 @@ void CPacketHandler::PlayerSetHost__Handle(void* data, int size)
 	if (packet->playerid == CNetworkPlayerManager::m_nMyId)
 	{
 		CLocalPlayer::m_bIsHost = true;
-		CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
+		CMissionSyncState::SetMissionAuthorityMetadata(packet->missionEpoch, packet->sequenceId);
 
 		CPatch::RevertTemporaryPatchesForHost();
 
@@ -415,7 +415,7 @@ void CPacketHandler::PlayerSetHost__Handle(void* data, int size)
 	CChat::AddMessage("[Player] " + std::string(player->GetName()) + " is now the host");
 
 	CLocalPlayer::m_bIsHost = false;
-	CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
+	CMissionSyncState::SetMissionAuthorityMetadata(packet->missionEpoch, packet->sequenceId);
 	CPacketHandler::PickupSnapshotResync__Trigger(PICKUP_RESYNC_REASON_HOST_MIGRATION);
 }
 
@@ -1844,7 +1844,8 @@ void CPacketHandler::OpCodeSync__Handle(void* data, int size)
 void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 {
 	CPackets::OnMissionFlagSync* packet = (CPackets::OnMissionFlagSync*)data;
-	CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
+	if (!CMissionSyncState::ShouldAcceptInboundMissionEvent(packet->missionEpoch, packet->sequenceId))
+		return;
 	if (CLocalPlayer::m_bIsHost)
 		return;
 
@@ -1863,7 +1864,6 @@ void CPacketHandler::MissionFlowSync__Handle(void* data, int size)
 		return;
 
 	CPackets::MissionFlowSync* packet = (CPackets::MissionFlowSync*)data;
-	CMissionSyncState::SetMissionAuthorityEpoch(packet->missionEpoch);
 	CMissionSyncState::HandleMissionFlowSync(*packet);
 }
 
@@ -1877,6 +1877,7 @@ void CPacketHandler::OnMissionFlagSync__Trigger()
 		CPackets::OnMissionFlagSync packet{};
 		packet.bOnMission = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
 		packet.missionEpoch = CMissionSyncState::GetMissionAuthorityEpoch();
+		packet.sequenceId = CMissionSyncState::NextMissionEventSequenceId();
 		CNetwork::SendPacket(CPacketsID::ON_MISSION_FLAG_SYNC, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
 	}
 }
@@ -1992,6 +1993,8 @@ void CPacketHandler::UpdateCheckpoint__Handle(void* data, int size)
 		return;
 	
 	CPackets::UpdateCheckpoint* packet = (CPackets::UpdateCheckpoint*)data;
+	if (!CMissionSyncState::ShouldAcceptInboundMissionEvent(packet->missionEpoch, packet->sequenceId))
+		return;
 	CNetworkCheckpoint::Update(packet->position, packet->radius);
 }
 
@@ -2000,6 +2003,10 @@ void CPacketHandler::UpdateCheckpoint__Handle(void* data, int size)
 void CPacketHandler::RemoveCheckpoint__Handle(void* data, int size)
 {
 	if (CLocalPlayer::m_bIsHost)
+		return;
+
+	CPackets::RemoveCheckpoint* packet = (CPackets::RemoveCheckpoint*)data;
+	if (!CMissionSyncState::ShouldAcceptInboundMissionEvent(packet->missionEpoch, packet->sequenceId))
 		return;
 
 	CNetworkCheckpoint::Remove();

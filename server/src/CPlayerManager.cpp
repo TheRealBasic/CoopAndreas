@@ -89,6 +89,7 @@ void CPlayerManager::AssignHostToFirstPlayer()
 	CPlayerPackets::PlayerSetHost setHostPacket{};
 	setHostPacket.playerid = player->m_iPlayerId;
 	setHostPacket.missionEpoch = CMissionRuntimeManager::HandleHostMigration(player->m_iPlayerId);
+	setHostPacket.sequenceId = CMissionRuntimeManager::GetLastSequenceId();
 	CNetwork::SendPacketToAll(CPacketsID::PLAYER_SET_HOST, &setHostPacket, sizeof(setHostPacket), ENET_PACKET_FLAG_RELIABLE, nullptr);
 	CPlayerPackets::BroadcastPickupBootstrapResync();
 	CPlayerPackets::BroadcastPropertyStateResync();

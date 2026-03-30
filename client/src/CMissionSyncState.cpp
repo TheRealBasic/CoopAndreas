@@ -32,6 +32,7 @@ namespace
     bool ms_bLastAppliedWidescreenValue = false;
     uint32_t ms_nMissionFlowSequence = 0;
     uint32_t ms_nLastReceivedMissionFlowSequence = 0;
+    uint32_t ms_nLastReceivedMissionEventSequence = 0;
     uint32_t ms_missionEpoch = 0;
     uint32_t ms_lastAppliedTerminalRuntimeSessionToken = 0;
     uint8_t ms_lastAppliedTerminalReasonCode = CPackets::MISSION_TERMINAL_REASON_NONE;
@@ -288,6 +289,7 @@ void CMissionSyncState::Init()
     ms_bLastAppliedWidescreenValue = false;
     ms_nMissionFlowSequence = 0;
     ms_nLastReceivedMissionFlowSequence = 0;
+    ms_nLastReceivedMissionEventSequence = 0;
     ms_missionEpoch = 0;
     ms_lastAppliedTerminalRuntimeSessionToken = 0;
     ms_lastAppliedTerminalReasonCode = CPackets::MISSION_TERMINAL_REASON_NONE;
@@ -427,7 +429,8 @@ void CMissionSyncState::EmitMissionFlowCutscenePhase(uint8_t phase, const char* 
     }
     packet.currArea = currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
-    packet.sequence = ++ms_nMissionFlowSequence;
+    packet.sequence = NextMissionEventSequenceId();
+    packet.sequenceId = packet.sequence;
     packet.missionEpoch = ms_missionEpoch;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
@@ -484,7 +487,8 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     packet.flag = message.flag;
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
-    packet.sequence = ++ms_nMissionFlowSequence;
+    packet.sequence = NextMissionEventSequenceId();
+    packet.sequenceId = packet.sequence;
     packet.missionEpoch = ms_missionEpoch;
     packet.sourceOpcode = opcode;
     packet.missionId = ms_sideContentAttemptState.missionId;
@@ -525,7 +529,8 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     packet.eventType = CPackets::MISSION_FLOW_EVENT_STATE_UPDATE;
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
-    packet.sequence = ++ms_nMissionFlowSequence;
+    packet.sequence = NextMissionEventSequenceId();
+    packet.sequenceId = packet.sequence;
     packet.missionEpoch = ms_missionEpoch;
     packet.sourceOpcode = opcode;
     packet.missionId = ms_sideContentAttemptState.missionId;
@@ -551,15 +556,9 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
 void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& packet)
 {
     const bool isHostReplay = CLocalPlayer::m_bIsHost && packet.replay != 0;
-    if (packet.missionEpoch < ms_missionEpoch)
+    if (!ShouldAcceptInboundMissionEvent(packet.missionEpoch, packet.sequenceId))
     {
         return;
-    }
-
-    if (packet.missionEpoch > ms_missionEpoch)
-    {
-        ms_missionEpoch = packet.missionEpoch;
-        ms_nLastReceivedMissionFlowSequence = 0;
     }
 
     if (CLocalPlayer::m_bIsHost && !isHostReplay)
@@ -655,6 +654,11 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
 
 void CMissionSyncState::SetMissionAuthorityEpoch(uint32_t missionEpoch)
 {
+    SetMissionAuthorityMetadata(missionEpoch, 0);
+}
+
+void CMissionSyncState::SetMissionAuthorityMetadata(uint32_t missionEpoch, uint32_t sequenceId)
+{
     if (missionEpoch == 0)
     {
         return;
@@ -664,13 +668,57 @@ void CMissionSyncState::SetMissionAuthorityEpoch(uint32_t missionEpoch)
     {
         ms_missionEpoch = missionEpoch;
         ms_nLastReceivedMissionFlowSequence = 0;
-        ms_nMissionFlowSequence = 0;
+        ms_nLastReceivedMissionEventSequence = sequenceId;
+        ms_nMissionFlowSequence = sequenceId;
+        return;
+    }
+
+    if (missionEpoch == ms_missionEpoch && sequenceId > ms_nMissionFlowSequence)
+    {
+        ms_nMissionFlowSequence = sequenceId;
+    }
+    if (missionEpoch == ms_missionEpoch && sequenceId > ms_nLastReceivedMissionEventSequence)
+    {
+        ms_nLastReceivedMissionEventSequence = sequenceId;
     }
 }
 
 uint32_t CMissionSyncState::GetMissionAuthorityEpoch()
 {
     return ms_missionEpoch;
+}
+
+uint32_t CMissionSyncState::NextMissionEventSequenceId()
+{
+    return ++ms_nMissionFlowSequence;
+}
+
+bool CMissionSyncState::ShouldAcceptInboundMissionEvent(uint32_t missionEpoch, uint32_t sequenceId)
+{
+    if (missionEpoch < ms_missionEpoch)
+    {
+        return false;
+    }
+
+    if (missionEpoch > ms_missionEpoch)
+    {
+        ms_missionEpoch = missionEpoch;
+        ms_nLastReceivedMissionFlowSequence = 0;
+        ms_nLastReceivedMissionEventSequence = 0;
+        ms_nMissionFlowSequence = 0;
+    }
+
+    if (sequenceId != 0 && sequenceId <= ms_nLastReceivedMissionEventSequence)
+    {
+        return false;
+    }
+
+    if (sequenceId > ms_nLastReceivedMissionEventSequence)
+    {
+        ms_nLastReceivedMissionEventSequence = sequenceId;
+    }
+
+    return true;
 }
 
 void CMissionSyncState::ApplyAdjudicatedTerminalState(const CPackets::MissionFlowSync& packet)
