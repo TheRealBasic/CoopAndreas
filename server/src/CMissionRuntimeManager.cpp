@@ -18,6 +18,7 @@ namespace
     bool g_hasCheckpoint = false;
     bool g_isOnMission = false;
     bool g_terminalEventSeen = false;
+    bool g_terminalOutcomeCommitted = false;
     uint8_t g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
     uint8_t g_terminalSourceEventType = 0;
     uint16_t g_terminalSourceOpcode = 0;
@@ -39,6 +40,7 @@ namespace
         bool hasCheckpoint = false;
         bool isOnMission = false;
         bool terminalEventSeen = false;
+        bool terminalOutcomeCommitted = false;
         uint8_t terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
         uint8_t terminalSourceEventType = 0;
         uint16_t terminalSourceOpcode = 0;
@@ -53,6 +55,13 @@ namespace
     bool IsTerminal(RuntimeState state)
     {
         return state == RuntimeState::Teardown;
+    }
+
+    bool HasCommittedTerminalOutcome()
+    {
+        return g_terminalOutcomeCommitted
+            && (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS
+                || g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL);
     }
 
     bool Transition(RuntimeState next)
@@ -117,6 +126,7 @@ namespace
             Transition(RuntimeState::Starting);
             Transition(RuntimeState::Active);
             g_terminalEventSeen = false;
+            g_terminalOutcomeCommitted = false;
             g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
             g_terminalSourceEventType = 0;
             g_terminalSourceOpcode = 0;
@@ -147,34 +157,50 @@ namespace
         }
     }
 
-    void ApplyTerminalPending(const CMissionRuntimeManager::MissionFlowPayload& packet)
+    bool CommitTerminalOutcome(CMissionRuntimeManager::MissionFlowPayload& packet, uint8_t terminalReasonCode)
+    {
+        if (HasCommittedTerminalOutcome())
+        {
+            return false;
+        }
+
+        g_terminalEventSeen = true;
+        g_terminalOutcomeCommitted = true;
+        g_terminalReasonCode = terminalReasonCode;
+        g_terminalSourceEventType = packet.eventType;
+        g_terminalSourceOpcode = packet.sourceOpcode;
+        g_terminalSourceSequence = packet.sequence;
+        g_runtimeState = RuntimeState::Teardown;
+        g_isOnMission = false;
+        g_hasCheckpoint = false;
+
+        packet.onMission = 0;
+        packet.passFailPending = 0;
+        packet.runtimeState = static_cast<uint8_t>(g_runtimeState);
+        packet.terminalReasonCode = g_terminalReasonCode;
+        packet.terminalSourceEventType = g_terminalSourceEventType;
+        packet.terminalSourceOpcode = g_terminalSourceOpcode;
+        packet.terminalSourceSequence = g_terminalSourceSequence;
+        return true;
+    }
+
+    void ApplyTerminalPending(CMissionRuntimeManager::MissionFlowPayload& packet)
     {
         if (packet.passFailPending == 1)
         {
-            if (Transition(RuntimeState::PassPending))
-            {
-                g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS;
-                g_terminalSourceEventType = packet.eventType;
-                g_terminalSourceOpcode = packet.sourceOpcode;
-                g_terminalSourceSequence = packet.sequence;
-            }
+            CommitTerminalOutcome(packet, CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS);
         }
         else if (packet.passFailPending == 2)
         {
-            if (Transition(RuntimeState::FailPending))
-            {
-                g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL;
-                g_terminalSourceEventType = packet.eventType;
-                g_terminalSourceOpcode = packet.sourceOpcode;
-                g_terminalSourceSequence = packet.sequence;
-            }
+            CommitTerminalOutcome(packet, CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL);
         }
     }
 
     void ApplyCompletion()
     {
-        Transition(RuntimeState::Teardown);
+        g_runtimeState = RuntimeState::Teardown;
         g_isOnMission = false;
+        g_hasCheckpoint = false;
     }
 
     void WriteTerminalMetadata(CMissionRuntimeManager::MissionFlowPayload& packet)
@@ -195,6 +221,7 @@ namespace
         snapshot.hasCheckpoint = g_hasCheckpoint;
         snapshot.isOnMission = g_isOnMission;
         snapshot.terminalEventSeen = g_terminalEventSeen;
+        snapshot.terminalOutcomeCommitted = g_terminalOutcomeCommitted;
         snapshot.terminalReasonCode = g_terminalReasonCode;
         snapshot.terminalSourceEventType = g_terminalSourceEventType;
         snapshot.terminalSourceOpcode = g_terminalSourceOpcode;
@@ -216,6 +243,7 @@ namespace
         g_hasCheckpoint = snapshot.hasCheckpoint;
         g_isOnMission = snapshot.isOnMission;
         g_terminalEventSeen = snapshot.terminalEventSeen;
+        g_terminalOutcomeCommitted = snapshot.terminalOutcomeCommitted;
         g_terminalReasonCode = snapshot.terminalReasonCode;
         g_terminalSourceEventType = snapshot.terminalSourceEventType;
         g_terminalSourceOpcode = snapshot.terminalSourceOpcode;
@@ -236,6 +264,10 @@ namespace
             return true;
         case CMissionRuntimeManager::EventKind::CheckpointUpdate:
         case CMissionRuntimeManager::EventKind::CheckpointRemove:
+            if (HasCommittedTerminalOutcome())
+            {
+                return false;
+            }
             return currentState == RuntimeState::Starting
                 || currentState == RuntimeState::Active
                 || currentState == RuntimeState::PassPending
@@ -347,47 +379,50 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         return false;
     }
 
-    if (packet->onMission)
+    if (packet->onMission && !HasCommittedTerminalOutcome())
     {
         ApplyMissionLaunch();
     }
 
-    g_objectiveState.missionId = packet->missionId;
-    g_objectiveState.timerMs = packet->timerMs;
-    g_objectiveState.objectivePhaseIndex = packet->objectivePhaseIndex;
-    g_objectiveState.checkpointIndex = packet->checkpointIndex;
-    g_objectiveState.checkpointCount = packet->checkpointCount;
-    g_objectiveState.timerVisible = packet->timerVisible;
-    g_objectiveState.timerFrozen = packet->timerFrozen;
-    g_objectiveState.timerDirection = packet->timerDirection;
-    g_objectiveState.passFailPending = packet->passFailPending;
-    g_objectiveState.playerControlState = packet->playerControlState;
-    g_objectiveState.movementLocked = packet->movementLocked;
-    g_objectiveState.firingLocked = packet->firingLocked;
-    g_objectiveState.cameraLocked = packet->cameraLocked;
-    g_objectiveState.hudHidden = packet->hudHidden;
-    g_objectiveState.cutscenePhase = packet->cutscenePhase;
-    g_objectiveState.cutsceneSessionToken = packet->cutsceneSessionToken;
-    std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
-
-    if (g_hasFlow)
+    if (!HasCommittedTerminalOutcome())
     {
-        ApplyObjectiveUpdate(*packet);
-        ApplyCheckpointProgression(*packet);
-    }
+        g_objectiveState.missionId = packet->missionId;
+        g_objectiveState.timerMs = packet->timerMs;
+        g_objectiveState.objectivePhaseIndex = packet->objectivePhaseIndex;
+        g_objectiveState.checkpointIndex = packet->checkpointIndex;
+        g_objectiveState.checkpointCount = packet->checkpointCount;
+        g_objectiveState.timerVisible = packet->timerVisible;
+        g_objectiveState.timerFrozen = packet->timerFrozen;
+        g_objectiveState.timerDirection = packet->timerDirection;
+        g_objectiveState.passFailPending = packet->passFailPending;
+        g_objectiveState.playerControlState = packet->playerControlState;
+        g_objectiveState.movementLocked = packet->movementLocked;
+        g_objectiveState.firingLocked = packet->firingLocked;
+        g_objectiveState.cameraLocked = packet->cameraLocked;
+        g_objectiveState.hudHidden = packet->hudHidden;
+        g_objectiveState.cutscenePhase = packet->cutscenePhase;
+        g_objectiveState.cutsceneSessionToken = packet->cutsceneSessionToken;
+        std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
-    ApplyTerminalPending(*packet);
-
-    if (!packet->onMission && g_isOnMission)
-    {
-        if (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE)
+        if (g_hasFlow)
         {
-            g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_ON_MISSION_CLEARED;
-            g_terminalSourceEventType = packet->eventType;
-            g_terminalSourceOpcode = packet->sourceOpcode;
-            g_terminalSourceSequence = packet->sequence;
+            ApplyObjectiveUpdate(*packet);
+            ApplyCheckpointProgression(*packet);
         }
-        ApplyCompletion();
+
+        ApplyTerminalPending(*packet);
+
+        if (!packet->onMission && g_isOnMission)
+        {
+            if (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE)
+            {
+                g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_ON_MISSION_CLEARED;
+                g_terminalSourceEventType = packet->eventType;
+                g_terminalSourceOpcode = packet->sourceOpcode;
+                g_terminalSourceSequence = packet->sequence;
+            }
+            ApplyCompletion();
+        }
     }
     g_isOnMission = packet->onMission != 0;
 
@@ -595,6 +630,7 @@ void CMissionRuntimeManager::Teardown()
     g_hasCheckpoint = false;
     g_isOnMission = false;
     g_terminalEventSeen = false;
+    g_terminalOutcomeCommitted = false;
     g_lastSequence = 0;
     g_objectiveVersion = 0;
     g_checkpointVersion = 0;
