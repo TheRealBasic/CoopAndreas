@@ -1759,6 +1759,7 @@ void CPacketHandler::SkipCutscene__Handle(void* data, int size)
 {
 	CPackets::SkipCutscene* packet = (CPackets::SkipCutscene*)data;
 	CStatsSync::TriggerWantedLevelReset();
+	CMissionSyncState::HandleAuthoritativeCutsceneSkip(packet->sessionToken);
 
 	CHud::m_BigMessage[1][0] = 0;
 	CCutsceneMgr::ms_wasCutsceneSkipped = 1;

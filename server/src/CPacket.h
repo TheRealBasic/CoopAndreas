@@ -284,6 +284,12 @@ public:
 		uint8_t timerDirection;
 		uint8_t passFailPending;
 		uint8_t playerControlState;
+		uint8_t movementLocked;
+		uint8_t firingLocked;
+		uint8_t cameraLocked;
+		uint8_t hudHidden;
+		uint8_t cutscenePhase;
+		uint32_t cutsceneSessionToken;
 		char objective[8];
 		uint8_t runtimeState;
 		uint16_t objectiveVersion;

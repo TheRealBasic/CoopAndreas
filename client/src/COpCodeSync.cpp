@@ -100,9 +100,12 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x06D5}, // [var handle: Checkpoint] = create_checkpoint {type} [CheckpointType] ...
     {0x06D6}, // delete_checkpoint [Checkpoint]
     {0x07F3}, // set_checkpoint_coords [Checkpoint] {x} [float] {y} [float] {z} [float]
+    {0x0826}, // display_hud {state} [bool]
+    {0x0881, true, {eSyncedParamType::PLAYER}}, // set_player_fire_button {playerId} [Player] {state} [bool]
     {0x08FB}, // set_checkpoint_type [Checkpoint] {type} [CheckpointType]
     {0x0956}, // find_number_of_players_in_group [var int]
     {0x0996}, // set_checkpoint_heading [Checkpoint] {heading} [float]
+    {0x0E60}, // set_camera_control {state} [bool]
     {0x0417}, // start_mission {missionNumber} [int]
     {COMMAND_SET_TAG_STATUS_IN_AREA},
     {0x06F0, true, {eSyncedParamType::PED}}, // remove_char_from_group [Char]
@@ -628,6 +631,9 @@ void BuildAndSendOpcode()
     const bool isMissionFlowStateOpcode =
         lastOpCodeProcessed == 0x0417 || // Mission.LoadAndLaunchInternal
         lastOpCodeProcessed == 0x01B4 || // set_player_control
+        lastOpCodeProcessed == 0x0881 || // set_player_fire_button
+        lastOpCodeProcessed == 0x0E60 || // set_camera_control
+        lastOpCodeProcessed == 0x0826 || // display_hud
         lastOpCodeProcessed == 0x00BA || // set_objective via print_big
         lastOpCodeProcessed == 0x00BC || // set_objective via print_now
         lastOpCodeProcessed == 0x03E5 || // set_objective via print_help

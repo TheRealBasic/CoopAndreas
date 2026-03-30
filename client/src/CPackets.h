@@ -585,11 +585,13 @@ public:
 	enum eMissionFlowEventType : uint8_t
 	{
 		MISSION_FLOW_EVENT_NONE = 0,
-		MISSION_FLOW_EVENT_CUTSCENE_TRIGGER = 1,
+		MISSION_FLOW_EVENT_CUTSCENE_INTRO = 1,
 		MISSION_FLOW_EVENT_OBJECTIVE = 2,
 		MISSION_FLOW_EVENT_FAIL = 3,
 		MISSION_FLOW_EVENT_PASS = 4,
-		MISSION_FLOW_EVENT_STATE_UPDATE = 5
+		MISSION_FLOW_EVENT_STATE_UPDATE = 5,
+		MISSION_FLOW_EVENT_CUTSCENE_SKIP = 6,
+		MISSION_FLOW_EVENT_CUTSCENE_END = 7
 	};
 
 	struct MissionFlowSync
@@ -619,7 +621,17 @@ public:
 		uint8_t timerDirection = 0;       // TimerDirection mirrored from display timer opcode
 		uint8_t passFailPending = 0;      // 0 = none, 1 = pass, 2 = fail (terminal outcome latch)
 		uint8_t playerControlState = 0;   // set_player_control mirror for scripted transitions
+		uint8_t movementLocked = 0;       // 1 = movement/gameplay locomotion lock is active
+		uint8_t firingLocked = 0;         // 1 = scripted firing lock is active
+		uint8_t cameraLocked = 0;         // 1 = scripted camera control lock is active
+		uint8_t hudHidden = 0;            // 1 = scripted HUD hide lock is active
+		uint8_t cutscenePhase = 0;        // 0 = none, 1 = intro, 2 = skip, 3 = end
+		uint32_t cutsceneSessionToken = 0;
 		char objective[8]{};
+		uint8_t runtimeState = 0;
+		uint16_t objectiveVersion = 0;
+		uint16_t checkpointVersion = 0;
+		uint32_t runtimeSessionToken = 0;
 	};
 
 	struct UpdateEntityBlip
