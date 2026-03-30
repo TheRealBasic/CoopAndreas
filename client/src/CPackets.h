@@ -609,13 +609,16 @@ public:
 		char gxt[8]{};
 		char cutsceneName[8]{};
 		uint16_t sourceOpcode = 0;
-		uint16_t missionId = 0;        // Launch/start identity (Mission.LoadAndLaunchInternal / race start script launch)
-		int32_t timerMs = 0;           // Canonical timer value in milliseconds
-		uint16_t checkpointIndex = 0;  // Monotonic progression index (checkpoint + objective updates)
-		uint8_t timerVisible = 0;      // 1 when on-screen timer should be visible
-		uint8_t timerFrozen = 0;       // 1 when on-screen timer is frozen
-		uint8_t passFailPending = 0;   // 0 = none, 1 = pass, 2 = fail (terminal outcome latch)
-		uint8_t playerControlState = 0;// set_player_control mirror for scripted transitions
+		uint16_t missionId = 0;           // Launch/start identity (Mission.LoadAndLaunchInternal / race start script launch)
+		int32_t timerMs = 0;              // Canonical timer value in milliseconds
+		uint16_t objectivePhaseIndex = 0; // Monotonic objective phase index
+		uint16_t checkpointIndex = 0;     // Monotonic progression index (checkpoint + objective updates)
+		uint16_t checkpointCount = 0;     // Number of checkpoint handles created for this attempt
+		uint8_t timerVisible = 0;         // 1 when on-screen timer should be visible
+		uint8_t timerFrozen = 0;          // 1 when on-screen timer is frozen
+		uint8_t timerDirection = 0;       // TimerDirection mirrored from display timer opcode
+		uint8_t passFailPending = 0;      // 0 = none, 1 = pass, 2 = fail (terminal outcome latch)
+		uint8_t playerControlState = 0;   // set_player_control mirror for scripted transitions
 		char objective[8]{};
 	};
 
