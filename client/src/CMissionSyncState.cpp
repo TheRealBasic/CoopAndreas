@@ -32,6 +32,7 @@ namespace
     bool ms_bLastAppliedWidescreenValue = false;
     uint32_t ms_nMissionFlowSequence = 0;
     uint32_t ms_nLastReceivedMissionFlowSequence = 0;
+    uint32_t ms_missionEpoch = 0;
     uint32_t ms_lastAppliedTerminalRuntimeSessionToken = 0;
     uint8_t ms_lastAppliedTerminalReasonCode = CPackets::MISSION_TERMINAL_REASON_NONE;
     uint16_t ms_runtimeMissionInstanceId = 0;
@@ -287,6 +288,7 @@ void CMissionSyncState::Init()
     ms_bLastAppliedWidescreenValue = false;
     ms_nMissionFlowSequence = 0;
     ms_nLastReceivedMissionFlowSequence = 0;
+    ms_missionEpoch = 0;
     ms_lastAppliedTerminalRuntimeSessionToken = 0;
     ms_lastAppliedTerminalReasonCode = CPackets::MISSION_TERMINAL_REASON_NONE;
     ms_runtimeMissionInstanceId = 0;
@@ -426,6 +428,7 @@ void CMissionSyncState::EmitMissionFlowCutscenePhase(uint8_t phase, const char* 
     packet.currArea = currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = ++ms_nMissionFlowSequence;
+    packet.missionEpoch = ms_missionEpoch;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
     packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
@@ -482,6 +485,7 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = ++ms_nMissionFlowSequence;
+    packet.missionEpoch = ms_missionEpoch;
     packet.sourceOpcode = opcode;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
@@ -522,6 +526,7 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     packet.currArea = (uint8_t)CGame::currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = ++ms_nMissionFlowSequence;
+    packet.missionEpoch = ms_missionEpoch;
     packet.sourceOpcode = opcode;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
@@ -545,7 +550,19 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
 
 void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& packet)
 {
-    if (CLocalPlayer::m_bIsHost)
+    const bool isHostReplay = CLocalPlayer::m_bIsHost && packet.replay != 0;
+    if (packet.missionEpoch < ms_missionEpoch)
+    {
+        return;
+    }
+
+    if (packet.missionEpoch > ms_missionEpoch)
+    {
+        ms_missionEpoch = packet.missionEpoch;
+        ms_nLastReceivedMissionFlowSequence = 0;
+    }
+
+    if (CLocalPlayer::m_bIsHost && !isHostReplay)
     {
         return;
     }
@@ -556,7 +573,10 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     }
 
     ms_nLastReceivedMissionFlowSequence = packet.sequence;
-    HandleMissionFlagSync(packet.onMission != 0);
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        HandleMissionFlagSync(packet.onMission != 0);
+    }
 
     const bool newAttempt = packet.sourceOpcode == 0x0417
         || (packet.missionId != 0 && packet.missionId != ms_sideContentAttemptState.missionId);
@@ -608,9 +628,10 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
 
     ApplyReplicatedControlLocks(ms_sideContentAttemptState);
 
-    if (packet.eventType == CPackets::MISSION_FLOW_EVENT_OBJECTIVE
-        || packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL
-        || packet.eventType == CPackets::MISSION_FLOW_EVENT_PASS)
+    if (!CLocalPlayer::m_bIsHost
+        && (packet.eventType == CPackets::MISSION_FLOW_EVENT_OBJECTIVE
+            || packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL
+            || packet.eventType == CPackets::MISSION_FLOW_EVENT_PASS))
     {
         if ((packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL || packet.eventType == CPackets::MISSION_FLOW_EVENT_PASS)
             && packet.passFailPending == 0)
@@ -630,6 +651,26 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         default: Command<Commands::PRINT>(gxt, packet.time, packet.flag); break;
         }
     }
+}
+
+void CMissionSyncState::SetMissionAuthorityEpoch(uint32_t missionEpoch)
+{
+    if (missionEpoch == 0)
+    {
+        return;
+    }
+
+    if (missionEpoch > ms_missionEpoch)
+    {
+        ms_missionEpoch = missionEpoch;
+        ms_nLastReceivedMissionFlowSequence = 0;
+        ms_nMissionFlowSequence = 0;
+    }
+}
+
+uint32_t CMissionSyncState::GetMissionAuthorityEpoch()
+{
+    return ms_missionEpoch;
 }
 
 void CMissionSyncState::ApplyAdjudicatedTerminalState(const CPackets::MissionFlowSync& packet)

@@ -232,6 +232,7 @@ public:
 	struct PlayerSetHost
 	{
 		int playerid;
+		uint32_t missionEpoch;
 	};
 
 	struct AddExplosion
@@ -580,6 +581,7 @@ public:
 	struct OnMissionFlagSync 
 	{
 		uint8_t bOnMission : 1;
+		uint32_t missionEpoch = 0;
 	};
 
 	enum eMissionFlowEventType : uint8_t
@@ -640,6 +642,7 @@ public:
 		uint16_t objectiveVersion = 0;
 		uint16_t checkpointVersion = 0;
 		uint32_t runtimeSessionToken = 0;
+		uint32_t missionEpoch = 0;
 		uint8_t terminalReasonCode = MISSION_TERMINAL_REASON_NONE;
 		uint8_t terminalSourceEventType = MISSION_FLOW_EVENT_NONE;
 		uint16_t terminalSourceOpcode = 0;

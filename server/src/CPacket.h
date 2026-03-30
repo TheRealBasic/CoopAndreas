@@ -267,6 +267,7 @@ public:
 	struct OnMissionFlagSync
 	{
 		uint8_t bOnMission : 1;
+		uint32_t missionEpoch;
 	};
 
 	struct MissionFlowSync
@@ -303,6 +304,7 @@ public:
 		uint16_t objectiveVersion;
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
+		uint32_t missionEpoch;
 		uint8_t terminalReasonCode;
 		uint8_t terminalSourceEventType;
 		uint16_t terminalSourceOpcode;
@@ -317,6 +319,7 @@ public:
 		uint16_t checkpointIndex;
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
+		uint32_t missionEpoch;
 	};
 
 	struct RemoveCheckpoint
@@ -324,6 +327,7 @@ public:
 		int playerid;
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
+		uint32_t missionEpoch;
 	};
 	#pragma pack()
 };
