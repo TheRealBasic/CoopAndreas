@@ -4,6 +4,7 @@
 #include "CCutsceneMgr.h"
 #include "CNetwork.h"
 #include "ObjectiveSyncState.h"
+#include <vector>
 
 namespace
 {
@@ -40,6 +41,12 @@ namespace
     uint32_t ms_submissionStateVersion = 0;
     uint32_t ms_submissionSnapshotVersion = 0;
     bool ms_submissionSnapshotInProgress = false;
+    bool ms_runtimeSnapshotInProgress = false;
+    bool ms_runtimeSnapshotHydrated = false;
+    uint32_t ms_runtimeSnapshotVersion = 0;
+    uint8_t ms_runtimeSnapshotExpectedActorCount = 0;
+    std::vector<CPackets::MissionRuntimeSnapshotActor> ms_runtimeSnapshotActors{};
+    CPackets::MissionRuntimeSnapshotState ms_runtimeSnapshotState{};
     // Shared side-content replication state (schools/races/courier/etc).
     //
     // Payload contract:
@@ -297,8 +304,19 @@ void CMissionSyncState::Init()
     ms_submissionStateVersion = 0;
     ms_submissionSnapshotVersion = 0;
     ms_submissionSnapshotInProgress = false;
+    ms_runtimeSnapshotInProgress = false;
+    ms_runtimeSnapshotHydrated = false;
+    ms_runtimeSnapshotVersion = 0;
+    ms_runtimeSnapshotExpectedActorCount = 0;
+    ms_runtimeSnapshotActors.clear();
+    ms_runtimeSnapshotState = {};
     ms_submissionStates.clear();
     ms_sideContentAttemptState = {};
+}
+
+bool CMissionSyncState::CanAcceptLiveMissionEvents()
+{
+    return !ms_runtimeSnapshotInProgress;
 }
 
 bool CMissionSyncState::IsProcessingTaskSequence()
@@ -650,6 +668,83 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         default: Command<Commands::PRINT>(gxt, packet.time, packet.flag); break;
         }
     }
+}
+
+void CMissionSyncState::HandleMissionRuntimeSnapshotBegin(const CPackets::MissionRuntimeSnapshotBegin& packet)
+{
+    ms_runtimeSnapshotInProgress = true;
+    ms_runtimeSnapshotHydrated = false;
+    ms_runtimeSnapshotVersion = packet.snapshotVersion;
+    ms_runtimeSnapshotExpectedActorCount = packet.actorCount;
+    ms_runtimeSnapshotActors.clear();
+    ms_runtimeSnapshotState = {};
+}
+
+void CMissionSyncState::HandleMissionRuntimeSnapshotState(const CPackets::MissionRuntimeSnapshotState& packet)
+{
+    if (!ms_runtimeSnapshotInProgress)
+    {
+        return;
+    }
+
+    ms_runtimeSnapshotState = packet;
+}
+
+void CMissionSyncState::HandleMissionRuntimeSnapshotActor(const CPackets::MissionRuntimeSnapshotActor& packet)
+{
+    if (!ms_runtimeSnapshotInProgress)
+    {
+        return;
+    }
+
+    if (ms_runtimeSnapshotActors.size() >= UINT8_MAX)
+    {
+        return;
+    }
+
+    ms_runtimeSnapshotActors.push_back(packet);
+}
+
+void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionRuntimeSnapshotEnd& packet)
+{
+    if (!ms_runtimeSnapshotInProgress)
+    {
+        return;
+    }
+
+    if (packet.snapshotVersion != 0 && ms_runtimeSnapshotVersion != 0 && packet.snapshotVersion != ms_runtimeSnapshotVersion)
+    {
+        ms_runtimeSnapshotInProgress = false;
+        return;
+    }
+
+    ms_sideContentAttemptState.missionId = ms_runtimeSnapshotState.missionId;
+    ms_sideContentAttemptState.objectivePhaseIndex = ms_runtimeSnapshotState.objectivePhaseIndex;
+    ms_sideContentAttemptState.timerMs = std::max(ms_runtimeSnapshotState.timerMs, 0);
+    ms_sideContentAttemptState.timerVisible = ms_runtimeSnapshotState.timerVisible;
+    ms_sideContentAttemptState.timerFrozen = ms_runtimeSnapshotState.timerFrozen;
+    ms_sideContentAttemptState.timerDirection = ms_runtimeSnapshotState.timerDirection;
+    ms_sideContentAttemptState.checkpointIndex = ms_runtimeSnapshotState.checkpointIndex;
+    ms_sideContentAttemptState.checkpointCount = ms_runtimeSnapshotState.checkpointCount;
+    ms_sideContentAttemptState.passFailPending = ms_runtimeSnapshotState.passFailPending;
+    ms_sideContentAttemptState.cutscenePhase = ms_runtimeSnapshotState.cutscenePhase;
+    ms_sideContentAttemptState.cutsceneSessionToken = ms_runtimeSnapshotState.cutsceneSessionToken;
+    std::memcpy(ms_sideContentAttemptState.objective, ms_runtimeSnapshotState.objective, sizeof(ms_sideContentAttemptState.objective));
+
+    SetMissionAuthorityMetadata(ms_runtimeSnapshotState.missionEpoch, ms_runtimeSnapshotState.sequenceId);
+    HandleMissionFlagSync(ms_runtimeSnapshotState.onMission != 0);
+
+    CPackets::MissionFlowSync terminalView{};
+    terminalView.terminalReasonCode = ms_runtimeSnapshotState.terminalReasonCode;
+    terminalView.terminalSourceEventType = ms_runtimeSnapshotState.terminalSourceEventType;
+    terminalView.terminalSourceOpcode = ms_runtimeSnapshotState.terminalSourceOpcode;
+    terminalView.terminalSourceSequence = ms_runtimeSnapshotState.terminalSourceSequence;
+    terminalView.runtimeSessionToken = ms_runtimeSnapshotState.runtimeSessionToken;
+    terminalView.passFailPending = ms_runtimeSnapshotState.passFailPending;
+    ApplyAdjudicatedTerminalState(terminalView);
+
+    ms_runtimeSnapshotHydrated = true;
+    ms_runtimeSnapshotInProgress = false;
 }
 
 void CMissionSyncState::SetMissionAuthorityEpoch(uint32_t missionEpoch)

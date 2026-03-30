@@ -334,6 +334,52 @@ public:
 		uint32_t missionEpoch;
 		uint32_t sequenceId;
 	};
+
+	struct MissionRuntimeSnapshotBegin
+	{
+		uint32_t snapshotVersion;
+		uint8_t actorCount;
+	};
+
+	struct MissionRuntimeSnapshotState
+	{
+		uint8_t runtimeState;
+		uint8_t onMission;
+		uint16_t missionId;
+		uint16_t objectivePhaseIndex;
+		char objective[8];
+		int32_t timerMs;
+		uint8_t timerVisible;
+		uint8_t timerFrozen;
+		uint8_t timerDirection;
+		uint16_t checkpointIndex;
+		uint16_t checkpointCount;
+		uint16_t objectiveVersion;
+		uint16_t checkpointVersion;
+		uint32_t runtimeSessionToken;
+		uint32_t missionEpoch;
+		uint32_t sequenceId;
+		uint8_t terminalReasonCode;
+		uint8_t terminalSourceEventType;
+		uint16_t terminalSourceOpcode;
+		uint32_t terminalSourceSequence;
+		uint8_t passFailPending;
+		uint8_t cutscenePhase;
+		uint32_t cutsceneSessionToken;
+	};
+
+	struct MissionRuntimeSnapshotActor
+	{
+		uint8_t actorType;
+		int32_t actorNetworkId;
+		uint8_t roleFlags;
+		uint8_t isAlive;
+	};
+
+	struct MissionRuntimeSnapshotEnd
+	{
+		uint32_t snapshotVersion;
+	};
 	#pragma pack()
 };
 

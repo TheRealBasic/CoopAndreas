@@ -216,6 +216,10 @@ void CNetwork::InitListeners()
 	CNetwork::AddListener(CPacketsID::PLAY_MISSION_AUDIO, CPacketHandler::PlayMissionAudio__Handle);
 	CNetwork::AddListener(CPacketsID::UPDATE_CHECKPOINT, CPacketHandler::UpdateCheckpoint__Handle);
 	CNetwork::AddListener(CPacketsID::REMOVE_CHECKPOINT, CPacketHandler::RemoveCheckpoint__Handle);
+	CNetwork::AddListener(CPacketsID::MISSION_RUNTIME_SNAPSHOT_BEGIN, CPacketHandler::MissionRuntimeSnapshotBegin__Handle);
+	CNetwork::AddListener(CPacketsID::MISSION_RUNTIME_SNAPSHOT_STATE, CPacketHandler::MissionRuntimeSnapshotState__Handle);
+	CNetwork::AddListener(CPacketsID::MISSION_RUNTIME_SNAPSHOT_ACTOR, CPacketHandler::MissionRuntimeSnapshotActor__Handle);
+	CNetwork::AddListener(CPacketsID::MISSION_RUNTIME_SNAPSHOT_END, CPacketHandler::MissionRuntimeSnapshotEnd__Handle);
 	CNetwork::AddListener(CPacketsID::ENEX_SYNC, CPacketHandler::EnExSync__Handle);
 	CNetwork::AddListener(CPacketsID::CREATE_STATIC_BLIP, CPacketHandler::CreateMissionMarker__Handle);
 	CNetwork::AddListener(CPacketsID::SET_VEHICLE_CREATED_BY, CPacketHandler::SetVehicleCreatedBy__Handle);
