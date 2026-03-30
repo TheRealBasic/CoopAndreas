@@ -13,6 +13,8 @@ void CNetworkAnimQueue::AddOpCode(const uint8_t* buffer, int bufferSize)
 
 void CNetworkAnimQueue::Process()
 {
+	COpCodeSync::ProcessDeferredPackets();
+
 	bool processedAnim = false;
 	for (auto v : ms_vQueue)
 	{

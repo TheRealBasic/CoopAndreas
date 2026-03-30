@@ -45,6 +45,11 @@ SSyncedOpCode m_syncedTasks[] =
 	{COMMAND_TASK_PLAY_ANIM_WITH_FLAGS, true, eSyncedParamType::PED},
 	// Vehicle exit tasks
 	{COMMAND_TASK_LEAVE_ANY_CAR, true, eSyncedParamType::PED},
+	// Mission-critical combat/vehicle objective tasks
+	{0x05CB, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}},
+	{0x05E2, true, {eSyncedParamType::PED, eSyncedParamType::PED}},
+	{0x0672, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}},
+	{0x0713, true, {eSyncedParamType::PED, eSyncedParamType::PED, eSyncedParamType::VEHICLE}},
 };
 
 std::vector<uint8_t> m_serializedSequences[CTaskSequences::NUM_SEQUENCES][CTaskSequences::NUM_TASKS];
