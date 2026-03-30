@@ -31,6 +31,7 @@ namespace
     bool ms_bLastAppliedWidescreenValue = false;
     uint32_t ms_nMissionFlowSequence = 0;
     uint32_t ms_nLastReceivedMissionFlowSequence = 0;
+    uint16_t ms_runtimeMissionInstanceId = 0;
     uint32_t ms_submissionStateVersion = 0;
     uint32_t ms_submissionSnapshotVersion = 0;
     bool ms_submissionSnapshotInProgress = false;
@@ -229,6 +230,7 @@ void CMissionSyncState::Init()
     ms_bLastAppliedWidescreenValue = false;
     ms_nMissionFlowSequence = 0;
     ms_nLastReceivedMissionFlowSequence = 0;
+    ms_runtimeMissionInstanceId = 0;
     ms_submissionStateVersion = 0;
     ms_submissionSnapshotVersion = 0;
     ms_submissionSnapshotInProgress = false;
@@ -317,11 +319,29 @@ void CMissionSyncState::HandleMissionFlagSync(bool onMission)
     }
 
     ms_nWidescreenEventId++;
+    if (onMission)
+    {
+        ms_runtimeMissionInstanceId++;
+        if (ms_runtimeMissionInstanceId == 0)
+        {
+            ms_runtimeMissionInstanceId = 1;
+        }
+    }
 
     if (!onMission)
     {
         ResetScriptWideScreenOverride();
     }
+}
+
+uint16_t CMissionSyncState::GetMissionInstanceId()
+{
+    if (ms_sideContentAttemptState.missionId != 0)
+    {
+        return ms_sideContentAttemptState.missionId;
+    }
+
+    return ms_runtimeMissionInstanceId;
 }
 
 void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName, uint8_t currArea)
