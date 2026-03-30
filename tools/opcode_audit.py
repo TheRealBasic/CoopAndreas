@@ -5,6 +5,7 @@ import re
 import sys
 from pathlib import Path
 from collections import Counter, defaultdict
+from datetime import date
 
 ROOT = Path(__file__).resolve().parent.parent
 ROADMAP = ROOT / 'docs/ROADMAP.md'
@@ -17,6 +18,23 @@ NUM_OPCODE_RE = re.compile(r'\b([0-9A-Fa-f]{4}):')
 DOT_CALL_RE = re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|$)')
 SYNCED_HEX_RE = re.compile(r'\{\s*0x([0-9A-Fa-f]{4})')
 SYNCED_MACRO_RE = re.compile(r'\{\s*COMMAND_([A-Z0-9_]+)')
+
+
+WAVE_FAMILIES = [
+    ('W1', 'SWEET', 'Mission Sync Pod (Sweet stream)'),
+    ('W2', 'RYDER', 'Mission Sync Pod (Ryder stream)'),
+    ('W3', 'SMOKE', 'Mission Sync Pod (Smoke stream)'),
+]
+
+
+def wave_missing_rows(triaged):
+    rows = []
+    for wave_id, family, owner in WAVE_FAMILIES:
+        family_suffix = f"{family}.txt"
+        family_missing = [item for item in triaged if any(f == family_suffix for f in item['files'])]
+        new_gaps = ', '.join(f"`0x{item['opcode']:04X}`" for item in family_missing) or 'none'
+        rows.append((wave_id, family, owner, len(family_missing), new_gaps))
+    return rows
 
 
 def load_targets():
@@ -180,6 +198,21 @@ def main():
         lines.append(
             f"| `0x{op:04X}` | `{item['display']}` | {item['category']}; used {item['count']} times across {len(item['files'])} target scripts. |"
         )
+
+    lines += [
+        '',
+        '## Wave audit ledger (update per implementation wave)',
+        '',
+        f'- Last generated: {date.today().isoformat()}',
+        '- Command: `python3 tools/opcode_audit.py --output docs/qa/storyline-opcode-backlog.md`',
+        '- Workflow: rerun at wave start and wave end; record newly discovered coverage gaps (or `none`) before changing wave status in the roadmap.',
+        '',
+        '| Wave | Script family | Owner | Missing opcode count | Newly discovered command coverage gaps |',
+        '| --- | --- | --- | ---: | --- |',
+    ]
+
+    for wave_id, family, owner, count, gaps in wave_missing_rows(triaged):
+        lines.append(f"| {wave_id} | `{family}` | {owner} | {count} | {gaps} |")
 
     out_md.parent.mkdir(parents=True, exist_ok=True)
     out_md.write_text('\n'.join(lines) + '\n', encoding='utf-8')
