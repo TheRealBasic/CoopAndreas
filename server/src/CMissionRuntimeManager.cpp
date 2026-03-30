@@ -403,6 +403,35 @@ namespace
 
         return CanAcceptEvent(eventKind, g_runtimeState);
     }
+
+    uint8_t ResolveTargetObjectiveTypeForOpcode(uint16_t opcode)
+    {
+        switch (opcode)
+        {
+        case 0x05E2:
+        case 0x0634:
+            return ObjectiveSync::State::TARGET_OBJECTIVE_KILL;
+        case 0x0603:
+            return ObjectiveSync::State::TARGET_OBJECTIVE_FLEE;
+        case 0x05BF:
+            return ObjectiveSync::State::TARGET_OBJECTIVE_PROTECT;
+        default:
+            return ObjectiveSync::State::TARGET_OBJECTIVE_NONE;
+        }
+    }
+
+    void PromoteTargetLifecycle(uint8_t lifecycleState)
+    {
+        if (g_objectiveState.targetLifecycleState == lifecycleState)
+        {
+            return;
+        }
+        g_objectiveState.targetLifecycleState = lifecycleState;
+        if (g_objectiveState.targetStateSequence < UINT16_MAX)
+        {
+            ++g_objectiveState.targetStateSequence;
+        }
+    }
 }
 
 void CMissionRuntimeManager::HandleOpcodeRegistrySync(const void* data, int size)
@@ -451,6 +480,19 @@ void CMissionRuntimeManager::HandleOpcodeRegistrySync(const void* data, int size
         actor.sourceOpcode = key.opcode;
         actor.sourceSlot = key.slot;
         g_registryActors[key] = actor;
+
+        if (i == 1)
+        {
+            const uint8_t objectiveType = ResolveTargetObjectiveTypeForOpcode(header->opcode);
+            if (objectiveType != ObjectiveSync::State::TARGET_OBJECTIVE_NONE)
+            {
+                g_objectiveState.targetObjectiveType = objectiveType;
+                g_objectiveState.targetEntityType = key.entityType;
+                g_objectiveState.targetEntityNetworkId = actor.actorNetworkId;
+                PromoteTargetLifecycle(ObjectiveSync::State::TARGET_LIFECYCLE_SPAWN);
+                PromoteTargetLifecycle(ObjectiveSync::State::TARGET_LIFECYCLE_ACTIVE);
+            }
+        }
     }
 
     g_snapshotActors.clear();
@@ -578,6 +620,11 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.pursuitState = packet->pursuitState;
         g_objectiveState.destroyEscapeState = packet->destroyEscapeState;
         g_objectiveState.vehicleTaskSequence = packet->vehicleTaskSequence;
+        g_objectiveState.targetObjectiveType = packet->targetObjectiveType;
+        g_objectiveState.targetLifecycleState = packet->targetLifecycleState;
+        g_objectiveState.targetEntityNetworkId = packet->targetEntityNetworkId;
+        g_objectiveState.targetEntityType = packet->targetEntityType;
+        g_objectiveState.targetStateSequence = packet->targetStateSequence;
         std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
         if (packet->sourceOpcode == 0x0417 || (packet->missionId != 0 && packet->missionId != g_lastFlow.missionId))
@@ -598,6 +645,14 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         if (packet->eventType == MISSION_FLOW_EVENT_PARTICIPANT_DEATH
             || packet->eventType == MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED)
         {
+            if (packet->eventType == MISSION_FLOW_EVENT_PARTICIPANT_DEATH)
+            {
+                PromoteTargetLifecycle(ObjectiveSync::State::TARGET_LIFECYCLE_DEAD);
+            }
+            else
+            {
+                PromoteTargetLifecycle(ObjectiveSync::State::TARGET_LIFECYCLE_DOWNED);
+            }
             const bool deathThresholdHit = g_objectiveState.missionFailThreshold > 0
                 && g_objectiveState.participantDeathCount >= g_objectiveState.missionFailThreshold;
             const bool incapThresholdHit = g_objectiveState.incapacitationFailThreshold != UINT8_MAX
@@ -606,6 +661,11 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
             {
                 packet->passFailPending = 2;
             }
+        }
+        if (g_objectiveState.destroyEscapeState == ObjectiveSync::State::DESTROY_ESCAPE_STATE_ESCAPED
+            || g_objectiveState.pursuitState == ObjectiveSync::State::PURSUIT_STATE_ESCAPING)
+        {
+            PromoteTargetLifecycle(ObjectiveSync::State::TARGET_LIFECYCLE_ESCAPED);
         }
 
         if (g_hasFlow)
@@ -664,6 +724,11 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->pursuitState = g_objectiveState.pursuitState;
     packet->destroyEscapeState = g_objectiveState.destroyEscapeState;
     packet->vehicleTaskSequence = g_objectiveState.vehicleTaskSequence;
+    packet->targetObjectiveType = g_objectiveState.targetObjectiveType;
+    packet->targetLifecycleState = g_objectiveState.targetLifecycleState;
+    packet->targetEntityNetworkId = g_objectiveState.targetEntityNetworkId;
+    packet->targetEntityType = g_objectiveState.targetEntityType;
+    packet->targetStateSequence = g_objectiveState.targetStateSequence;
     WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
@@ -811,6 +876,11 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     snapshotState.pursuitState = g_objectiveState.pursuitState;
     snapshotState.destroyEscapeState = g_objectiveState.destroyEscapeState;
     snapshotState.vehicleTaskSequence = g_objectiveState.vehicleTaskSequence;
+    snapshotState.targetObjectiveType = g_objectiveState.targetObjectiveType;
+    snapshotState.targetLifecycleState = g_objectiveState.targetLifecycleState;
+    snapshotState.targetEntityNetworkId = g_objectiveState.targetEntityNetworkId;
+    snapshotState.targetEntityType = g_objectiveState.targetEntityType;
+    snapshotState.targetStateSequence = g_objectiveState.targetStateSequence;
     snapshotState.terminalTieBreaker = g_lastFlow.terminalTieBreaker;
     CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_STATE, &snapshotState, sizeof(snapshotState), ENET_PACKET_FLAG_RELIABLE);
 

@@ -603,7 +603,8 @@ public:
 		MISSION_FLOW_EVENT_PARTICIPANT_DEATH = 8,
 		MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED = 9,
 		MISSION_FLOW_EVENT_RESPAWN_ELIGIBILITY = 10,
-		MISSION_FLOW_EVENT_PARTICIPANT_RESPAWNED = 11
+		MISSION_FLOW_EVENT_PARTICIPANT_RESPAWNED = 11,
+		MISSION_FLOW_EVENT_TARGET_STATE = 12
 	};
 
 	enum eMissionTerminalReasonCode : uint8_t
@@ -671,6 +672,11 @@ public:
 		uint8_t pursuitState = 0;
 		uint8_t destroyEscapeState = 0;
 		uint16_t vehicleTaskSequence = 0;
+		uint8_t targetObjectiveType = 0;
+		uint8_t targetLifecycleState = 0;
+		int32_t targetEntityNetworkId = -1;
+		uint8_t targetEntityType = 0;
+		uint16_t targetStateSequence = 0;
 		uint8_t terminalTieBreaker = 0;
 	};
 
@@ -792,6 +798,11 @@ public:
 		uint8_t pursuitState = 0;
 		uint8_t destroyEscapeState = 0;
 		uint16_t vehicleTaskSequence = 0;
+		uint8_t targetObjectiveType = 0;
+		uint8_t targetLifecycleState = 0;
+		int32_t targetEntityNetworkId = -1;
+		uint8_t targetEntityType = 0;
+		uint16_t targetStateSequence = 0;
 		uint8_t terminalTieBreaker = 0;
 	};
 

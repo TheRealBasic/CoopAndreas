@@ -352,6 +352,16 @@ public:
 		uint8_t respawnCount;
 		uint8_t missionFailThreshold;
 		uint8_t incapacitationFailThreshold;
+		uint8_t vehicleTaskState;
+		uint8_t pursuitState;
+		uint8_t destroyEscapeState;
+		uint16_t vehicleTaskSequence;
+		uint8_t targetObjectiveType;
+		uint8_t targetLifecycleState;
+		int32_t targetEntityNetworkId;
+		uint8_t targetEntityType;
+		uint16_t targetStateSequence;
+		uint8_t terminalTieBreaker;
 	};
 
 	struct UpdateCheckpoint
@@ -420,6 +430,16 @@ public:
 		uint8_t respawnCount;
 		uint8_t missionFailThreshold;
 		uint8_t incapacitationFailThreshold;
+		uint8_t vehicleTaskState;
+		uint8_t pursuitState;
+		uint8_t destroyEscapeState;
+		uint16_t vehicleTaskSequence;
+		uint8_t targetObjectiveType;
+		uint8_t targetLifecycleState;
+		int32_t targetEntityNetworkId;
+		uint8_t targetEntityType;
+		uint16_t targetStateSequence;
+		uint8_t terminalTieBreaker;
 	};
 
 	struct MissionRuntimeSnapshotActor
