@@ -1,9 +1,16 @@
 # Property purchase sync parity checklist
 
+## Scope
+Validate host-authoritative property purchase synchronization for the four required parity gates:
+1. purchase flow propagation,
+2. reconnect restore,
+3. late-join hydration,
+4. post-host-migration state consistency.
+
 ## Script inventory (buy points + ownership flags)
 
 ### Ownership flags observed in `scm/scripts/*.txt`
-- `$already_bought_house[0..31]` initialization/reset in `INITIAL.txt` (32 property ownership bits).  
+- `$already_bought_house[0..31]` initialization/reset in `INITIAL.txt` (32 property ownership bits).
 - `$zeros_property_bought` set in `BUYPRO1.txt` and checked in `MOB_SF.txt` for Zero's asset progression gating.
 
 ### Property buy pickup slots observed in scripts
@@ -12,65 +19,28 @@
 - Unlock promotions (`OPENUP.txt`): converts additional locked slots to `Pickup.CreateForSaleProperty('PROP_3', ...)`.
 - Entry/exit linkage is managed with `World.SetClosestEntryExitFlag(...)` calls tied to the same `propertyX/Y/Z` slots.
 
-## Test matrix
+## Scenario matrix
 
-### 1) Purchase propagation (host-authoritative)
-1. Start with two peers connected and ensure both can see the same for-sale marker for one target slot.
-2. Host purchases the property.
-3. Verify non-host immediately observes:
-   - ownership state changed,
-   - pickup/interior linkage state updated (for-sale marker removed/converted),
-   - no local rollback after a few seconds.
-4. Repeat with a second property in a different area/interior.
+| Scenario ID | Parity gate | Steps | Expected | Observed |
+| --- | --- | --- | --- | --- |
+| `PP-01` | Purchase flow propagation | 1) Connect host + at least one client. 2) Confirm both peers see same target for-sale pickup. 3) Host purchases property. 4) Repeat on a second property in a different area/interior. | Non-host peers immediately converge on host-authoritative ownership bit, pickup conversion/removal, and interior linkage updates with no rollback after several seconds. | **Blocked in container**: GTA:SA runtime and multiplayer clients are unavailable, so end-to-end peer observation cannot be executed here. |
+| `PP-02` | Reconnect restore | 1) After at least two purchases, disconnect one client. 2) Keep host running for 30+ seconds. 3) Reconnect client. | Reconnecting peer restores identical ownership, unlocked state, and pickup/interior linkage snapshot from host with no stale for-sale markers. | **Blocked in container**: no GTA:SA runtime/assets and no reconnect-capable client harness in this environment. |
+| `PP-03` | Late-join hydration | 1) Keep a session running after purchases. 2) Join with a fresh peer that had no prior state. | Late joiner hydrates full property snapshot immediately on connect; no temporary rollback to for-sale/locked state. | **Blocked in container**: no GTA:SA runtime/assets and no multi-peer late-join harness in this environment. |
+| `PP-04` | Post-host-migration state consistency | 1) Purchase at least one property. 2) Force host migration (original host leaves). 3) Continue session with new host. | Remaining peers keep identical purchased-property state after migration, and new host continues authoritative updates without reverting previously purchased properties. | **Blocked in container**: host-migration scenario cannot be executed without full multiplayer runtime. |
 
-### 2) Rejoin parity
-1. After at least two purchases, disconnect non-host.
-2. Continue gameplay on host for 30+ seconds.
-3. Reconnect non-host.
-4. Verify reconnect snapshot restores identical ownership/unlock/pickup-interior linkage state.
-
-### 3) Late-join parity
-1. Keep existing session running after purchases.
-2. Join with a fresh third peer (no prior state).
-3. Verify late joiner receives full property snapshot immediately on connect (no temporary for-sale rollback visuals).
-
-### 4) Host-migration parity
-1. Purchase at least one property.
-2. Force host migration (original host leaves).
-3. Verify remaining peers keep identical property ownership state post-migration.
-4. Verify newly assigned host can continue updates without reverting previously purchased properties.
-
-## Pass/Fail
-- **PASS:** ownership flags, unlocked state, and linked pickup/interior state remain identical across connected peers, rejoiners, late joiners, and post-migration peers.
-- **FAIL:** any purchased property reverts to for-sale/locked for any peer, or diverges after reconnect/host migration.
+## Pass/Fail criteria
+- **PASS:** all four scenario IDs (`PP-01..PP-04`) satisfy their expected results with no ownership/pickup/interior divergence.
+- **FAIL:** any scenario shows rollback, stale for-sale state, missing snapshot hydrate, or post-migration divergence.
 
 ## Execution record
 
-- **Date (UTC):** 2026-03-26
-- **Build/commit:** `1919137c80dc63ddc63bb5ce4f1ac710f80109a7` (repo HEAD)
+- **Date (UTC):** 2026-03-30
+- **Build/commit:** `28a198c` (repo HEAD observed during latest QA artifact refresh)
 - **Peer count exercised:** 0 (blocked: runtime environment does not include GTA:SA client/runtime needed for multi-peer end-to-end session)
-- **Case IDs:**
-  - `PP-01` Basic buy propagation — **FAIL (blocked by environment; not executable in this container)**
-  - `PP-02` Reconnect parity — **FAIL (blocked by environment; not executable in this container)**
-  - `PP-03` Late-join snapshot parity — **FAIL (blocked by environment; not executable in this container)**
-  - `PP-04` Host-migration parity — **FAIL (blocked by environment; not executable in this container)**
-- **Passed case IDs:** none
-- **Notes:** Attempted to prepare a runnable build environment, but `xmake` is unavailable in this container (`xmake: command not found`), and no GTA:SA runtime/assets are present to execute multiplayer parity scenarios end-to-end.
-
-## Retry record (after installing `xmake`)
-
-- **Date (UTC):** 2026-03-26
-- **Build/commit:** `28a198c` (retry run HEAD before compile-fix patch)
-- **Peer count exercised:** 0 (blocked: no GTA:SA runtime/assets or multiplayer clients in container)
-- **Retry steps:**
-  1. Installed `xmake` via apt.
-  2. Fixed `server/src/CPlayerManager.h` compile issue in `MissionFlowSyncState` by removing in-struct default member initializers that broke this toolchain.
-  3. Rebuilt with `XMAKE_ROOT=y xmake f -m release && XMAKE_ROOT=y xmake --build server`.
-  4. Smoke-launched server binary with `timeout 5s ./build/linux/x86_64/release/server`.
-- **Build result:** **PASS** (server target builds successfully in this container after the header fix).
-- **Case IDs:**
-  - `PP-01` Basic buy propagation — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
-  - `PP-02` Reconnect parity — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
-  - `PP-03` Late-join snapshot parity — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
-  - `PP-04` Host-migration parity — **FAIL (blocked by lack of GTA:SA client runtime + multi-peer session harness)**
-- **Passed case IDs:** none
+- **Scenario outcomes:**
+  - `PP-01` Purchase flow propagation — **FAIL (blocked by environment; not executable in this container)**
+  - `PP-02` Reconnect restore — **FAIL (blocked by environment; not executable in this container)**
+  - `PP-03` Late-join hydration — **FAIL (blocked by environment; not executable in this container)**
+  - `PP-04` Post-host-migration state consistency — **FAIL (blocked by environment; not executable in this container)**
+- **Passed scenario IDs:** none
+- **Notes:** This checklist now explicitly captures all required parity gates and expected/observed fields. Runtime execution remains blocked by missing GTA:SA client/assets and lack of a multi-peer harness in the container.
