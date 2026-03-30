@@ -76,6 +76,20 @@ Use a lightweight parity tag in implementation and QA artifacts to keep roadmap 
 
 ## Milestone: Mission Parity
 
+### Storyline mission DoD
+
+A storyline mission may only be promoted to `done` after all of the following gates are explicitly marked complete:
+
+- objective parity
+- fail/pass parity
+- reconnect parity
+- late-join parity
+- evidence link
+
+Use the dedicated sign-off checklist: `docs/qa/storyline-mission-signoff-checklist.md`.
+
+Status transition rule (`in progress` -> `done`): every roadmap status update must include the checklist reference and completion date (`YYYY-MM-DD`).
+
 ### P1
 - [ ] Storyline mission parity checklist (`Cleaning The Hood` → `End Of The Line`, excluding already complete: `Big Smoke`, `Ryder`, `Tagging Up Turf`). **[P1][L]**
 
