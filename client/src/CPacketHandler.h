@@ -77,6 +77,10 @@ public:
 	static void PlayMissionAudio__Handle(void* data, int size);
 	static void UpdateCheckpoint__Handle(void* data, int size);
 	static void RemoveCheckpoint__Handle(void* data, int size);
+	static void MissionRuntimeSnapshotBegin__Handle(void* data, int size);
+	static void MissionRuntimeSnapshotState__Handle(void* data, int size);
+	static void MissionRuntimeSnapshotActor__Handle(void* data, int size);
+	static void MissionRuntimeSnapshotEnd__Handle(void* data, int size);
 	static void EnExSync__Handle(void* data, int size);
 	static void CreateMissionMarker__Handle(void* data, int size);
 	static void SetVehicleCreatedBy__Handle(void* data, int size);

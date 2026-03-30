@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 #include "CNetwork.h"
 #include "ObjectiveSyncState.h"
@@ -28,8 +29,10 @@ namespace
     uint16_t g_checkpointVersion = 0;
     uint32_t g_runtimeSessionToken = 0;
     uint32_t g_missionEpoch = 1;
+    uint32_t g_snapshotVersion = 0;
     int g_missionAuthorityPlayerId = -1;
     ObjectiveSync::State g_objectiveState{};
+    std::vector<CMissionRuntimePackets::MissionRuntimeSnapshotActor> g_snapshotActors{};
     
     struct MigrationSnapshot
     {
@@ -549,6 +552,47 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
         return;
     }
 
+    ++g_snapshotVersion;
+    CMissionRuntimePackets::MissionRuntimeSnapshotBegin snapshotBegin{};
+    snapshotBegin.snapshotVersion = g_snapshotVersion;
+    snapshotBegin.actorCount = static_cast<uint8_t>(std::min<size_t>(g_snapshotActors.size(), UINT8_MAX));
+    CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_BEGIN, &snapshotBegin, sizeof(snapshotBegin), ENET_PACKET_FLAG_RELIABLE);
+
+    CMissionRuntimePackets::MissionRuntimeSnapshotState snapshotState{};
+    snapshotState.runtimeState = static_cast<uint8_t>(g_runtimeState);
+    snapshotState.onMission = g_isOnMission ? 1 : 0;
+    snapshotState.missionId = g_objectiveState.missionId;
+    snapshotState.objectivePhaseIndex = g_objectiveState.objectivePhaseIndex;
+    std::memcpy(snapshotState.objective, g_objectiveState.objective, sizeof(snapshotState.objective));
+    snapshotState.timerMs = g_objectiveState.timerMs;
+    snapshotState.timerVisible = g_objectiveState.timerVisible;
+    snapshotState.timerFrozen = g_objectiveState.timerFrozen;
+    snapshotState.timerDirection = g_objectiveState.timerDirection;
+    snapshotState.checkpointIndex = g_objectiveState.checkpointIndex;
+    snapshotState.checkpointCount = g_objectiveState.checkpointCount;
+    snapshotState.objectiveVersion = g_objectiveVersion;
+    snapshotState.checkpointVersion = g_checkpointVersion;
+    snapshotState.runtimeSessionToken = g_runtimeSessionToken;
+    snapshotState.missionEpoch = g_missionEpoch;
+    snapshotState.sequenceId = g_lastSequence;
+    snapshotState.terminalReasonCode = g_terminalReasonCode;
+    snapshotState.terminalSourceEventType = g_terminalSourceEventType;
+    snapshotState.terminalSourceOpcode = g_terminalSourceOpcode;
+    snapshotState.terminalSourceSequence = g_terminalSourceSequence;
+    snapshotState.passFailPending = g_lastFlow.passFailPending;
+    snapshotState.cutscenePhase = g_objectiveState.cutscenePhase;
+    snapshotState.cutsceneSessionToken = g_objectiveState.cutsceneSessionToken;
+    CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_STATE, &snapshotState, sizeof(snapshotState), ENET_PACKET_FLAG_RELIABLE);
+
+    for (size_t i = 0; i < std::min<size_t>(g_snapshotActors.size(), UINT8_MAX); ++i)
+    {
+        CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_ACTOR, &g_snapshotActors[i], sizeof(g_snapshotActors[i]), ENET_PACKET_FLAG_RELIABLE);
+    }
+
+    CMissionRuntimePackets::MissionRuntimeSnapshotEnd snapshotEnd{};
+    snapshotEnd.snapshotVersion = g_snapshotVersion;
+    CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_END, &snapshotEnd, sizeof(snapshotEnd), ENET_PACKET_FLAG_RELIABLE);
+
     OnMissionFlagPayload onMissionPacket{};
     onMissionPacket.bOnMission = g_isOnMission ? 1 : 0;
     onMissionPacket.missionEpoch = g_missionEpoch;
@@ -638,6 +682,7 @@ void CMissionRuntimeManager::Teardown()
     ++g_missionEpoch;
     g_missionAuthorityPlayerId = -1;
     g_objectiveState = {};
+    g_snapshotActors.clear();
     g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
     g_terminalSourceEventType = 0;
     g_terminalSourceOpcode = 0;

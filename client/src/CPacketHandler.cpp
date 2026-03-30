@@ -1843,6 +1843,10 @@ void CPacketHandler::OpCodeSync__Handle(void* data, int size)
 
 void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 {
+	if (size < (int)sizeof(CPackets::OnMissionFlagSync))
+		return;
+	if (!CMissionSyncState::CanAcceptLiveMissionEvents())
+		return;
 	CPackets::OnMissionFlagSync* packet = (CPackets::OnMissionFlagSync*)data;
 	if (!CMissionSyncState::ShouldAcceptInboundMissionEvent(packet->missionEpoch, packet->sequenceId))
 		return;
@@ -1860,11 +1864,15 @@ void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 
 void CPacketHandler::MissionFlowSync__Handle(void* data, int size)
 {
-	if (size < (int)sizeof(CPackets::MissionFlowSync))
+	if (!CMissionSyncState::CanAcceptLiveMissionEvents())
+		return;
+	if (size < (int)offsetof(CPackets::MissionFlowSync, gxt))
 		return;
 
-	CPackets::MissionFlowSync* packet = (CPackets::MissionFlowSync*)data;
-	CMissionSyncState::HandleMissionFlowSync(*packet);
+	CPackets::MissionFlowSync packet{};
+	const size_t copySize = std::min<size_t>(size, sizeof(packet));
+	std::memcpy(&packet, data, copySize);
+	CMissionSyncState::HandleMissionFlowSync(packet);
 }
 
 void CPacketHandler::OnMissionFlagSync__Trigger()
@@ -1991,6 +1999,8 @@ void CPacketHandler::UpdateCheckpoint__Handle(void* data, int size)
 {
 	if (CLocalPlayer::m_bIsHost)
 		return;
+	if (!CMissionSyncState::CanAcceptLiveMissionEvents())
+		return;
 	
 	CPackets::UpdateCheckpoint* packet = (CPackets::UpdateCheckpoint*)data;
 	if (!CMissionSyncState::ShouldAcceptInboundMissionEvent(packet->missionEpoch, packet->sequenceId))
@@ -2004,12 +2014,54 @@ void CPacketHandler::RemoveCheckpoint__Handle(void* data, int size)
 {
 	if (CLocalPlayer::m_bIsHost)
 		return;
+	if (!CMissionSyncState::CanAcceptLiveMissionEvents())
+		return;
 
 	CPackets::RemoveCheckpoint* packet = (CPackets::RemoveCheckpoint*)data;
 	if (!CMissionSyncState::ShouldAcceptInboundMissionEvent(packet->missionEpoch, packet->sequenceId))
 		return;
 
 	CNetworkCheckpoint::Remove();
+}
+
+void CPacketHandler::MissionRuntimeSnapshotBegin__Handle(void* data, int size)
+{
+	if (size < (int)offsetof(CPackets::MissionRuntimeSnapshotBegin, actorCount))
+		return;
+	CPackets::MissionRuntimeSnapshotBegin packet{};
+	const size_t copySize = std::min<size_t>(size, sizeof(packet));
+	std::memcpy(&packet, data, copySize);
+	CMissionSyncState::HandleMissionRuntimeSnapshotBegin(packet);
+}
+
+void CPacketHandler::MissionRuntimeSnapshotState__Handle(void* data, int size)
+{
+	if (size < (int)offsetof(CPackets::MissionRuntimeSnapshotState, objective))
+		return;
+	CPackets::MissionRuntimeSnapshotState packet{};
+	const size_t copySize = std::min<size_t>(size, sizeof(packet));
+	std::memcpy(&packet, data, copySize);
+	CMissionSyncState::HandleMissionRuntimeSnapshotState(packet);
+}
+
+void CPacketHandler::MissionRuntimeSnapshotActor__Handle(void* data, int size)
+{
+	if (size < (int)offsetof(CPackets::MissionRuntimeSnapshotActor, roleFlags))
+		return;
+	CPackets::MissionRuntimeSnapshotActor packet{};
+	const size_t copySize = std::min<size_t>(size, sizeof(packet));
+	std::memcpy(&packet, data, copySize);
+	CMissionSyncState::HandleMissionRuntimeSnapshotActor(packet);
+}
+
+void CPacketHandler::MissionRuntimeSnapshotEnd__Handle(void* data, int size)
+{
+	if (size < (int)offsetof(CPackets::MissionRuntimeSnapshotEnd, snapshotVersion))
+		return;
+	CPackets::MissionRuntimeSnapshotEnd packet{};
+	const size_t copySize = std::min<size_t>(size, sizeof(packet));
+	std::memcpy(&packet, data, copySize);
+	CMissionSyncState::HandleMissionRuntimeSnapshotEnd(packet);
 }
 
 // EnExSync

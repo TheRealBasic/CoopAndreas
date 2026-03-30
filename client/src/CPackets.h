@@ -72,6 +72,10 @@ public:
 			sizeof(PlayMissionAudio), // PLAY_MISSION_AUDIO,
 			sizeof(UpdateCheckpoint), // UPDATE_CHECKPOINT,
 			sizeof(RemoveCheckpoint), // REMOVE_CHECKPOINT,
+			sizeof(MissionRuntimeSnapshotBegin), // MISSION_RUNTIME_SNAPSHOT_BEGIN,
+			sizeof(MissionRuntimeSnapshotState), // MISSION_RUNTIME_SNAPSHOT_STATE,
+			sizeof(MissionRuntimeSnapshotActor), // MISSION_RUNTIME_SNAPSHOT_ACTOR,
+			sizeof(MissionRuntimeSnapshotEnd), // MISSION_RUNTIME_SNAPSHOT_END,
 			0, // ENEX_SYNC,
 			sizeof(CreateStaticBlip), // CREATE_STATIC_BLIP,
 			sizeof(SetVehicleCreatedBy), // SET_VEHICLE_CREATED_BY
@@ -719,6 +723,52 @@ public:
 		uint32_t runtimeSessionToken = 0;
 		uint32_t missionEpoch = 0;
 		uint32_t sequenceId = 0;
+	};
+
+	struct MissionRuntimeSnapshotBegin
+	{
+		uint32_t snapshotVersion = 0;
+		uint8_t actorCount = 0;
+	};
+
+	struct MissionRuntimeSnapshotState
+	{
+		uint8_t runtimeState = 0;
+		uint8_t onMission = 0;
+		uint16_t missionId = 0;
+		uint16_t objectivePhaseIndex = 0;
+		char objective[8]{};
+		int32_t timerMs = 0;
+		uint8_t timerVisible = 0;
+		uint8_t timerFrozen = 0;
+		uint8_t timerDirection = 0;
+		uint16_t checkpointIndex = 0;
+		uint16_t checkpointCount = 0;
+		uint16_t objectiveVersion = 0;
+		uint16_t checkpointVersion = 0;
+		uint32_t runtimeSessionToken = 0;
+		uint32_t missionEpoch = 0;
+		uint32_t sequenceId = 0;
+		uint8_t terminalReasonCode = MISSION_TERMINAL_REASON_NONE;
+		uint8_t terminalSourceEventType = MISSION_FLOW_EVENT_NONE;
+		uint16_t terminalSourceOpcode = 0;
+		uint32_t terminalSourceSequence = 0;
+		uint8_t passFailPending = 0;
+		uint8_t cutscenePhase = 0;
+		uint32_t cutsceneSessionToken = 0;
+	};
+
+	struct MissionRuntimeSnapshotActor
+	{
+		uint8_t actorType = 0;
+		int32_t actorNetworkId = 0;
+		uint8_t roleFlags = 0;
+		uint8_t isAlive = 0;
+	};
+
+	struct MissionRuntimeSnapshotEnd
+	{
+		uint32_t snapshotVersion = 0;
 	};
 
 	struct CreateStaticBlip

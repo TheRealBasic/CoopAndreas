@@ -62,6 +62,10 @@ enum CPacketsID : unsigned short
 	PLAY_MISSION_AUDIO,
 	UPDATE_CHECKPOINT,
 	REMOVE_CHECKPOINT,
+	MISSION_RUNTIME_SNAPSHOT_BEGIN,
+	MISSION_RUNTIME_SNAPSHOT_STATE,
+	MISSION_RUNTIME_SNAPSHOT_ACTOR,
+	MISSION_RUNTIME_SNAPSHOT_END,
 	ENEX_SYNC,
 	CREATE_STATIC_BLIP,
 	SET_VEHICLE_CREATED_BY,
@@ -238,6 +242,10 @@ namespace PacketRegistry
 
 		// server -> client
 		set(PLAYER_DISCONNECTED, "PLAYER_DISCONNECTED", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
+		set(MISSION_RUNTIME_SNAPSHOT_BEGIN, "MISSION_RUNTIME_SNAPSHOT_BEGIN", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
+		set(MISSION_RUNTIME_SNAPSHOT_STATE, "MISSION_RUNTIME_SNAPSHOT_STATE", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
+		set(MISSION_RUNTIME_SNAPSHOT_ACTOR, "MISSION_RUNTIME_SNAPSHOT_ACTOR", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
+		set(MISSION_RUNTIME_SNAPSHOT_END, "MISSION_RUNTIME_SNAPSHOT_END", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
 		set(PLAYER_HANDSHAKE, "PLAYER_HANDSHAKE", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
 		set(PLAYER_SET_HOST, "PLAYER_SET_HOST", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);
 		set(VEHICLE_CONFIRM, "VEHICLE_CONFIRM", PacketDirection::ServerToClient, PacketReliability::Reliable, 0);

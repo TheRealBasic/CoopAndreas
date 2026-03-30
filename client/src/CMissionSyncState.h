@@ -34,6 +34,11 @@ public:
     static void EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message);
     static void EmitMissionFlowOpcode(uint16_t opcode, const int* params, uint16_t paramCount, const char* text);
     static void HandleMissionFlowSync(const CPackets::MissionFlowSync& packet);
+    static void HandleMissionRuntimeSnapshotBegin(const CPackets::MissionRuntimeSnapshotBegin& packet);
+    static void HandleMissionRuntimeSnapshotState(const CPackets::MissionRuntimeSnapshotState& packet);
+    static void HandleMissionRuntimeSnapshotActor(const CPackets::MissionRuntimeSnapshotActor& packet);
+    static void HandleMissionRuntimeSnapshotEnd(const CPackets::MissionRuntimeSnapshotEnd& packet);
+    static bool CanAcceptLiveMissionEvents();
     static void HandleAuthoritativeCutsceneSkip(uint32_t sessionToken);
     static bool HandleNetworkSwitchWidescreen(bool enabled);
     static void ProcessSubmissionMissionSync();
