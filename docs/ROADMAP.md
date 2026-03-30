@@ -101,7 +101,7 @@ Wave execution rule: advance one wave at a time; each wave keeps a named owner, 
 | --- | --- | --- | --- | --- | --- |
 | W1 | `SWEET` | Mission Sync Pod (Sweet stream) | `in progress` | `clear` (0 missing on 2026-03-30) | `C1` owner assigned, `C2` mission rows created in QA evidence doc, `C3` start/objective/fail/pass/reconnect notes captured per mission before promotion + onboarding template reference (`docs/qa/storyline-mission-template.md`), `C4` reconnect replay validated on 2+ peers, `C5` `tools/opcode_audit.py` rerun and delta logged in storyline backlog, `C6` wave sign-off attached. |
 | W2 | `RYDER` | Mission Sync Pod (Ryder stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W2 missions and template reference is present. |
-| W3 | `SMOKE` | Mission Sync Pod (Smoke stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W3 missions and template reference is present. |
+| W3 | `SMOKE` | Mission Sync Pod (Smoke stream) | `in progress` | `clear` (0 missing on 2026-03-30) | Checkpoints `C1..C6` active; Wave B completed `Running Dog` + `Just Business` with remaining W3 missions pending evidence promotion. |
 
 Wave evidence + status gate source of truth: `docs/qa/storyline-wave-mission-evidence.md`.
 
@@ -143,6 +143,25 @@ Selected from roadmap early missions previously marked `not started` and advance
 
 Promotion rule: each mission remains non-functional until all six core gameplay gates are `pass` in `docs/qa/storyline-wave-mission-evidence.md`.
 
+#### Wave B (heterogeneous mechanics validation tranche)
+
+Execution focus: run missions with intentionally different gameplay mechanics to validate shared mission sync modules (`COpCodeSync`, `CMissionSyncState`, `CTaskSequenceSync`, runtime snapshot replay) under heterogeneous mission patterns before allowing mission-specific patches.
+
+Reusable blocking-fix ledger (engine-first policy):
+- `WB-FIX-001` — deferred actor/vehicle binding retries in mission snapshot apply path to eliminate join/reconnect ordering races before mission-specific handling.
+- `WB-FIX-002` — objective stage monotonic guard + idempotent replay latch in mission flow fan-out to prevent duplicate objective transitions.
+- `WB-FIX-003` — terminal pass/fail once-only adjudication latch shared across mission families to block duplicate outcome/reward emission.
+- `WB-FIX-004` — reconnect/late-join hydration epoch filter for mixed mission phases (chase, escort, scoring, drive-by wave).
+
+| Wave B mission | Mechanics profile | Status | Completion date | Blocking fix refs (engine-level first) |
+| --- | --- | --- | --- | --- |
+| Sweet's Girl | escort + flee + seat reassignment | `done` | 2026-03-30 | `WB-FIX-001`, `WB-FIX-002` |
+| Cesar Vialpando | lowrider scoring + control handoff windows | `done` | 2026-03-30 | `WB-FIX-002`, `WB-FIX-003` |
+| Running Dog | foot chase + kill objective + pickup recovery | `done` | 2026-03-30 | `WB-FIX-001`, `WB-FIX-004` |
+| Just Business | interior shootout + escape drive-by + chase waves | `done` | 2026-03-30 | `WB-FIX-003`, `WB-FIX-004` |
+
+Wave B completion evidence source of truth: `docs/qa/storyline-wave-mission-evidence.md` and `docs/qa/storyline-shared-command-mini-tickets.md`.
+
 
 | Mission | Script | Status | Blocking dependencies (opcodes/commands) | Quick acceptance criteria |
 | --- | --- | --- | --- | --- |
@@ -150,17 +169,17 @@ Promotion rule: each mission remains non-functional until all six core gameplay 
 | Drive-Thru | `scm/scripts/SWEET.txt` | `done` (Wave 1 stabilization parity gates evidenced) | `create_car`, `task_drive_by`, `set_char_obj_destroy_car` | [x] [Start/cutscene sync](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Objective propagation](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Fail/pass parity](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Reconnect restore](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Late-join hydration](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios). |
 | Nines And AK's | `scm/scripts/SWEET.txt` | `in progress` | `create_actor`, `set_char_obj_kill_char_any_means`, `set_objective` | See mini ticket: [`docs/qa/storyline-shared-command-mini-tickets.md#nines-and-aks-scmscriptssweettxt`](docs/qa/storyline-shared-command-mini-tickets.md#nines-and-aks-scmscriptssweettxt) (blocking mapping + QA scenarios documented). |
 | Drive-By | `scm/scripts/SWEET.txt` | `in progress` | `create_car`, `task_drive_by`, `set_objective` | See mini ticket: [`docs/qa/storyline-shared-command-mini-tickets.md#drive-by-scmscriptssweettxt`](docs/qa/storyline-shared-command-mini-tickets.md#drive-by-scmscriptssweettxt) (blocking mapping + QA scenarios documented). |
-| Sweet's Girl | `scm/scripts/SWEET.txt` | `in progress` | `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, `task_enter_car_as_driver` | Wave A pipeline executed through pass/fail adjudication; functional promotion blocked until six QA gates are `pass` in `docs/qa/storyline-wave-mission-evidence.md`. |
-| Cesar Vialpando | `scm/scripts/SWEET.txt` | `in progress` | `Mission.LoadAndLaunchInternal`, `task_car_drive_wander`, `set_objective` | Wave A pipeline executed through pass/fail adjudication; functional promotion blocked until six QA gates are `pass` in `docs/qa/storyline-wave-mission-evidence.md`. |
+| Sweet's Girl | `scm/scripts/SWEET.txt` | `done` (2026-03-30) | `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, `task_enter_car_as_driver` | Wave B heterogeneous validation complete; six QA gates `pass` in `docs/qa/storyline-wave-mission-evidence.md` (fix refs: `WB-FIX-001`, `WB-FIX-002`). |
+| Cesar Vialpando | `scm/scripts/SWEET.txt` | `done` (2026-03-30) | `Mission.LoadAndLaunchInternal`, `task_car_drive_wander`, `set_objective` | Wave B heterogeneous validation complete; six QA gates `pass` in `docs/qa/storyline-wave-mission-evidence.md` (fix refs: `WB-FIX-002`, `WB-FIX-003`). |
 | Burning Desire | `scm/scripts/CRASH.txt` | `not started` | `create_fire`, `remove_char_from_car_maintain_position`, `set_char_obj_leave_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Gray Imports | `scm/scripts/CRASH.txt` | `not started` | `create_actor`, `set_char_obj_kill_char_any_means`, `blow_up_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Home Invasion | `scm/scripts/RYDER.txt` | `not started` | `create_pickup`, `task_go_straight_to_coord`, `set_timers` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Catalyst | `scm/scripts/RYDER.txt` | `not started` | `create_train`, `task_jump_from_car`, `set_mission_audio_position` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Robbing Uncle Sam | `scm/scripts/RYDER.txt` | `not started` | `create_object`, `attach_object_to_car`, `set_char_obj_kill_char_any_means` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | OG Loc | `scm/scripts/SMOKE.txt` | `not started` | `task_follow_nav_mesh_to_coord`, `task_bike_flee_point`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| Running Dog | `scm/scripts/SMOKE.txt` | `in progress` | `create_actor`, `set_char_obj_kill_char_any_means`, `set_objective` | See mini ticket: [`docs/qa/storyline-shared-command-mini-tickets.md#running-dog-scmscriptssmoketxt`](docs/qa/storyline-shared-command-mini-tickets.md#running-dog-scmscriptssmoketxt) (blocking mapping + QA scenarios documented). |
+| Running Dog | `scm/scripts/SMOKE.txt` | `done` (2026-03-30) | `create_actor`, `set_char_obj_kill_char_any_means`, `set_objective` | Wave B heterogeneous validation complete; six QA gates `pass` in `docs/qa/storyline-wave-mission-evidence.md` (fix refs: `WB-FIX-001`, `WB-FIX-004`). |
 | Wrong Side Of The Tracks | `scm/scripts/SMOKE.txt` | `not started` | `create_train`, `task_drive_by`, `task_car_mission` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| Just Business | `scm/scripts/SMOKE.txt` | `in progress` | `create_car`, `task_drive_by`, `set_char_obj_kill_char_any_means`, `set_objective` | See mini ticket: [`docs/qa/storyline-shared-command-mini-tickets.md#just-business-scmscriptssmoketxt`](docs/qa/storyline-shared-command-mini-tickets.md#just-business-scmscriptssmoketxt) (blocking mapping + QA scenarios documented). |
+| Just Business | `scm/scripts/SMOKE.txt` | `done` (2026-03-30) | `create_car`, `task_drive_by`, `set_char_obj_kill_char_any_means`, `set_objective` | Wave B heterogeneous validation complete; six QA gates `pass` in `docs/qa/storyline-wave-mission-evidence.md` (fix refs: `WB-FIX-003`, `WB-FIX-004`). |
 | Life's A Beach | `scm/scripts/STRAP.txt` | `not started` | `start_mini_game`, `task_play_anim_non_interruptable`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Madd Dogg's Rhymes | `scm/scripts/STRAP.txt` | `not started` | `task_sneak_at_coord`, `set_char_obj_steal_any_car`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Management Issues | `scm/scripts/STRAP.txt` | `not started` | `task_enter_car_as_driver`, `set_car_driving_style`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |

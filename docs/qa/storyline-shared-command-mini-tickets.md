@@ -119,7 +119,7 @@ Status: `in progress` (Wave A pipeline stages 1-5 implemented; functional gate p
 
 ## Running Dog (`scm/scripts/SMOKE.txt`)
 
-Status: `in progress` (blocking mapping + QA scenario list documented)
+Status: `done` (Wave B heterogeneous-mechanics validation complete on 2026-03-30; all six core gameplay gates `pass`)
 
 ### Blocking commands
 - `create_actor` — courier + pursuer actor creation with consistent net ids.
@@ -143,7 +143,7 @@ Status: `in progress` (blocking mapping + QA scenario list documented)
 
 ## Just Business (`scm/scripts/SMOKE.txt`)
 
-Status: `in progress` (blocking mapping + QA scenario list documented)
+Status: `done` (Wave B heterogeneous-mechanics validation complete on 2026-03-30; all six core gameplay gates `pass`)
 
 ### Blocking commands
 - `create_car` — bike/vehicle sequence initialization and occupant replication.
