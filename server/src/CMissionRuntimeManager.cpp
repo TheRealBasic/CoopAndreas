@@ -12,6 +12,8 @@
 namespace
 {
     using RuntimeState = CMissionRuntimeManager::RuntimeState;
+    constexpr uint8_t MISSION_FLOW_EVENT_PARTICIPANT_DEATH = 8;
+    constexpr uint8_t MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED = 9;
 
     RuntimeState g_runtimeState = RuntimeState::Idle;
     CMissionRuntimeManager::MissionFlowPayload g_lastFlow{};
@@ -64,6 +66,16 @@ namespace
     };
 
     std::unordered_map<RegistryActorKey, CMissionRuntimePackets::MissionRuntimeSnapshotActor, RegistryActorKeyHash> g_registryActors{};
+    struct MissionRuntimePolicy
+    {
+        uint8_t respawnEligible = 0;
+        uint8_t missionFailThreshold = 1;
+        uint8_t incapacitationFailThreshold = UINT8_MAX;
+    };
+
+    const std::unordered_map<uint16_t, MissionRuntimePolicy> kMissionPolicyOverrides = {
+        // Mission-specific policy overrides can be added here.
+    };
     
     struct MigrationSnapshot
     {
@@ -89,6 +101,16 @@ namespace
     bool IsTerminal(RuntimeState state)
     {
         return state == RuntimeState::Teardown;
+    }
+
+    MissionRuntimePolicy ResolveMissionRuntimePolicy(uint16_t missionId)
+    {
+        auto overrideIt = kMissionPolicyOverrides.find(missionId);
+        if (overrideIt != kMissionPolicyOverrides.end())
+        {
+            return overrideIt->second;
+        }
+        return MissionRuntimePolicy{};
     }
 
     bool HasCommittedTerminalOutcome()
@@ -165,6 +187,11 @@ namespace
             g_terminalSourceEventType = 0;
             g_terminalSourceOpcode = 0;
             g_terminalSourceSequence = 0;
+            g_objectiveState = {};
+            const MissionRuntimePolicy policy = ResolveMissionRuntimePolicy(0);
+            g_objectiveState.respawnEligible = policy.respawnEligible;
+            g_objectiveState.missionFailThreshold = policy.missionFailThreshold;
+            g_objectiveState.incapacitationFailThreshold = policy.incapacitationFailThreshold;
         }
     }
 
@@ -515,7 +542,41 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.cutsceneSessionToken = packet->cutsceneSessionToken;
         g_objectiveState.objectiveTextToken = packet->objectiveTextToken;
         g_objectiveState.objectiveTextSemantics = packet->objectiveTextSemantics;
+        g_objectiveState.respawnEligible = packet->respawnEligible;
+        g_objectiveState.participantDeathCount = packet->participantDeathCount;
+        g_objectiveState.participantIncapacitationCount = packet->participantIncapacitationCount;
+        g_objectiveState.respawnCount = packet->respawnCount;
+        g_objectiveState.missionFailThreshold = packet->missionFailThreshold == 0 ? 1 : packet->missionFailThreshold;
+        g_objectiveState.incapacitationFailThreshold = packet->incapacitationFailThreshold;
         std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
+
+        if (packet->sourceOpcode == 0x0417 || (packet->missionId != 0 && packet->missionId != g_lastFlow.missionId))
+        {
+            const MissionRuntimePolicy policy = ResolveMissionRuntimePolicy(packet->missionId);
+            if (packet->missionFailThreshold == 0)
+            {
+                g_objectiveState.missionFailThreshold = policy.missionFailThreshold;
+                packet->missionFailThreshold = policy.missionFailThreshold;
+            }
+            if (packet->incapacitationFailThreshold == 0)
+            {
+                g_objectiveState.incapacitationFailThreshold = policy.incapacitationFailThreshold;
+                packet->incapacitationFailThreshold = policy.incapacitationFailThreshold;
+            }
+        }
+
+        if (packet->eventType == MISSION_FLOW_EVENT_PARTICIPANT_DEATH
+            || packet->eventType == MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED)
+        {
+            const bool deathThresholdHit = g_objectiveState.missionFailThreshold > 0
+                && g_objectiveState.participantDeathCount >= g_objectiveState.missionFailThreshold;
+            const bool incapThresholdHit = g_objectiveState.incapacitationFailThreshold != UINT8_MAX
+                && g_objectiveState.participantIncapacitationCount >= g_objectiveState.incapacitationFailThreshold;
+            if ((deathThresholdHit || incapThresholdHit) && packet->passFailPending == 0)
+            {
+                packet->passFailPending = 2;
+            }
+        }
 
         if (g_hasFlow)
         {
@@ -563,6 +624,12 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->runtimeSessionToken = g_runtimeSessionToken;
     packet->missionEpoch = g_missionEpoch;
     packet->sequenceId = g_lastSequence;
+    packet->respawnEligible = g_objectiveState.respawnEligible;
+    packet->participantDeathCount = g_objectiveState.participantDeathCount;
+    packet->participantIncapacitationCount = g_objectiveState.participantIncapacitationCount;
+    packet->respawnCount = g_objectiveState.respawnCount;
+    packet->missionFailThreshold = g_objectiveState.missionFailThreshold;
+    packet->incapacitationFailThreshold = g_objectiveState.incapacitationFailThreshold;
     WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
@@ -700,6 +767,12 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     snapshotState.passFailPending = g_lastFlow.passFailPending;
     snapshotState.cutscenePhase = g_objectiveState.cutscenePhase;
     snapshotState.cutsceneSessionToken = g_objectiveState.cutsceneSessionToken;
+    snapshotState.respawnEligible = g_objectiveState.respawnEligible;
+    snapshotState.participantDeathCount = g_objectiveState.participantDeathCount;
+    snapshotState.participantIncapacitationCount = g_objectiveState.participantIncapacitationCount;
+    snapshotState.respawnCount = g_objectiveState.respawnCount;
+    snapshotState.missionFailThreshold = g_objectiveState.missionFailThreshold;
+    snapshotState.incapacitationFailThreshold = g_objectiveState.incapacitationFailThreshold;
     CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_STATE, &snapshotState, sizeof(snapshotState), ENET_PACKET_FLAG_RELIABLE);
 
     for (size_t i = 0; i < std::min<size_t>(g_snapshotActors.size(), UINT8_MAX); ++i)

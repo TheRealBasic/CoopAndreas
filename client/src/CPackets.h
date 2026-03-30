@@ -599,7 +599,11 @@ public:
 		MISSION_FLOW_EVENT_PASS = 4,
 		MISSION_FLOW_EVENT_STATE_UPDATE = 5,
 		MISSION_FLOW_EVENT_CUTSCENE_SKIP = 6,
-		MISSION_FLOW_EVENT_CUTSCENE_END = 7
+		MISSION_FLOW_EVENT_CUTSCENE_END = 7,
+		MISSION_FLOW_EVENT_PARTICIPANT_DEATH = 8,
+		MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED = 9,
+		MISSION_FLOW_EVENT_RESPAWN_ELIGIBILITY = 10,
+		MISSION_FLOW_EVENT_PARTICIPANT_RESPAWNED = 11
 	};
 
 	enum eMissionTerminalReasonCode : uint8_t
@@ -657,6 +661,12 @@ public:
 		uint8_t terminalSourceEventType = MISSION_FLOW_EVENT_NONE;
 		uint16_t terminalSourceOpcode = 0;
 		uint32_t terminalSourceSequence = 0;
+		uint8_t respawnEligible = 0;
+		uint8_t participantDeathCount = 0;
+		uint8_t participantIncapacitationCount = 0;
+		uint8_t respawnCount = 0;
+		uint8_t missionFailThreshold = 1;
+		uint8_t incapacitationFailThreshold = UINT8_MAX;
 	};
 
 	struct UpdateEntityBlip
@@ -767,6 +777,12 @@ public:
 		uint8_t passFailPending = 0;
 		uint8_t cutscenePhase = 0;
 		uint32_t cutsceneSessionToken = 0;
+		uint8_t respawnEligible = 0;
+		uint8_t participantDeathCount = 0;
+		uint8_t participantIncapacitationCount = 0;
+		uint8_t respawnCount = 0;
+		uint8_t missionFailThreshold = 1;
+		uint8_t incapacitationFailThreshold = UINT8_MAX;
 	};
 
 	struct MissionRuntimeSnapshotActor

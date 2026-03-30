@@ -64,6 +64,28 @@ namespace
     // immediately hydrate this state without waiting for another opcode edge.
     using SideContentAttemptState = ObjectiveSync::State;
     SideContentAttemptState ms_sideContentAttemptState{};
+    struct MissionRuntimePolicy
+    {
+        uint8_t respawnEligible = 0;
+        uint8_t missionFailThreshold = 1;
+        uint8_t incapacitationFailThreshold = UINT8_MAX;
+    };
+
+    const std::unordered_map<uint16_t, MissionRuntimePolicy> kMissionPolicyOverrides = {
+        // Mission scripts with custom fail handling can be added here.
+        // { missionId, { respawnEligible, missionFailThreshold, incapacitationFailThreshold } }
+    };
+
+    MissionRuntimePolicy ResolveMissionRuntimePolicy(uint16_t missionId)
+    {
+        auto overrideIt = kMissionPolicyOverrides.find(missionId);
+        if (overrideIt != kMissionPolicyOverrides.end())
+        {
+            return overrideIt->second;
+        }
+
+        return MissionRuntimePolicy{};
+    }
 
     bool TrySetTerminalOutcome(uint8_t outcome)
     {
@@ -377,6 +399,12 @@ namespace
         packet.objectiveTextToken = state.objectiveTextToken;
         packet.objectiveTextSemantics = state.objectiveTextSemantics;
         strncpy_s(packet.objective, state.objective, sizeof(packet.objective));
+        packet.respawnEligible = state.respawnEligible;
+        packet.participantDeathCount = state.participantDeathCount;
+        packet.participantIncapacitationCount = state.participantIncapacitationCount;
+        packet.respawnCount = state.respawnCount;
+        packet.missionFailThreshold = state.missionFailThreshold;
+        packet.incapacitationFailThreshold = state.incapacitationFailThreshold;
     }
 
     void ApplyInboundObjectiveTextState(SideContentAttemptState& state, const CPackets::MissionFlowSync& packet)
@@ -674,6 +702,68 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
 
+void CMissionSyncState::EmitParticipantRuntimeEvent(uint8_t eventType, bool respawnEligible)
+{
+    if (!CLocalPlayer::m_bIsHost || !IsMissionContextActive())
+    {
+        return;
+    }
+
+    if (ms_sideContentAttemptState.missionFailThreshold == 0)
+    {
+        const MissionRuntimePolicy policy = ResolveMissionRuntimePolicy(ms_sideContentAttemptState.missionId);
+        ms_sideContentAttemptState.missionFailThreshold = policy.missionFailThreshold;
+        ms_sideContentAttemptState.incapacitationFailThreshold = policy.incapacitationFailThreshold;
+        ms_sideContentAttemptState.respawnEligible = policy.respawnEligible;
+    }
+
+    if (eventType == CPackets::MISSION_FLOW_EVENT_PARTICIPANT_DEATH)
+    {
+        ms_sideContentAttemptState.participantDeathCount = static_cast<uint8_t>(std::min<int>(ms_sideContentAttemptState.participantDeathCount + 1, UINT8_MAX));
+    }
+    else if (eventType == CPackets::MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED)
+    {
+        ms_sideContentAttemptState.participantIncapacitationCount = static_cast<uint8_t>(std::min<int>(ms_sideContentAttemptState.participantIncapacitationCount + 1, UINT8_MAX));
+    }
+    else if (eventType == CPackets::MISSION_FLOW_EVENT_PARTICIPANT_RESPAWNED)
+    {
+        ms_sideContentAttemptState.respawnCount = static_cast<uint8_t>(std::min<int>(ms_sideContentAttemptState.respawnCount + 1, UINT8_MAX));
+        ms_sideContentAttemptState.respawnEligible = 0;
+        if (ms_sideContentAttemptState.checkpointIndex < UINT16_MAX)
+        {
+            ++ms_sideContentAttemptState.checkpointIndex;
+        }
+    }
+    else if (eventType == CPackets::MISSION_FLOW_EVENT_RESPAWN_ELIGIBILITY)
+    {
+        ms_sideContentAttemptState.respawnEligible = respawnEligible ? 1 : 0;
+    }
+
+    if (ms_sideContentAttemptState.passFailPending == 0)
+    {
+        if (ms_sideContentAttemptState.missionFailThreshold > 0
+            && ms_sideContentAttemptState.participantDeathCount >= ms_sideContentAttemptState.missionFailThreshold)
+        {
+            TrySetTerminalOutcome(2);
+        }
+        if (ms_sideContentAttemptState.incapacitationFailThreshold != UINT8_MAX
+            && ms_sideContentAttemptState.participantIncapacitationCount >= ms_sideContentAttemptState.incapacitationFailThreshold)
+        {
+            TrySetTerminalOutcome(2);
+        }
+    }
+
+    CPackets::MissionFlowSync packet{};
+    packet.eventType = eventType;
+    packet.currArea = static_cast<uint8_t>(CGame::currArea);
+    packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
+    packet.sequence = NextMissionEventSequenceId();
+    packet.sequenceId = packet.sequence;
+    packet.missionEpoch = ms_missionEpoch;
+    PopulateMissionFlowStatePayload(packet, ms_sideContentAttemptState);
+    CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+}
+
 void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& packet)
 {
     const bool isHostReplay = CLocalPlayer::m_bIsHost && packet.replay != 0;
@@ -703,6 +793,10 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     if (newAttempt)
     {
         ms_sideContentAttemptState = {};
+        const MissionRuntimePolicy policy = ResolveMissionRuntimePolicy(packet.missionId);
+        ms_sideContentAttemptState.respawnEligible = policy.respawnEligible;
+        ms_sideContentAttemptState.missionFailThreshold = policy.missionFailThreshold;
+        ms_sideContentAttemptState.incapacitationFailThreshold = policy.incapacitationFailThreshold;
         ms_hasAuthoritativeFlowState = false;
         ms_authoritativeCheckpointState = {};
         ms_authoritativeTimerState = {};
@@ -721,6 +815,12 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.hudHidden = packet.hudHidden;
     ms_sideContentAttemptState.cutscenePhase = packet.cutscenePhase;
     ms_sideContentAttemptState.cutsceneSessionToken = packet.cutsceneSessionToken;
+    ms_sideContentAttemptState.respawnEligible = packet.respawnEligible;
+    ms_sideContentAttemptState.participantDeathCount = packet.participantDeathCount;
+    ms_sideContentAttemptState.participantIncapacitationCount = packet.participantIncapacitationCount;
+    ms_sideContentAttemptState.respawnCount = packet.respawnCount;
+    ms_sideContentAttemptState.missionFailThreshold = packet.missionFailThreshold == 0 ? 1 : packet.missionFailThreshold;
+    ms_sideContentAttemptState.incapacitationFailThreshold = packet.incapacitationFailThreshold;
     ApplyInboundObjectiveTextState(ms_sideContentAttemptState, packet);
 
     CPackets::ReplicatedCheckpointState authoritativeCheckpoint{};
@@ -882,6 +982,12 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.passFailPending = ms_runtimeSnapshotState.passFailPending;
     ms_sideContentAttemptState.cutscenePhase = ms_runtimeSnapshotState.cutscenePhase;
     ms_sideContentAttemptState.cutsceneSessionToken = ms_runtimeSnapshotState.cutsceneSessionToken;
+    ms_sideContentAttemptState.respawnEligible = ms_runtimeSnapshotState.respawnEligible;
+    ms_sideContentAttemptState.participantDeathCount = ms_runtimeSnapshotState.participantDeathCount;
+    ms_sideContentAttemptState.participantIncapacitationCount = ms_runtimeSnapshotState.participantIncapacitationCount;
+    ms_sideContentAttemptState.respawnCount = ms_runtimeSnapshotState.respawnCount;
+    ms_sideContentAttemptState.missionFailThreshold = ms_runtimeSnapshotState.missionFailThreshold == 0 ? 1 : ms_runtimeSnapshotState.missionFailThreshold;
+    ms_sideContentAttemptState.incapacitationFailThreshold = ms_runtimeSnapshotState.incapacitationFailThreshold;
     ms_sideContentAttemptState.objectiveTextToken = ms_runtimeSnapshotState.objectiveTextToken;
     ms_sideContentAttemptState.objectiveTextSemantics = ms_runtimeSnapshotState.objectiveTextSemantics;
     std::memcpy(ms_sideContentAttemptState.objective, ms_runtimeSnapshotState.objective, sizeof(ms_sideContentAttemptState.objective));
@@ -1008,6 +1114,12 @@ void CMissionSyncState::ApplyAdjudicatedTerminalState(const CPackets::MissionFlo
     }
 
     ApplyMissionCleanupFromTerminal();
+}
+
+void CMissionSyncState::HandleLocalPlayerRespawned()
+{
+    EmitParticipantRuntimeEvent(CPackets::MISSION_FLOW_EVENT_RESPAWN_ELIGIBILITY, true);
+    EmitParticipantRuntimeEvent(CPackets::MISSION_FLOW_EVENT_PARTICIPANT_RESPAWNED, false);
 }
 
 void CMissionSyncState::ProcessSubmissionMissionSync()

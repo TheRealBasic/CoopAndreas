@@ -35,6 +35,12 @@ namespace ObjectiveSync
         uint32_t objectiveTextToken = 0;
         uint8_t objectiveTextSemantics = static_cast<uint8_t>(ObjectiveTextSemantics::None);
         char objective[8]{};
+        uint8_t respawnEligible = 0;
+        uint8_t participantDeathCount = 0;
+        uint8_t participantIncapacitationCount = 0;
+        uint8_t respawnCount = 0;
+        uint8_t missionFailThreshold = 1;
+        uint8_t incapacitationFailThreshold = UINT8_MAX;
     };
 
     struct ApplyResult

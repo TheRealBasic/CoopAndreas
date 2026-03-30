@@ -33,6 +33,7 @@ public:
     static void EmitMissionFlowCutscenePhase(uint8_t phase, const char* cutsceneName, uint8_t currArea, uint32_t cutsceneSessionToken);
     static void EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message);
     static void EmitMissionFlowOpcode(uint16_t opcode, const int* params, uint16_t paramCount, const char* text);
+    static void EmitParticipantRuntimeEvent(uint8_t eventType, bool respawnEligible);
     static void HandleMissionFlowSync(const CPackets::MissionFlowSync& packet);
     static void HandleMissionRuntimeSnapshotBegin(const CPackets::MissionRuntimeSnapshotBegin& packet);
     static void HandleMissionRuntimeSnapshotState(const CPackets::MissionRuntimeSnapshotState& packet);
@@ -49,6 +50,7 @@ public:
     static void TriggerSubmissionMissionRewardDelta(int rewardDelta);
     static void HandleSubmissionMissionOutcome(bool passed);
     static void ApplyAdjudicatedTerminalState(const CPackets::MissionFlowSync& packet);
+    static void HandleLocalPlayerRespawned();
     static uint16_t GetMissionInstanceId();
 
     static bool HandleEndSceneSkip();
