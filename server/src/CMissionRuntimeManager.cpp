@@ -18,6 +18,10 @@ namespace
     bool g_hasCheckpoint = false;
     bool g_isOnMission = false;
     bool g_terminalEventSeen = false;
+    uint8_t g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
+    uint8_t g_terminalSourceEventType = 0;
+    uint16_t g_terminalSourceOpcode = 0;
+    uint32_t g_terminalSourceSequence = 0;
     uint32_t g_lastSequence = 0;
     uint16_t g_objectiveVersion = 0;
     uint16_t g_checkpointVersion = 0;
@@ -91,6 +95,10 @@ namespace
             Transition(RuntimeState::Starting);
             Transition(RuntimeState::Active);
             g_terminalEventSeen = false;
+            g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
+            g_terminalSourceEventType = 0;
+            g_terminalSourceOpcode = 0;
+            g_terminalSourceSequence = 0;
         }
     }
 
@@ -117,15 +125,27 @@ namespace
         }
     }
 
-    void ApplyTerminalPending(uint8_t pending)
+    void ApplyTerminalPending(const CMissionRuntimeManager::MissionFlowPayload& packet)
     {
-        if (pending == 1)
+        if (packet.passFailPending == 1)
         {
-            Transition(RuntimeState::PassPending);
+            if (Transition(RuntimeState::PassPending))
+            {
+                g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS;
+                g_terminalSourceEventType = packet.eventType;
+                g_terminalSourceOpcode = packet.sourceOpcode;
+                g_terminalSourceSequence = packet.sequence;
+            }
         }
-        else if (pending == 2)
+        else if (packet.passFailPending == 2)
         {
-            Transition(RuntimeState::FailPending);
+            if (Transition(RuntimeState::FailPending))
+            {
+                g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL;
+                g_terminalSourceEventType = packet.eventType;
+                g_terminalSourceOpcode = packet.sourceOpcode;
+                g_terminalSourceSequence = packet.sequence;
+            }
         }
     }
 
@@ -133,6 +153,14 @@ namespace
     {
         Transition(RuntimeState::Completed);
         g_isOnMission = false;
+    }
+
+    void WriteTerminalMetadata(CMissionRuntimeManager::MissionFlowPayload& packet)
+    {
+        packet.terminalReasonCode = g_terminalReasonCode;
+        packet.terminalSourceEventType = g_terminalSourceEventType;
+        packet.terminalSourceOpcode = g_terminalSourceOpcode;
+        packet.terminalSourceSequence = g_terminalSourceSequence;
     }
 }
 
@@ -162,6 +190,13 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
     {
         if (g_isOnMission)
         {
+            if (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE)
+            {
+                g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_ON_MISSION_CLEARED;
+                g_terminalSourceEventType = 0;
+                g_terminalSourceOpcode = 0;
+                g_terminalSourceSequence = g_lastSequence;
+            }
             ApplyCompletion();
         }
     }
@@ -212,10 +247,17 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         ApplyCheckpointProgression(*packet);
     }
 
-    ApplyTerminalPending(packet->passFailPending);
+    ApplyTerminalPending(*packet);
 
     if (!packet->onMission && g_isOnMission)
     {
+        if (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE)
+        {
+            g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_ON_MISSION_CLEARED;
+            g_terminalSourceEventType = packet->eventType;
+            g_terminalSourceOpcode = packet->sourceOpcode;
+            g_terminalSourceSequence = packet->sequence;
+        }
         ApplyCompletion();
     }
     g_isOnMission = packet->onMission != 0;
@@ -227,6 +269,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     g_lastFlow.runtimeState = static_cast<uint8_t>(g_runtimeState);
     g_lastFlow.objectiveVersion = g_objectiveVersion;
     g_lastFlow.checkpointVersion = g_checkpointVersion;
+    WriteTerminalMetadata(g_lastFlow);
 
     if (g_runtimeSessionToken == 0 || (g_hasFlow && packet->missionId != previousMissionId))
     {
@@ -239,9 +282,10 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->objectiveVersion = g_objectiveVersion;
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
+    WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
-    CNetwork::SendPacketToAll(CPacketsID::MISSION_FLOW_SYNC, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
+    CNetwork::SendPacketToAll(CPacketsID::MISSION_FLOW_SYNC, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
     return true;
 }
 
@@ -311,6 +355,7 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
         replayPacket.objectiveVersion = g_objectiveVersion;
         replayPacket.checkpointVersion = g_checkpointVersion;
         replayPacket.runtimeSessionToken = g_runtimeSessionToken;
+        WriteTerminalMetadata(replayPacket);
         CNetwork::SendPacket(peer, CPacketsID::MISSION_FLOW_SYNC, &replayPacket, sizeof(replayPacket), ENET_PACKET_FLAG_RELIABLE);
     }
 
@@ -337,4 +382,8 @@ void CMissionRuntimeManager::Teardown()
     g_checkpointVersion = 0;
     ++g_runtimeSessionToken;
     g_objectiveState = {};
+    g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
+    g_terminalSourceEventType = 0;
+    g_terminalSourceOpcode = 0;
+    g_terminalSourceSequence = 0;
 }

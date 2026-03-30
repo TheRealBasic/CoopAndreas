@@ -32,6 +32,8 @@ namespace
     bool ms_bLastAppliedWidescreenValue = false;
     uint32_t ms_nMissionFlowSequence = 0;
     uint32_t ms_nLastReceivedMissionFlowSequence = 0;
+    uint32_t ms_lastAppliedTerminalRuntimeSessionToken = 0;
+    uint8_t ms_lastAppliedTerminalReasonCode = CPackets::MISSION_TERMINAL_REASON_NONE;
     uint16_t ms_runtimeMissionInstanceId = 0;
     uint32_t ms_submissionStateVersion = 0;
     uint32_t ms_submissionSnapshotVersion = 0;
@@ -240,6 +242,30 @@ namespace
         pad->bDisablePlayerFireWeaponWithL1 = firingLocked ? 1 : 0;
         pad->bDisablePlayerDisplayVitalStats = hudHidden ? 1 : 0;
     }
+
+    void ApplyMissionCleanupFromTerminal()
+    {
+        CNetworkCheckpoint::Remove();
+        CNetworkEntityBlip::ClearEntityBlips();
+
+        CPad* pad = CPad::GetPad(0);
+        if (pad)
+        {
+            pad->SetDrunkInputDelay(0);
+            pad->bApplyBrakes = 0;
+            pad->bDisablePlayerEnterCar = 0;
+            pad->bDisablePlayerDuck = 0;
+            pad->bDisablePlayerFireWeapon = 0;
+            pad->bDisablePlayerFireWeaponWithL1 = 0;
+            pad->bDisablePlayerCycleWeapon = 0;
+            pad->bDisablePlayerJump = 0;
+            pad->bDisablePlayerDisplayVitalStats = 0;
+        }
+
+        CHud::m_BigMessage[0][0] = 0;
+        CHud::m_BigMessage[1][0] = 0;
+        CDraw::FadeValue = 0;
+    }
 }
 
 void CMissionSyncState::Init()
@@ -261,6 +287,8 @@ void CMissionSyncState::Init()
     ms_bLastAppliedWidescreenValue = false;
     ms_nMissionFlowSequence = 0;
     ms_nLastReceivedMissionFlowSequence = 0;
+    ms_lastAppliedTerminalRuntimeSessionToken = 0;
+    ms_lastAppliedTerminalReasonCode = CPackets::MISSION_TERMINAL_REASON_NONE;
     ms_runtimeMissionInstanceId = 0;
     ms_submissionStateVersion = 0;
     ms_submissionSnapshotVersion = 0;
@@ -566,6 +594,8 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         ms_sideContentAttemptState.passFailPending = packet.passFailPending;
     }
 
+    ApplyAdjudicatedTerminalState(packet);
+
     if (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_INTRO)
     {
         ms_bCutsceneActive = true;
@@ -600,6 +630,35 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
         default: Command<Commands::PRINT>(gxt, packet.time, packet.flag); break;
         }
     }
+}
+
+void CMissionSyncState::ApplyAdjudicatedTerminalState(const CPackets::MissionFlowSync& packet)
+{
+    if (packet.terminalReasonCode == CPackets::MISSION_TERMINAL_REASON_NONE)
+    {
+        return;
+    }
+
+    if (packet.runtimeSessionToken != 0
+        && packet.runtimeSessionToken == ms_lastAppliedTerminalRuntimeSessionToken
+        && packet.terminalReasonCode == ms_lastAppliedTerminalReasonCode)
+    {
+        return;
+    }
+
+    ms_lastAppliedTerminalRuntimeSessionToken = packet.runtimeSessionToken;
+    ms_lastAppliedTerminalReasonCode = packet.terminalReasonCode;
+
+    if (packet.terminalReasonCode == CPackets::MISSION_TERMINAL_REASON_PASS)
+    {
+        HandleSubmissionMissionOutcome(true);
+    }
+    else if (packet.terminalReasonCode == CPackets::MISSION_TERMINAL_REASON_FAIL)
+    {
+        HandleSubmissionMissionOutcome(false);
+    }
+
+    ApplyMissionCleanupFromTerminal();
 }
 
 void CMissionSyncState::ProcessSubmissionMissionSync()

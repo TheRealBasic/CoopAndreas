@@ -594,6 +594,14 @@ public:
 		MISSION_FLOW_EVENT_CUTSCENE_END = 7
 	};
 
+	enum eMissionTerminalReasonCode : uint8_t
+	{
+		MISSION_TERMINAL_REASON_NONE = 0,
+		MISSION_TERMINAL_REASON_PASS = 1,
+		MISSION_TERMINAL_REASON_FAIL = 2,
+		MISSION_TERMINAL_REASON_ON_MISSION_CLEARED = 3
+	};
+
 	struct MissionFlowSync
 	{
 		// Shared side-content payload used by mission/sync modules.
@@ -632,6 +640,10 @@ public:
 		uint16_t objectiveVersion = 0;
 		uint16_t checkpointVersion = 0;
 		uint32_t runtimeSessionToken = 0;
+		uint8_t terminalReasonCode = MISSION_TERMINAL_REASON_NONE;
+		uint8_t terminalSourceEventType = MISSION_FLOW_EVENT_NONE;
+		uint16_t terminalSourceOpcode = 0;
+		uint32_t terminalSourceSequence = 0;
 	};
 
 	struct UpdateEntityBlip
