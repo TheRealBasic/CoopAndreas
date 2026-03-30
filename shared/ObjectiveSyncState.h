@@ -15,6 +15,33 @@ namespace ObjectiveSync
 
     struct State
     {
+        enum : uint8_t
+        {
+            VEHICLE_TASK_NONE = 0,
+            VEHICLE_TASK_ENTER_VEHICLE = 1,
+            VEHICLE_TASK_PURSUIT = 2,
+            VEHICLE_TASK_DESTROY_TARGET = 3
+        };
+
+        enum : uint8_t
+        {
+            PURSUIT_STATE_NONE = 0,
+            PURSUIT_STATE_ACTIVE = 1,
+            PURSUIT_STATE_ESCAPING = 2,
+            PURSUIT_STATE_COMPLETE = 3,
+            PURSUIT_STATE_FAILED = 4
+        };
+
+        enum : uint8_t
+        {
+            DESTROY_ESCAPE_STATE_NONE = 0,
+            DESTROY_ESCAPE_STATE_DESTROY_ACTIVE = 1,
+            DESTROY_ESCAPE_STATE_DESTROYED = 2,
+            DESTROY_ESCAPE_STATE_ESCAPE_ACTIVE = 3,
+            DESTROY_ESCAPE_STATE_ESCAPED = 4,
+            DESTROY_ESCAPE_STATE_FAILED = 5
+        };
+
         uint16_t missionId = 0;
         int32_t timerMs = 0;
         uint16_t objectivePhaseIndex = 0;
@@ -41,6 +68,10 @@ namespace ObjectiveSync
         uint8_t respawnCount = 0;
         uint8_t missionFailThreshold = 1;
         uint8_t incapacitationFailThreshold = UINT8_MAX;
+        uint8_t vehicleTaskState = VEHICLE_TASK_NONE;
+        uint8_t pursuitState = PURSUIT_STATE_NONE;
+        uint8_t destroyEscapeState = DESTROY_ESCAPE_STATE_NONE;
+        uint16_t vehicleTaskSequence = 0;
     };
 
     struct ApplyResult
@@ -143,6 +174,52 @@ namespace ObjectiveSync
 
         switch (opcode)
         {
+        case 0x05CA: // task_enter_car_as_passenger
+        case 0x05CB: // task_enter_car_as_driver
+            if (state.vehicleTaskState != State::VEHICLE_TASK_ENTER_VEHICLE)
+            {
+                state.vehicleTaskState = State::VEHICLE_TASK_ENTER_VEHICLE;
+                if (state.vehicleTaskSequence < UINT16_MAX)
+                {
+                    ++state.vehicleTaskSequence;
+                }
+                result.changed = true;
+                result.progressionChanged = true;
+            }
+            break;
+        case 0x0713: // task_drive_by (pursuit/combat vehicle phase)
+            if (state.vehicleTaskState != State::VEHICLE_TASK_PURSUIT
+                || state.pursuitState != State::PURSUIT_STATE_ACTIVE)
+            {
+                state.vehicleTaskState = State::VEHICLE_TASK_PURSUIT;
+                state.pursuitState = State::PURSUIT_STATE_ACTIVE;
+                if (state.destroyEscapeState == State::DESTROY_ESCAPE_STATE_NONE
+                    || state.destroyEscapeState == State::DESTROY_ESCAPE_STATE_DESTROYED)
+                {
+                    state.destroyEscapeState = State::DESTROY_ESCAPE_STATE_ESCAPE_ACTIVE;
+                }
+                if (state.vehicleTaskSequence < UINT16_MAX)
+                {
+                    ++state.vehicleTaskSequence;
+                }
+                result.changed = true;
+                result.progressionChanged = true;
+            }
+            break;
+        case 0x0672: // task_destroy_car
+            if (state.vehicleTaskState != State::VEHICLE_TASK_DESTROY_TARGET
+                || state.destroyEscapeState != State::DESTROY_ESCAPE_STATE_DESTROY_ACTIVE)
+            {
+                state.vehicleTaskState = State::VEHICLE_TASK_DESTROY_TARGET;
+                state.destroyEscapeState = State::DESTROY_ESCAPE_STATE_DESTROY_ACTIVE;
+                if (state.vehicleTaskSequence < UINT16_MAX)
+                {
+                    ++state.vehicleTaskSequence;
+                }
+                result.changed = true;
+                result.progressionChanged = true;
+            }
+            break;
         case 0x0417: // start_mission
         {
             const uint16_t missionId = (params && paramCount > 0) ? static_cast<uint16_t>(std::max(params[0], 0)) : 0;
@@ -242,6 +319,11 @@ namespace ObjectiveSync
                 result.changed = true;
                 result.progressionChanged = true;
             }
+            if (state.vehicleTaskState == State::VEHICLE_TASK_PURSUIT && state.pursuitState != State::PURSUIT_STATE_COMPLETE)
+            {
+                state.pursuitState = State::PURSUIT_STATE_ESCAPING;
+                result.changed = true;
+            }
             break;
         case 0x014E: // display_onscreen_timer
         case 0x03C3: // display_onscreen_timer_with_string
@@ -300,6 +382,18 @@ namespace ObjectiveSync
             if (state.passFailPending == 0)
             {
                 state.passFailPending = 1;
+                if (state.destroyEscapeState == State::DESTROY_ESCAPE_STATE_DESTROY_ACTIVE)
+                {
+                    state.destroyEscapeState = State::DESTROY_ESCAPE_STATE_DESTROYED;
+                }
+                else if (state.destroyEscapeState == State::DESTROY_ESCAPE_STATE_ESCAPE_ACTIVE)
+                {
+                    state.destroyEscapeState = State::DESTROY_ESCAPE_STATE_ESCAPED;
+                }
+                if (state.pursuitState == State::PURSUIT_STATE_ACTIVE || state.pursuitState == State::PURSUIT_STATE_ESCAPING)
+                {
+                    state.pursuitState = State::PURSUIT_STATE_COMPLETE;
+                }
                 result.changed = true;
                 result.progressionChanged = true;
             }
@@ -308,6 +402,8 @@ namespace ObjectiveSync
             if (state.passFailPending == 0)
             {
                 state.passFailPending = 2;
+                state.pursuitState = State::PURSUIT_STATE_FAILED;
+                state.destroyEscapeState = State::DESTROY_ESCAPE_STATE_FAILED;
                 result.changed = true;
                 result.progressionChanged = true;
             }
