@@ -129,8 +129,10 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x05C0, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}}, // task_look_at_vehicle {char} [Char] {vehicle} [Car] {time} [int]
     {0x05CA, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}}, // task_enter_car_as_passenger {char} [Char] {vehicle} [Car] {time} [int] {seatId} [int]
     {0x05CB, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}}, // task_enter_car_as_driver {char} [Char] {vehicle} [Car] {time} [int]
+    {0x05E2, true, {eSyncedParamType::PED, eSyncedParamType::PED}}, // task_kill_char_on_foot {killer} [Char] {target} [Char]
     {0x0603, true, {eSyncedParamType::PED}}, // task_go_to_coord_any_means {char} [Char] {x} [float] {y} [float] {z} [float] {walkSpeed} [int] {vehicle} [Car] // OOPS, 6th parameter is an entity, but its not used anywhere 
     {0x0634, true, {eSyncedParamType::PED, eSyncedParamType::PED}}, // task_kill_char_on_foot_while_ducking {char} [Char] {target} [Char] {flags} [int] {actionDelay} [int] {actionChance} [int]
+    {0x0672, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}}, // task_destroy_car {char} [Char] {vehicle} [Car]
     {0x0673, true, {eSyncedParamType::PED}}, // task_dive_and_get_up {handle} [Char] {directionX} [float] {directionY} [float] {timeOnGround} [int]
     {0x0713, true, {eSyncedParamType::PED, eSyncedParamType::PED, eSyncedParamType::VEHICLE}}, // task_drive_by {handle} [Char] {targetChar} [Char] {targetVehicle} [Car] {x} [float] {y} [float] {z} [float] {radius} [float] {type} [DriveByType] {rightHandCarSeat} [bool] {fireRate} [int]
     {0x0792, true, {eSyncedParamType::PED}}, // clear_char_tasks_immediately [Char]
@@ -234,6 +236,52 @@ static uint16_t argCount = 0;
 
 namespace
 {
+    struct DeferredOpcodePacket
+    {
+        std::vector<uint8_t> payload{};
+        uint16_t opcode = 0;
+        uint16_t retries = 0;
+    };
+
+    std::vector<DeferredOpcodePacket> s_deferredOpcodePackets{};
+    constexpr uint16_t kDeferredOpcodeMaxRetries = 600;
+
+    bool IsDeferredResolutionOpcode(uint16_t opcode)
+    {
+        switch (opcode)
+        {
+        case 0x05CB: // task_enter_car_as_driver
+        case 0x05E2: // task_kill_char_on_foot
+        case 0x0672: // task_destroy_car
+        case 0x0713: // task_drive_by
+        case 0x014E: // display_onscreen_timer
+        case 0x014F: // clear_onscreen_timer
+        case 0x03C3: // display_onscreen_timer_with_string
+        case 0x0396: // freeze_onscreen_timer
+        case 0x0890: // set_timer_beep_countdown_time
+        case 0x06D5: // create_checkpoint
+        case 0x06D6: // delete_checkpoint
+        case 0x07F3: // set_checkpoint_coords
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool TryQueueDeferredOpcodePacket(uint16_t opcode, const uint8_t* buffer, int bufferSize)
+    {
+        if (!IsDeferredResolutionOpcode(opcode) || !buffer || bufferSize <= 0)
+        {
+            return false;
+        }
+
+        DeferredOpcodePacket deferred{};
+        deferred.payload.assign(buffer, buffer + bufferSize);
+        deferred.opcode = opcode;
+        s_deferredOpcodePackets.push_back(std::move(deferred));
+        return true;
+    }
+
     struct MissionEntityHandleKey
     {
         uint16_t missionInstanceId = 0;
@@ -308,6 +356,9 @@ namespace
         {
         case 0x05CA: // task_enter_car_as_passenger
         case 0x05CB: // task_enter_car_as_driver
+        case 0x05E2: // task_kill_char_on_foot
+        case 0x0672: // task_destroy_car
+        case 0x0713: // task_drive_by
         case 0x0634: // task_kill_char_on_foot_while_ducking
         case COMMAND_TASK_LEAVE_CAR:
         case COMMAND_TASK_LEAVE_ANY_CAR:
@@ -776,6 +827,11 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
         return;
     }
 
+    const auto deferIfPossible = [&]() -> bool
+    {
+        return TryQueueDeferredOpcodePacket(header.opcode, buffer, bufferSize);
+    };
+
     if (scriptParamCount)
     {
         memcpy(scriptParamsBuffer, current, scriptParamCount * sizeof(int));
@@ -815,7 +871,13 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             if (auto ped = networkPed->m_pPed)
                             {
                                 if (!CUtil::IsValidEntityPtr(ped))
+                                {
+                                    if (!deferIfPossible())
+                                    {
+                                        return;
+                                    }
                                     return;
+                                }
 
                                 scriptParamsBuffer[i].value = CPools::GetPedRef(ped);
                                 /*if (header.opcode == 0x0605)
@@ -824,6 +886,10 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             else if (!IsOpcodeRequiresStrictCheck(header.opcode))
                             {
                                 scriptParamsBuffer[i].value = -1;
+                            }
+                            else if (!deferIfPossible())
+                            {
+                                return;
                             }
                             else return;
                         }
@@ -840,6 +906,10 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 }
                             }
                             scriptParamsBuffer[i].value = -1;
+                        }
+                        else if (!deferIfPossible())
+                        {
+                            return;
                         }
                         else return;
                     }
@@ -863,7 +933,13 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 if (auto ped = networkPlayer->m_pPed)
                                 {
                                     if (!CUtil::IsValidEntityPtr(ped))
+                                    {
+                                        if (!deferIfPossible())
+                                        {
+                                            return;
+                                        }
                                         return;
+                                    }
 
                                     scriptParamsBuffer[i].value = CPools::GetPedRef(ped);
                                     RememberRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PLAYER, scriptParamsBuffer[i].entityId);
@@ -874,11 +950,19 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 {
                                     scriptParamsBuffer[i].value = -1;
                                 }
+                                else if (!deferIfPossible())
+                                {
+                                    return;
+                                }
                                 else return;
                             }
                             else if (!IsOpcodeRequiresStrictCheck(header.opcode))
                             {
                                 scriptParamsBuffer[i].value = -1;
+                            }
+                            else if (!deferIfPossible())
+                            {
+                                return;
                             }
                             else return;
                         }
@@ -934,7 +1018,13 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                         if (auto vehicle = networkVehicle->m_pVehicle)
                         {
                             if (!CUtil::IsValidEntityPtr(vehicle))
+                            {
+                                if (!deferIfPossible())
+                                {
+                                    return;
+                                }
                                 return;
+                            }
 
                             scriptParamsBuffer[i].value = CPools::GetVehicleRef(vehicle);
                             RememberRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, scriptParamsBuffer[i].entityId);
@@ -954,6 +1044,10 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 }
                             }
                             scriptParamsBuffer[i].value = -1;
+                        }
+                        else if (!deferIfPossible())
+                        {
+                            return;
                         }
                         else return;
                     }
@@ -977,6 +1071,10 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             }
                         }
                         scriptParamsBuffer[i].value = -1;
+                    }
+                    else if (!deferIfPossible())
+                    {
+                        return;
                     }
                     else return;
 
@@ -1115,6 +1213,45 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
     patch::SetRaw(0x464080, (void*)"\x66\x8B\x44\x24\x04", 5, false);
     patch::SetRaw(0x463D50, (void*)"\x8B\x41\x14\x83\xEC\x08", 6, false);
     bProcessingNetworkOpcode = false;
+}
+
+void COpCodeSync::ProcessDeferredPackets()
+{
+    if (s_deferredOpcodePackets.empty())
+    {
+        return;
+    }
+
+    std::vector<DeferredOpcodePacket> pending{};
+    pending.reserve(s_deferredOpcodePackets.size());
+
+    const auto deferredSnapshot = s_deferredOpcodePackets;
+    s_deferredOpcodePackets.clear();
+
+    for (auto packet : deferredSnapshot)
+    {
+        if (packet.payload.empty())
+        {
+            continue;
+        }
+
+        const size_t queueSizeBefore = s_deferredOpcodePackets.size();
+        COpCodeSync::HandlePacket(packet.payload.data(), (int)packet.payload.size());
+        if (s_deferredOpcodePackets.size() > queueSizeBefore)
+        {
+            s_deferredOpcodePackets.pop_back();
+            packet.retries++;
+            if (packet.retries < kDeferredOpcodeMaxRetries)
+            {
+                pending.push_back(std::move(packet));
+            }
+        }
+    }
+
+    if (!pending.empty())
+    {
+        s_deferredOpcodePackets.insert(s_deferredOpcodePackets.end(), pending.begin(), pending.end());
+    }
 }
 
 void __declspec(naked) OpcodeProcessingWellDone_Hook()
