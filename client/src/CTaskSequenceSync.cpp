@@ -4,26 +4,46 @@
 #include <game_sa/CTaskSequences.h>
 #include <COpCodeSync.h>
 
-SSyncedOpCode m_syncedTasks[] = // TODO
+// Synced task opcodes should be included when:
+// 1) The opcode can be serialized into task sequence packets without extra local-only state.
+// 2) It directly affects mission/AI progression that must stay deterministic across peers.
+// 3) Its parameter schema is already represented in COpCodeSync synced opcode serialization.
+//
+// Grouping strategy:
+// - Movement/locomotion tasks
+// - Orientation/aim/look control tasks
+// - Animation and blended animation tasks
+// - Vehicle exit tasks
+// - Task cleanup/reset operations
+SSyncedOpCode m_syncedTasks[] =
 {
+	// Animation and blended animation tasks
 	{COMMAND_TASK_PLAY_ANIM_NON_INTERRUPTABLE, true, eSyncedParamType::PED},
+	// Movement/locomotion tasks
 	{COMMAND_TASK_GO_STRAIGHT_TO_COORD, true, eSyncedParamType::PED},
 	{COMMAND_TASK_ACHIEVE_HEADING, true, eSyncedParamType::PED},
 	{COMMAND_TASK_JUMP, true, eSyncedParamType::PED},
 	{COMMAND_TASK_TIRED, true, eSyncedParamType::PED},
+	// Animation and blended animation tasks
 	{COMMAND_TASK_PLAY_ANIM_SECONDARY, true, eSyncedParamType::PED},
 	{COMMAND_TASK_CHAR_SLIDE_TO_COORD_AND_PLAY_ANIM, true, eSyncedParamType::PED},
 	{COMMAND_TASK_PLAY_ANIM, true, eSyncedParamType::PED},
+	// Orientation/aim/look control tasks
 	{COMMAND_TASK_TURN_CHAR_TO_FACE_CHAR, true, eSyncedParamType::PED, eSyncedParamType::PED},
 	{COMMAND_TASK_SHOOT_AT_COORD, true, eSyncedParamType::PED},
 	{COMMAND_TASK_LOOK_AT_CHAR, true, eSyncedParamType::PED, eSyncedParamType::PED},
+	// Task cleanup/reset operations
 	{COMMAND_CLEAR_CHAR_TASKS, true, eSyncedParamType::PED},
 	{COMMAND_CLEAR_LOOK_AT, true, eSyncedParamType::PED},
 	{COMMAND_TASK_STAND_STILL, true, eSyncedParamType::PED},
+	// Orientation/aim/look control tasks
 	{COMMAND_TASK_LOOK_AT_COORD, true, eSyncedParamType::PED},
+	// Vehicle exit tasks
 	{COMMAND_TASK_LEAVE_CAR, true, eSyncedParamType::PED, eSyncedParamType::VEHICLE},
+	// Animation and blended animation tasks
 	{COMMAND_TASK_DIE_NAMED_ANIM, true, eSyncedParamType::PED},
 	{COMMAND_TASK_PLAY_ANIM_WITH_FLAGS, true, eSyncedParamType::PED},
+	// Vehicle exit tasks
 	{COMMAND_TASK_LEAVE_ANY_CAR, true, eSyncedParamType::PED},
 };
 
