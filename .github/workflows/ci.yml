@@ -41,3 +41,18 @@ jobs:
         with:
           name: opcode-audit-report
           path: artifacts/storyline-opcode-backlog.md
+
+  qa-trace:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate roadmap QA trace index
+        run: python3 tools/qa_trace.py --output artifacts/roadmap-trace-index.json --check-complete
+
+      - name: Upload QA trace index
+        uses: actions/upload-artifact@v4
+        with:
+          name: roadmap-trace-index
+          path: artifacts/roadmap-trace-index.json

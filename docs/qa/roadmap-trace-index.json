@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "tag_format": {
+    "prefix": "PARITY-ID:",
+    "pattern": "PARITY-ID: <AREA>-<ITEM>",
+    "example": "PARITY-ID: STADIUM-8-TRACK"
+  },
+  "generated_from": "docs/ROADMAP.md",
+  "items": [
+    {
+      "parity_id": "SCHOOLS-DRIVING-SCHOOL",
+      "roadmap": {
+        "phase": "Schools",
+        "mode": "Driving school",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-schools-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "SCHOOLS-FLIGHT-SCHOOL",
+      "roadmap": {
+        "phase": "Schools",
+        "mode": "Flight school",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-schools-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "SCHOOLS-BIKE-SCHOOL",
+      "roadmap": {
+        "phase": "Schools",
+        "mode": "Bike school",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-schools-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "SCHOOLS-BOAT-SCHOOL",
+      "roadmap": {
+        "phase": "Schools",
+        "mode": "Boat school",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-schools-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "STADIUM-8-TRACK",
+      "roadmap": {
+        "phase": "Stadium events",
+        "mode": "8-Track",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-stadium-events-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "STADIUM-BLOOD-BOWL",
+      "roadmap": {
+        "phase": "Stadium events",
+        "mode": "Blood Bowl",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-stadium-events-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "STADIUM-DIRT-TRACK",
+      "roadmap": {
+        "phase": "Stadium events",
+        "mode": "Dirt Track",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-stadium-events-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "STADIUM-KICK-START",
+      "roadmap": {
+        "phase": "Stadium events",
+        "mode": "Kick Start",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-stadium-events-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "HIDDEN-BMX",
+      "roadmap": {
+        "phase": "Hidden races",
+        "mode": "BMX",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-hidden-races-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "HIDDEN-NRG-500",
+      "roadmap": {
+        "phase": "Hidden races",
+        "mode": "NRG-500",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-hidden-races-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "HIDDEN-CHILIAD-CHALLENGE",
+      "roadmap": {
+        "phase": "Hidden races",
+        "mode": "Chiliad Challenge",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-hidden-races-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "COURIER-LOS-SANTOS-COURIER",
+      "roadmap": {
+        "phase": "Courier routes",
+        "mode": "Los Santos courier",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-courier-routes-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "COURIER-SAN-FIERRO-COURIER",
+      "roadmap": {
+        "phase": "Courier routes",
+        "mode": "San Fierro courier",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-courier-routes-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "COURIER-LAS-VENTURAS-COURIER",
+      "roadmap": {
+        "phase": "Courier routes",
+        "mode": "Las Venturas courier",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-courier-routes-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "STREET-STREET-RACING-SET-22-RACES",
+      "roadmap": {
+        "phase": "Street races",
+        "mode": "Street Racing set (22 races)",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-street-races-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "IMPORTEXPORT-IMPORT-EXPORT",
+      "roadmap": {
+        "phase": "Import/Export",
+        "mode": "Import/Export",
+        "status": "not started",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-import-export-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    }
+  ]
+}
