@@ -132,6 +132,17 @@ Grouped by script family; each mission carries owner, target date, and next stat
 | Robbing Uncle Sam | `RYDER` | Mission Sync Pod (Ryder stream) | 2026-04-04 | `not started -> in progress` |
 | OG Loc | `SMOKE` | Mission Sync Pod (Smoke stream) | 2026-04-04 | `not started -> in progress` |
 
+#### Wave A (early mission implementation tranche)
+
+Selected from roadmap early missions previously marked `not started` and advanced through implementation pipeline (`command mapping` -> `actor registry hookup` -> `objective/checkpoint integration` -> `cutscene/control sync` -> `pass/fail adjudication`):
+
+- `Nines And AK's`
+- `Drive-By`
+- `Sweet's Girl`
+- `Cesar Vialpando`
+
+Promotion rule: each mission remains non-functional until all six core gameplay gates are `pass` in `docs/qa/storyline-wave-mission-evidence.md`.
+
 
 | Mission | Script | Status | Blocking dependencies (opcodes/commands) | Quick acceptance criteria |
 | --- | --- | --- | --- | --- |
@@ -139,8 +150,8 @@ Grouped by script family; each mission carries owner, target date, and next stat
 | Drive-Thru | `scm/scripts/SWEET.txt` | `done` (Wave 1 stabilization parity gates evidenced) | `create_car`, `task_drive_by`, `set_char_obj_destroy_car` | [x] [Start/cutscene sync](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Objective propagation](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Fail/pass parity](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Reconnect restore](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios) · [x] [Late-join hydration](docs/qa/sweet-w1-cleaning-drive-thru-parity.md#drive-thru-parity-scenarios). |
 | Nines And AK's | `scm/scripts/SWEET.txt` | `in progress` | `create_actor`, `set_char_obj_kill_char_any_means`, `set_objective` | See mini ticket: [`docs/qa/storyline-shared-command-mini-tickets.md#nines-and-aks-scmscriptssweettxt`](docs/qa/storyline-shared-command-mini-tickets.md#nines-and-aks-scmscriptssweettxt) (blocking mapping + QA scenarios documented). |
 | Drive-By | `scm/scripts/SWEET.txt` | `in progress` | `create_car`, `task_drive_by`, `set_objective` | See mini ticket: [`docs/qa/storyline-shared-command-mini-tickets.md#drive-by-scmscriptssweettxt`](docs/qa/storyline-shared-command-mini-tickets.md#drive-by-scmscriptssweettxt) (blocking mapping + QA scenarios documented). |
-| Sweet's Girl | `scm/scripts/SWEET.txt` | `not started` | `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, `task_enter_car_as_driver` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| Cesar Vialpando | `scm/scripts/SWEET.txt` | `not started` | `Mission.LoadAndLaunchInternal`, `task_car_drive_wander`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+| Sweet's Girl | `scm/scripts/SWEET.txt` | `in progress` | `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, `task_enter_car_as_driver` | Wave A pipeline executed through pass/fail adjudication; functional promotion blocked until six QA gates are `pass` in `docs/qa/storyline-wave-mission-evidence.md`. |
+| Cesar Vialpando | `scm/scripts/SWEET.txt` | `in progress` | `Mission.LoadAndLaunchInternal`, `task_car_drive_wander`, `set_objective` | Wave A pipeline executed through pass/fail adjudication; functional promotion blocked until six QA gates are `pass` in `docs/qa/storyline-wave-mission-evidence.md`. |
 | Burning Desire | `scm/scripts/CRASH.txt` | `not started` | `create_fire`, `remove_char_from_car_maintain_position`, `set_char_obj_leave_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Gray Imports | `scm/scripts/CRASH.txt` | `not started` | `create_actor`, `set_char_obj_kill_char_any_means`, `blow_up_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Home Invasion | `scm/scripts/RYDER.txt` | `not started` | `create_pickup`, `task_go_straight_to_coord`, `set_timers` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
