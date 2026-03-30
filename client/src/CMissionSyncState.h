@@ -38,6 +38,7 @@ public:
     static void HandleSubmissionMissionStateDelta(const CPackets::SubmissionMissionStateDelta& packet);
     static void TriggerSubmissionMissionRewardDelta(int rewardDelta);
     static void HandleSubmissionMissionOutcome(bool passed);
+    static void ApplyAdjudicatedTerminalState(const CPackets::MissionFlowSync& packet);
     static uint16_t GetMissionInstanceId();
 
     static bool HandleEndSceneSkip();

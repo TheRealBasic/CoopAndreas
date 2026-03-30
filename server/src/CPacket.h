@@ -256,6 +256,14 @@ public:
 		MISSION_RUNTIME_COMPLETED = 5
 	};
 
+	enum eMissionTerminalReasonCode : uint8_t
+	{
+		MISSION_TERMINAL_REASON_NONE = 0,
+		MISSION_TERMINAL_REASON_PASS = 1,
+		MISSION_TERMINAL_REASON_FAIL = 2,
+		MISSION_TERMINAL_REASON_ON_MISSION_CLEARED = 3
+	};
+
 	struct OnMissionFlagSync
 	{
 		uint8_t bOnMission : 1;
@@ -295,6 +303,10 @@ public:
 		uint16_t objectiveVersion;
 		uint16_t checkpointVersion;
 		uint32_t runtimeSessionToken;
+		uint8_t terminalReasonCode;
+		uint8_t terminalSourceEventType;
+		uint16_t terminalSourceOpcode;
+		uint32_t terminalSourceSequence;
 	};
 
 	struct UpdateCheckpoint

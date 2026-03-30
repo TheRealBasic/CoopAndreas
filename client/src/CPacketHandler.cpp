@@ -1849,37 +1849,23 @@ void CPacketHandler::OnMissionFlagSync__Handle(void* data, int size)
 
 	if (CTheScripts::OnAMissionFlag)
 	{
-		const bool wasOnMission = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] != 0;
 		CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] = packet->bOnMission;
-		if (!packet->bOnMission && wasOnMission)
-		{
-			// cleanup
-			CNetworkCheckpoint::Remove();
-			CNetworkEntityBlip::ClearEntityBlips();
-			CPad::GetPad(0)->SetDrunkInputDelay(0);
-			CPad::GetPad(0)->bApplyBrakes = 0;
-			CPad::GetPad(0)->bDisablePlayerEnterCar = 0;
-			CPad::GetPad(0)->bDisablePlayerDuck = 0;
-			CPad::GetPad(0)->bDisablePlayerFireWeapon = 0;
-			CPad::GetPad(0)->bDisablePlayerFireWeaponWithL1 = 0;
-			CPad::GetPad(0)->bDisablePlayerCycleWeapon = 0;
-			CPad::GetPad(0)->bDisablePlayerJump = 0;
-			CPad::GetPad(0)->bDisablePlayerDisplayVitalStats = 0;
-			CDraw::FadeValue = 0;
-		}
 	}
 
 }
 
 void CPacketHandler::MissionFlowSync__Handle(void* data, int size)
 {
-	if (CLocalPlayer::m_bIsHost)
-		return;
-
 	if (size < (int)sizeof(CPackets::MissionFlowSync))
 		return;
 
 	CPackets::MissionFlowSync* packet = (CPackets::MissionFlowSync*)data;
+	if (CLocalPlayer::m_bIsHost)
+	{
+		CMissionSyncState::ApplyAdjudicatedTerminalState(*packet);
+		return;
+	}
+
 	CMissionSyncState::HandleMissionFlowSync(*packet);
 }
 
