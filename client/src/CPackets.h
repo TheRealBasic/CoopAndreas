@@ -643,6 +643,8 @@ public:
 		uint8_t hudHidden = 0;            // 1 = scripted HUD hide lock is active
 		uint8_t cutscenePhase = 0;        // 0 = none, 1 = intro, 2 = skip, 3 = end
 		uint32_t cutsceneSessionToken = 0;
+		uint32_t objectiveTextToken = 0;  // Stable token for objective text key (0 = cleared)
+		uint8_t objectiveTextSemantics = 0; // 0 = none, 1 = replace, 2 = clear
 		char objective[8]{};
 		uint8_t runtimeState = 0;
 		uint16_t objectiveVersion = 0;
@@ -737,6 +739,8 @@ public:
 		uint8_t onMission = 0;
 		uint16_t missionId = 0;
 		uint16_t objectivePhaseIndex = 0;
+		uint32_t objectiveTextToken = 0;
+		uint8_t objectiveTextSemantics = 0;
 		char objective[8]{};
 		int32_t timerMs = 0;
 		uint8_t timerVisible = 0;

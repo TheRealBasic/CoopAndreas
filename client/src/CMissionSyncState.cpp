@@ -275,6 +275,56 @@ namespace
         CHud::m_BigMessage[1][0] = 0;
         CDraw::FadeValue = 0;
     }
+
+    void PopulateMissionFlowStatePayload(CPackets::MissionFlowSync& packet, const SideContentAttemptState& state)
+    {
+        packet.missionId = state.missionId;
+        packet.timerMs = state.timerMs;
+        packet.objectivePhaseIndex = state.objectivePhaseIndex;
+        packet.checkpointIndex = state.checkpointIndex;
+        packet.checkpointCount = state.checkpointCount;
+        packet.timerVisible = state.timerVisible;
+        packet.timerFrozen = state.timerFrozen;
+        packet.timerDirection = state.timerDirection;
+        packet.passFailPending = state.passFailPending;
+        packet.playerControlState = state.playerControlState;
+        packet.movementLocked = state.movementLocked;
+        packet.firingLocked = state.firingLocked;
+        packet.cameraLocked = state.cameraLocked;
+        packet.hudHidden = state.hudHidden;
+        packet.cutscenePhase = state.cutscenePhase;
+        packet.cutsceneSessionToken = state.cutsceneSessionToken;
+        packet.objectiveTextToken = state.objectiveTextToken;
+        packet.objectiveTextSemantics = state.objectiveTextSemantics;
+        strncpy_s(packet.objective, state.objective, sizeof(packet.objective));
+    }
+
+    void ApplyInboundObjectiveTextState(SideContentAttemptState& state, const CPackets::MissionFlowSync& packet)
+    {
+        state.objectiveTextToken = packet.objectiveTextToken;
+        state.objectiveTextSemantics = packet.objectiveTextSemantics;
+
+        if (packet.objectiveTextSemantics == static_cast<uint8_t>(ObjectiveSync::ObjectiveTextSemantics::Clear))
+        {
+            memset(state.objective, 0, sizeof(state.objective));
+            return;
+        }
+
+        if (packet.objectiveTextSemantics == static_cast<uint8_t>(ObjectiveSync::ObjectiveTextSemantics::Replace))
+        {
+            strncpy_s(state.objective, packet.objective, sizeof(state.objective));
+            return;
+        }
+
+        if (packet.objective[0])
+        {
+            strncpy_s(state.objective, packet.objective, sizeof(state.objective));
+        }
+        else
+        {
+            memset(state.objective, 0, sizeof(state.objective));
+        }
+    }
 }
 
 void CMissionSyncState::Init()
@@ -450,23 +500,11 @@ void CMissionSyncState::EmitMissionFlowCutscenePhase(uint8_t phase, const char* 
     packet.sequence = NextMissionEventSequenceId();
     packet.sequenceId = packet.sequence;
     packet.missionEpoch = ms_missionEpoch;
-    packet.missionId = ms_sideContentAttemptState.missionId;
-    packet.timerMs = ms_sideContentAttemptState.timerMs;
-    packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
-    packet.checkpointIndex = ms_sideContentAttemptState.checkpointIndex;
-    packet.checkpointCount = ms_sideContentAttemptState.checkpointCount;
-    packet.timerVisible = ms_sideContentAttemptState.timerVisible;
-    packet.timerFrozen = ms_sideContentAttemptState.timerFrozen;
-    packet.timerDirection = ms_sideContentAttemptState.timerDirection;
-    packet.passFailPending = ms_sideContentAttemptState.passFailPending;
-    packet.playerControlState = ms_sideContentAttemptState.playerControlState;
-    packet.movementLocked = ms_sideContentAttemptState.movementLocked;
-    packet.firingLocked = ms_sideContentAttemptState.firingLocked;
-    packet.cameraLocked = ms_sideContentAttemptState.cameraLocked;
-    packet.hudHidden = ms_sideContentAttemptState.hudHidden;
     packet.cutscenePhase = phase;
     packet.cutsceneSessionToken = cutsceneSessionToken;
-    strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
+    PopulateMissionFlowStatePayload(packet, ms_sideContentAttemptState);
+    packet.cutscenePhase = phase;
+    packet.cutsceneSessionToken = cutsceneSessionToken;
     strncpy_s(packet.cutsceneName, cutsceneName ? cutsceneName : "", sizeof(packet.cutsceneName));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
@@ -509,23 +547,17 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     packet.sequenceId = packet.sequence;
     packet.missionEpoch = ms_missionEpoch;
     packet.sourceOpcode = opcode;
-    packet.missionId = ms_sideContentAttemptState.missionId;
-    packet.timerMs = ms_sideContentAttemptState.timerMs;
-    packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
-    packet.checkpointIndex = ms_sideContentAttemptState.checkpointIndex;
-    packet.checkpointCount = ms_sideContentAttemptState.checkpointCount;
-    packet.timerVisible = ms_sideContentAttemptState.timerVisible;
-    packet.timerFrozen = ms_sideContentAttemptState.timerFrozen;
-    packet.timerDirection = ms_sideContentAttemptState.timerDirection;
-    packet.passFailPending = ms_sideContentAttemptState.passFailPending;
-    packet.playerControlState = ms_sideContentAttemptState.playerControlState;
-    packet.movementLocked = ms_sideContentAttemptState.movementLocked;
-    packet.firingLocked = ms_sideContentAttemptState.firingLocked;
-    packet.cameraLocked = ms_sideContentAttemptState.cameraLocked;
-    packet.hudHidden = ms_sideContentAttemptState.hudHidden;
-    packet.cutscenePhase = ms_sideContentAttemptState.cutscenePhase;
-    packet.cutsceneSessionToken = ms_sideContentAttemptState.cutsceneSessionToken;
-    strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
+    const ObjectiveSync::ObjectiveTextSemantics semantics =
+        (message.gxt && message.gxt[0]) ? ObjectiveSync::ObjectiveTextSemantics::Replace : ObjectiveSync::ObjectiveTextSemantics::Clear;
+    if (ObjectiveSync::ApplyObjectiveTextEvent(ms_sideContentAttemptState, semantics, message.gxt))
+    {
+        if (ms_sideContentAttemptState.checkpointIndex < UINT16_MAX)
+        {
+            ++ms_sideContentAttemptState.checkpointIndex;
+        }
+    }
+
+    PopulateMissionFlowStatePayload(packet, ms_sideContentAttemptState);
     strncpy_s(packet.gxt, message.gxt ? message.gxt : "", sizeof(packet.gxt));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
@@ -551,23 +583,7 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     packet.sequenceId = packet.sequence;
     packet.missionEpoch = ms_missionEpoch;
     packet.sourceOpcode = opcode;
-    packet.missionId = ms_sideContentAttemptState.missionId;
-    packet.timerMs = ms_sideContentAttemptState.timerMs;
-    packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
-    packet.checkpointIndex = ms_sideContentAttemptState.checkpointIndex;
-    packet.checkpointCount = ms_sideContentAttemptState.checkpointCount;
-    packet.timerVisible = ms_sideContentAttemptState.timerVisible;
-    packet.timerFrozen = ms_sideContentAttemptState.timerFrozen;
-    packet.timerDirection = ms_sideContentAttemptState.timerDirection;
-    packet.passFailPending = ms_sideContentAttemptState.passFailPending;
-    packet.playerControlState = ms_sideContentAttemptState.playerControlState;
-    packet.movementLocked = ms_sideContentAttemptState.movementLocked;
-    packet.firingLocked = ms_sideContentAttemptState.firingLocked;
-    packet.cameraLocked = ms_sideContentAttemptState.cameraLocked;
-    packet.hudHidden = ms_sideContentAttemptState.hudHidden;
-    packet.cutscenePhase = ms_sideContentAttemptState.cutscenePhase;
-    packet.cutsceneSessionToken = ms_sideContentAttemptState.cutsceneSessionToken;
-    strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
+    PopulateMissionFlowStatePayload(packet, ms_sideContentAttemptState);
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
 
@@ -617,14 +633,7 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.hudHidden = packet.hudHidden;
     ms_sideContentAttemptState.cutscenePhase = packet.cutscenePhase;
     ms_sideContentAttemptState.cutsceneSessionToken = packet.cutsceneSessionToken;
-    if (packet.objective[0])
-    {
-        strncpy_s(ms_sideContentAttemptState.objective, packet.objective, sizeof(ms_sideContentAttemptState.objective));
-    }
-    else
-    {
-        memset(ms_sideContentAttemptState.objective, 0, sizeof(ms_sideContentAttemptState.objective));
-    }
+    ApplyInboundObjectiveTextState(ms_sideContentAttemptState, packet);
 
     if (ms_sideContentAttemptState.passFailPending == 0)
     {
@@ -729,6 +738,8 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.passFailPending = ms_runtimeSnapshotState.passFailPending;
     ms_sideContentAttemptState.cutscenePhase = ms_runtimeSnapshotState.cutscenePhase;
     ms_sideContentAttemptState.cutsceneSessionToken = ms_runtimeSnapshotState.cutsceneSessionToken;
+    ms_sideContentAttemptState.objectiveTextToken = ms_runtimeSnapshotState.objectiveTextToken;
+    ms_sideContentAttemptState.objectiveTextSemantics = ms_runtimeSnapshotState.objectiveTextSemantics;
     std::memcpy(ms_sideContentAttemptState.objective, ms_runtimeSnapshotState.objective, sizeof(ms_sideContentAttemptState.objective));
 
     SetMissionAuthorityMetadata(ms_runtimeSnapshotState.missionEpoch, ms_runtimeSnapshotState.sequenceId);

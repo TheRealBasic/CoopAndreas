@@ -141,7 +141,9 @@ namespace
     {
         if (!g_hasFlow
             || std::memcmp(g_lastFlow.objective, packet.objective, sizeof(packet.objective)) != 0
-            || g_lastFlow.objectivePhaseIndex != packet.objectivePhaseIndex)
+            || g_lastFlow.objectivePhaseIndex != packet.objectivePhaseIndex
+            || g_lastFlow.objectiveTextToken != packet.objectiveTextToken
+            || g_lastFlow.objectiveTextSemantics != packet.objectiveTextSemantics)
         {
             ++g_objectiveVersion;
         }
@@ -405,6 +407,8 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.hudHidden = packet->hudHidden;
         g_objectiveState.cutscenePhase = packet->cutscenePhase;
         g_objectiveState.cutsceneSessionToken = packet->cutsceneSessionToken;
+        g_objectiveState.objectiveTextToken = packet->objectiveTextToken;
+        g_objectiveState.objectiveTextSemantics = packet->objectiveTextSemantics;
         std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
         if (g_hasFlow)
@@ -563,6 +567,8 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     snapshotState.onMission = g_isOnMission ? 1 : 0;
     snapshotState.missionId = g_objectiveState.missionId;
     snapshotState.objectivePhaseIndex = g_objectiveState.objectivePhaseIndex;
+    snapshotState.objectiveTextToken = g_objectiveState.objectiveTextToken;
+    snapshotState.objectiveTextSemantics = g_objectiveState.objectiveTextSemantics;
     std::memcpy(snapshotState.objective, g_objectiveState.objective, sizeof(snapshotState.objective));
     snapshotState.timerMs = g_objectiveState.timerMs;
     snapshotState.timerVisible = g_objectiveState.timerVisible;
