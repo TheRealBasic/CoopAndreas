@@ -301,6 +301,8 @@ public:
 		uint8_t hudHidden;
 		uint8_t cutscenePhase;
 		uint32_t cutsceneSessionToken;
+		uint32_t objectiveTextToken;
+		uint8_t objectiveTextSemantics;
 		char objective[8];
 		uint8_t runtimeState;
 		uint16_t objectiveVersion;
@@ -347,6 +349,8 @@ public:
 		uint8_t onMission;
 		uint16_t missionId;
 		uint16_t objectivePhaseIndex;
+		uint32_t objectiveTextToken;
+		uint8_t objectiveTextSemantics;
 		char objective[8];
 		int32_t timerMs;
 		uint8_t timerVisible;

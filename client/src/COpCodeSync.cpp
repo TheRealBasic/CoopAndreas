@@ -685,18 +685,13 @@ void BuildAndSendOpcode()
         lastOpCodeProcessed == 0x0881 || // set_player_fire_button
         lastOpCodeProcessed == 0x0E60 || // set_camera_control
         lastOpCodeProcessed == 0x0826 || // display_hud
-        lastOpCodeProcessed == 0x00BA || // set_objective via print_big
-        lastOpCodeProcessed == 0x00BC || // set_objective via print_now
-        lastOpCodeProcessed == 0x03E5 || // set_objective via print_help
         lastOpCodeProcessed == 0x06D5 || // checkpoint_create (checkpoint progression, including race checkpoint setup)
         lastOpCodeProcessed == 0x07F3 || // checkpoint_set_coords (checkpoint progression, including set_car_race_checkpoint flows)
         lastOpCodeProcessed == 0x014E || // set_timers
         lastOpCodeProcessed == 0x014F || // clear timer
         lastOpCodeProcessed == 0x03C3 || // set_timers with string
         lastOpCodeProcessed == 0x0396 || // freeze timer
-        lastOpCodeProcessed == 0x0890 || // timer countdown seconds
-        lastOpCodeProcessed == 0x0318 || // register_mission_passed
-        lastOpCodeProcessed == 0x045C;   // fail_current_mission
+        lastOpCodeProcessed == 0x0890;   // timer countdown seconds
 
     if (isMissionFlowStateOpcode)
     {

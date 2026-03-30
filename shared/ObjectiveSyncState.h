@@ -6,6 +6,13 @@
 
 namespace ObjectiveSync
 {
+    enum class ObjectiveTextSemantics : uint8_t
+    {
+        None = 0,
+        Replace = 1,
+        Clear = 2
+    };
+
     struct State
     {
         uint16_t missionId = 0;
@@ -24,6 +31,8 @@ namespace ObjectiveSync
         uint8_t hudHidden = 0;
         uint8_t cutscenePhase = 0;
         uint32_t cutsceneSessionToken = 0;
+        uint32_t objectiveTextToken = 0;
+        uint8_t objectiveTextSemantics = static_cast<uint8_t>(ObjectiveTextSemantics::None);
         char objective[8]{};
     };
 
@@ -51,6 +60,50 @@ namespace ObjectiveSync
             return false;
         }
 
+        std::memcpy(state.objective, nextObjective, sizeof(state.objective));
+        if (state.objectivePhaseIndex < UINT16_MAX)
+        {
+            ++state.objectivePhaseIndex;
+        }
+        return true;
+    }
+
+    inline uint32_t BuildObjectiveTextToken(const char* text)
+    {
+        if (!text || !text[0])
+        {
+            return 0;
+        }
+
+        constexpr uint32_t offset = 2166136261u;
+        constexpr uint32_t prime = 16777619u;
+        uint32_t hash = offset;
+        for (int i = 0; i < 8 && text[i]; ++i)
+        {
+            hash ^= static_cast<uint8_t>(text[i]);
+            hash *= prime;
+        }
+        return hash;
+    }
+
+    inline bool ApplyObjectiveTextEvent(State& state, ObjectiveTextSemantics semantics, const char* text)
+    {
+        char nextObjective[8]{};
+        if (semantics == ObjectiveTextSemantics::Replace && text && text[0])
+        {
+            strncpy_s(nextObjective, text, sizeof(nextObjective));
+        }
+
+        const uint32_t nextToken = (semantics == ObjectiveTextSemantics::Replace) ? BuildObjectiveTextToken(nextObjective) : 0;
+        if (state.objectiveTextSemantics == static_cast<uint8_t>(semantics)
+            && SameObjective(state.objective, nextObjective)
+            && state.objectiveTextToken == nextToken)
+        {
+            return false;
+        }
+
+        state.objectiveTextSemantics = static_cast<uint8_t>(semantics);
+        state.objectiveTextToken = nextToken;
         std::memcpy(state.objective, nextObjective, sizeof(state.objective));
         if (state.objectivePhaseIndex < UINT16_MAX)
         {
@@ -145,7 +198,7 @@ namespace ObjectiveSync
         case 0x00BA: // print_big
         case 0x00BC: // print_now
         case 0x03E5: // print_help
-            if (UpdateObjective(state, text))
+            if (ApplyObjectiveTextEvent(state, text && text[0] ? ObjectiveTextSemantics::Replace : ObjectiveTextSemantics::Clear, text))
             {
                 if (state.checkpointIndex < UINT16_MAX)
                 {
