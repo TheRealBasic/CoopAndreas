@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "CNetwork.h"
+#include "ObjectiveSyncState.h"
 #include "CPlayer.h"
 
 namespace
@@ -21,6 +22,7 @@ namespace
     uint16_t g_objectiveVersion = 0;
     uint16_t g_checkpointVersion = 0;
     uint32_t g_runtimeSessionToken = 0;
+    ObjectiveSync::State g_objectiveState{};
 
     bool IsTerminal(RuntimeState state)
     {
@@ -94,7 +96,9 @@ namespace
 
     void ApplyObjectiveUpdate(const CMissionRuntimeManager::MissionFlowPayload& packet)
     {
-        if (!g_hasFlow || std::memcmp(g_lastFlow.objective, packet.objective, sizeof(packet.objective)) != 0)
+        if (!g_hasFlow
+            || std::memcmp(g_lastFlow.objective, packet.objective, sizeof(packet.objective)) != 0
+            || g_lastFlow.objectivePhaseIndex != packet.objectivePhaseIndex)
         {
             ++g_objectiveVersion;
         }
@@ -106,7 +110,8 @@ namespace
 
     void ApplyCheckpointProgression(const CMissionRuntimeManager::MissionFlowPayload& packet)
     {
-        if (packet.checkpointIndex > g_lastFlow.checkpointIndex)
+        if (packet.checkpointIndex > g_lastFlow.checkpointIndex
+            || packet.checkpointCount != g_lastFlow.checkpointCount)
         {
             ++g_checkpointVersion;
         }
@@ -182,6 +187,18 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     {
         ApplyMissionLaunch();
     }
+
+    g_objectiveState.missionId = packet->missionId;
+    g_objectiveState.timerMs = packet->timerMs;
+    g_objectiveState.objectivePhaseIndex = packet->objectivePhaseIndex;
+    g_objectiveState.checkpointIndex = packet->checkpointIndex;
+    g_objectiveState.checkpointCount = packet->checkpointCount;
+    g_objectiveState.timerVisible = packet->timerVisible;
+    g_objectiveState.timerFrozen = packet->timerFrozen;
+    g_objectiveState.timerDirection = packet->timerDirection;
+    g_objectiveState.passFailPending = packet->passFailPending;
+    g_objectiveState.playerControlState = packet->playerControlState;
+    std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
     if (g_hasFlow)
     {
@@ -313,4 +330,5 @@ void CMissionRuntimeManager::Teardown()
     g_objectiveVersion = 0;
     g_checkpointVersion = 0;
     ++g_runtimeSessionToken;
+    g_objectiveState = {};
 }

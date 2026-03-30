@@ -3,7 +3,7 @@
 
 #include "CCutsceneMgr.h"
 #include "CNetwork.h"
-#include <limits>
+#include "ObjectiveSyncState.h"
 
 namespace
 {
@@ -46,18 +46,7 @@ namespace
     //
     // Server stores and replays the latest MissionFlowSync payload so reconnecting and late-join peers
     // immediately hydrate this state without waiting for another opcode edge.
-    struct SideContentAttemptState
-    {
-        uint16_t missionId = 0;
-        int32_t timerMs = 0;
-        uint16_t checkpointIndex = 0;
-        uint8_t timerVisible = 0;
-        uint8_t timerFrozen = 0;
-        uint8_t passFailPending = 0; // 0 = none, 1 = pass, 2 = fail
-        uint8_t playerControlState = 0;
-        char objective[8]{};
-    };
-
+    using SideContentAttemptState = ObjectiveSync::State;
     SideContentAttemptState ms_sideContentAttemptState{};
 
     bool TrySetTerminalOutcome(uint8_t outcome)
@@ -72,8 +61,8 @@ namespace
             return false;
         }
 
-        ms_sideContentAttemptState.passFailPending = outcome;
-        return true;
+        const int terminalParams[] = { outcome == 1 ? 1 : 0 };
+        return ObjectiveSync::ApplyOpcode(ms_sideContentAttemptState, outcome == 1 ? 0x0318 : 0x045C, terminalParams, 1, nullptr).changed;
     }
 
     struct SubmissionState
@@ -101,6 +90,11 @@ namespace
     constexpr uint16_t OP_START_CUTSCENE = 0x02E7;
     constexpr uint16_t OP_CLEAR_CUTSCENE = 0x02EA;
     constexpr uint16_t OP_SWITCH_WIDESCREEN = 0x02A3;
+    constexpr uint16_t OP_PRINT_BIG = 0x00BA;
+    constexpr uint16_t OP_PRINT_NOW = 0x00BC;
+    constexpr uint16_t OP_PRINT_HELP = 0x03E5;
+    constexpr uint16_t OP_REGISTER_MISSION_PASSED = 0x0318;
+    constexpr uint16_t OP_FAIL_CURRENT_MISSION = 0x045C;
 
     constexpr OpCodeHandlerEntry kPreExecuteOpCodeHandlers[] = {
         { OP_END_SCENE_SKIP, &CMissionSyncState::HandleEndSceneSkip },
@@ -135,6 +129,15 @@ namespace
     bool IsMissionContextActive()
     {
         return ms_bMissionActive || ms_bCutsceneActive;
+    }
+
+    bool IsAuthoritativeObjectiveRenderOpcode(uint16_t opcode)
+    {
+        return opcode == OP_PRINT_BIG
+            || opcode == OP_PRINT_NOW
+            || opcode == OP_PRINT_HELP
+            || opcode == OP_REGISTER_MISSION_PASSED
+            || opcode == OP_FAIL_CURRENT_MISSION;
     }
 
     struct SubmissionModeAdapter
@@ -335,9 +338,12 @@ void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName,
     packet.sequence = ++ms_nMissionFlowSequence;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
+    packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
     packet.checkpointIndex = ms_sideContentAttemptState.checkpointIndex;
+    packet.checkpointCount = ms_sideContentAttemptState.checkpointCount;
     packet.timerVisible = ms_sideContentAttemptState.timerVisible;
     packet.timerFrozen = ms_sideContentAttemptState.timerFrozen;
+    packet.timerDirection = ms_sideContentAttemptState.timerDirection;
     packet.passFailPending = ms_sideContentAttemptState.passFailPending;
     packet.playerControlState = ms_sideContentAttemptState.playerControlState;
     strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
@@ -383,9 +389,12 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     packet.sourceOpcode = opcode;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
+    packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
     packet.checkpointIndex = ms_sideContentAttemptState.checkpointIndex;
+    packet.checkpointCount = ms_sideContentAttemptState.checkpointCount;
     packet.timerVisible = ms_sideContentAttemptState.timerVisible;
     packet.timerFrozen = ms_sideContentAttemptState.timerFrozen;
+    packet.timerDirection = ms_sideContentAttemptState.timerDirection;
     packet.passFailPending = ms_sideContentAttemptState.passFailPending;
     packet.playerControlState = ms_sideContentAttemptState.playerControlState;
     strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
@@ -400,78 +409,8 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
         return;
     }
 
-    bool shouldEmit = true;
-    switch (opcode)
-    {
-    case 0x0417: // Mission.LoadAndLaunchInternal / start_mission
-        ms_sideContentAttemptState.missionId = (params && paramCount > 0) ? static_cast<uint16_t>(std::max(params[0], 0)) : 0;
-        ms_sideContentAttemptState.checkpointIndex = 0;
-        ms_sideContentAttemptState.timerVisible = 0;
-        ms_sideContentAttemptState.timerFrozen = 0;
-        ms_sideContentAttemptState.timerMs = 0;
-        ms_sideContentAttemptState.passFailPending = 0;
-        memset(ms_sideContentAttemptState.objective, 0, sizeof(ms_sideContentAttemptState.objective));
-        break;
-    case 0x01B4: // set_player_control
-        if (params && paramCount > 1)
-        {
-            ms_sideContentAttemptState.playerControlState = params[1] ? 1 : 0;
-        }
-        break;
-    case 0x00BA: // print_big
-    case 0x00BC: // print_now
-    case 0x03E5: // print_help
-        if (text && text[0])
-        {
-            strncpy_s(ms_sideContentAttemptState.objective, text, sizeof(ms_sideContentAttemptState.objective));
-            ms_sideContentAttemptState.checkpointIndex++;
-        }
-        break;
-    case 0x06D5: // checkpoint.create
-        if (ms_sideContentAttemptState.checkpointIndex == 0)
-        {
-            ms_sideContentAttemptState.checkpointIndex = 1;
-        }
-        break;
-    case 0x07F3: // checkpoint.set_coords
-        if (ms_sideContentAttemptState.checkpointIndex < std::numeric_limits<uint16_t>::max())
-        {
-            ms_sideContentAttemptState.checkpointIndex++;
-        }
-        break;
-    case 0x014E: // display_onscreen_timer
-    case 0x03C3: // display_onscreen_timer_with_string
-        ms_sideContentAttemptState.timerVisible = 1;
-        ms_sideContentAttemptState.timerFrozen = 0;
-        break;
-    case 0x014F: // clear_onscreen_timer
-        ms_sideContentAttemptState.timerVisible = 0;
-        ms_sideContentAttemptState.timerFrozen = 0;
-        ms_sideContentAttemptState.timerMs = 0;
-        break;
-    case 0x0396: // freeze_onscreen_timer
-        if (params && paramCount > 0)
-        {
-            ms_sideContentAttemptState.timerFrozen = params[0] ? 1 : 0;
-        }
-        break;
-    case 0x0890: // set_timer_beep_countdown_time
-        if (params && paramCount > 1)
-        {
-            ms_sideContentAttemptState.timerMs = std::max(params[1], 0) * 1000;
-        }
-        break;
-    case 0x0318: // register_mission_passed
-        shouldEmit = TrySetTerminalOutcome(1);
-        break;
-    case 0x045C: // fail_current_mission
-        shouldEmit = TrySetTerminalOutcome(2);
-        break;
-    default:
-        break;
-    }
-
-    if (!shouldEmit)
+    const ObjectiveSync::ApplyResult applyResult = ObjectiveSync::ApplyOpcode(ms_sideContentAttemptState, opcode, params, paramCount, text);
+    if (!applyResult.changed)
     {
         return;
     }
@@ -484,9 +423,12 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     packet.sourceOpcode = opcode;
     packet.missionId = ms_sideContentAttemptState.missionId;
     packet.timerMs = ms_sideContentAttemptState.timerMs;
+    packet.objectivePhaseIndex = ms_sideContentAttemptState.objectivePhaseIndex;
     packet.checkpointIndex = ms_sideContentAttemptState.checkpointIndex;
+    packet.checkpointCount = ms_sideContentAttemptState.checkpointCount;
     packet.timerVisible = ms_sideContentAttemptState.timerVisible;
     packet.timerFrozen = ms_sideContentAttemptState.timerFrozen;
+    packet.timerDirection = ms_sideContentAttemptState.timerDirection;
     packet.passFailPending = ms_sideContentAttemptState.passFailPending;
     packet.playerControlState = ms_sideContentAttemptState.playerControlState;
     strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
@@ -517,9 +459,12 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
 
     ms_sideContentAttemptState.missionId = packet.missionId;
     ms_sideContentAttemptState.timerMs = std::max(packet.timerMs, 0);
+    ms_sideContentAttemptState.objectivePhaseIndex = packet.objectivePhaseIndex;
     ms_sideContentAttemptState.checkpointIndex = packet.checkpointIndex;
+    ms_sideContentAttemptState.checkpointCount = packet.checkpointCount;
     ms_sideContentAttemptState.timerVisible = packet.timerVisible;
     ms_sideContentAttemptState.timerFrozen = packet.timerFrozen;
+    ms_sideContentAttemptState.timerDirection = packet.timerDirection;
     ms_sideContentAttemptState.playerControlState = packet.playerControlState;
     if (packet.objective[0])
     {
@@ -533,11 +478,6 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     if (ms_sideContentAttemptState.passFailPending == 0)
     {
         ms_sideContentAttemptState.passFailPending = packet.passFailPending;
-    }
-
-    if (!packet.replay)
-    {
-        return;
     }
 
     if (packet.eventType == CPackets::MISSION_FLOW_EVENT_OBJECTIVE
@@ -783,6 +723,13 @@ bool CMissionSyncState::HandleOpCodePreExecute(uint16_t opcode)
         {
             return entry.handler();
         }
+    }
+
+    if (!CLocalPlayer::m_bIsHost
+        && IsMissionContextActive()
+        && IsAuthoritativeObjectiveRenderOpcode(opcode))
+    {
+        return false;
     }
 
     return true;

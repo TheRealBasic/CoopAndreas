@@ -276,9 +276,12 @@ public:
 		uint16_t sourceOpcode;
 		uint16_t missionId;
 		int32_t timerMs;
+		uint16_t objectivePhaseIndex;
 		uint16_t checkpointIndex;
+		uint16_t checkpointCount;
 		uint8_t timerVisible;
 		uint8_t timerFrozen;
+		uint8_t timerDirection;
 		uint8_t passFailPending;
 		uint8_t playerControlState;
 		char objective[8];
