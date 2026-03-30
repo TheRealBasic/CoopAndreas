@@ -6,6 +6,15 @@ Legend:
 - **Priority:** `P0` = critical for playable co-op baseline, `P1` = important parity/quality, `P2` = optional or long-tail.
 - **Effort:** `S` (small), `M` (medium), `L` (large).
 
+## Traceability Tag Standard
+
+Use a lightweight parity tag in implementation and QA artifacts to keep roadmap work items traceable end-to-end:
+
+- **Tag format:** `PARITY-ID: <AREA>-<ITEM>`
+- **Pattern:** uppercase kebab-case tokens, e.g. `PARITY-ID: STADIUM-8-TRACK`, `PARITY-ID: SCHOOLS-BOAT-SCHOOL`.
+- **Where to add tags:** PR titles/descriptions, commit messages, and (optionally) focused code comments near critical sync logic.
+- **Index generator:** `python3 tools/qa_trace.py` writes `docs/qa/roadmap-trace-index.json`.
+
 ## Milestone: Core Sync Stability
 
 ### P0 (must-have)
