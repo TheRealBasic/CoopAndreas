@@ -51,7 +51,7 @@ namespace
 
     bool IsTerminal(RuntimeState state)
     {
-        return state == RuntimeState::Completed;
+        return state == RuntimeState::Teardown;
     }
 
     bool Transition(RuntimeState next)
@@ -67,7 +67,7 @@ namespace
             g_runtimeState = next;
             return true;
         case RuntimeState::Starting:
-            if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Completed)
+            if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Teardown)
             {
                 g_runtimeState = next;
                 return true;
@@ -93,7 +93,7 @@ namespace
                 return true;
             }
             return false;
-        case RuntimeState::Completed:
+        case RuntimeState::Teardown:
             if (IsTerminal(g_runtimeState))
             {
                 return false;
@@ -111,7 +111,7 @@ namespace
 
     void ApplyMissionLaunch()
     {
-        if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Completed)
+        if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Teardown)
         {
             Transition(RuntimeState::Starting);
             Transition(RuntimeState::Active);
@@ -172,7 +172,7 @@ namespace
 
     void ApplyCompletion()
     {
-        Transition(RuntimeState::Completed);
+        Transition(RuntimeState::Teardown);
         g_isOnMission = false;
     }
 
@@ -223,21 +223,54 @@ namespace
         g_runtimeSessionToken = snapshot.runtimeSessionToken;
         g_objectiveState = snapshot.objectiveState;
     }
+
+    bool CanAcceptEvent(CMissionRuntimeManager::EventKind eventKind, RuntimeState currentState)
+    {
+        switch (eventKind)
+        {
+        case CMissionRuntimeManager::EventKind::OnMissionFlagSync:
+        case CMissionRuntimeManager::EventKind::MissionFlowSync:
+            return true;
+        case CMissionRuntimeManager::EventKind::CheckpointUpdate:
+        case CMissionRuntimeManager::EventKind::CheckpointRemove:
+            return currentState == RuntimeState::Starting
+                || currentState == RuntimeState::Active
+                || currentState == RuntimeState::PassPending
+                || currentState == RuntimeState::FailPending;
+        default:
+            return false;
+        }
+    }
+
+    bool ValidateCommonEventGuards(
+        CMissionRuntimeManager::EventKind eventKind,
+        CPlayer* sourcePlayer,
+        const void* data,
+        int size,
+        int expectedSize)
+    {
+        if (!sourcePlayer || !sourcePlayer->m_bIsHost || !data || size < expectedSize)
+        {
+            return false;
+        }
+
+        if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
+        {
+            return false;
+        }
+
+        return CanAcceptEvent(eventKind, g_runtimeState);
+    }
 }
 
 bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size)
 {
-    if (!sourcePlayer || !sourcePlayer->m_bIsHost || !data || size < (int)sizeof(OnMissionFlagPayload))
+    if (!ValidateCommonEventGuards(EventKind::OnMissionFlagSync, sourcePlayer, data, size, (int)sizeof(OnMissionFlagPayload)))
     {
         return false;
     }
 
     auto* packet = (const OnMissionFlagPayload*)data;
-    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
-    {
-        return false;
-    }
-
     if (packet->missionEpoch != g_missionEpoch)
     {
         return false;
@@ -247,7 +280,7 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
 
     if (nextOnMission)
     {
-        if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Completed)
+        if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Teardown)
         {
             ApplyMissionLaunch();
             if (g_runtimeSessionToken == 0)
@@ -255,10 +288,19 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
                 g_runtimeSessionToken = 1;
             }
         }
+        else if (g_isOnMission)
+        {
+            return false;
+        }
         g_isOnMission = true;
     }
     else
     {
+        if (!g_isOnMission)
+        {
+            return false;
+        }
+
         if (g_isOnMission)
         {
             if (g_terminalReasonCode == CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE)
@@ -278,17 +320,12 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
 
 bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size)
 {
-    if (!sourcePlayer || !sourcePlayer->m_bIsHost || !data || size < (int)sizeof(MissionFlowPayload))
+    if (!ValidateCommonEventGuards(EventKind::MissionFlowSync, sourcePlayer, data, size, (int)sizeof(MissionFlowPayload)))
     {
         return false;
     }
 
     auto* packet = (MissionFlowPayload*)data;
-    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
-    {
-        return false;
-    }
-
     if (packet->missionEpoch != g_missionEpoch)
     {
         return false;
@@ -374,22 +411,12 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
 
 bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size)
 {
-    if (!sourcePlayer || !sourcePlayer->m_bIsHost || !data || size < (int)sizeof(CheckpointPayload))
-    {
-        return false;
-    }
-
-    if (g_runtimeState == RuntimeState::Idle || g_runtimeState == RuntimeState::Completed)
+    if (!ValidateCommonEventGuards(EventKind::CheckpointUpdate, sourcePlayer, data, size, (int)sizeof(CheckpointPayload)))
     {
         return false;
     }
 
     auto* packet = (CheckpointPayload*)data;
-    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
-    {
-        return false;
-    }
-
     if (packet->missionEpoch != g_missionEpoch)
     {
         return false;
@@ -416,17 +443,12 @@ bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetP
 
 bool CMissionRuntimeManager::HandleCheckpointRemove(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size)
 {
-    if (!sourcePlayer || !sourcePlayer->m_bIsHost || !data || size < (int)sizeof(CheckpointRemovePayload))
+    if (!ValidateCommonEventGuards(EventKind::CheckpointRemove, sourcePlayer, data, size, (int)sizeof(CheckpointRemovePayload)))
     {
         return false;
     }
 
     auto* packet = (CheckpointRemovePayload*)data;
-    if (g_missionAuthorityPlayerId != -1 && sourcePlayer->m_iPlayerId != g_missionAuthorityPlayerId)
-    {
-        return false;
-    }
-
     if (packet->missionEpoch != g_missionEpoch)
     {
         return false;
@@ -440,6 +462,23 @@ bool CMissionRuntimeManager::HandleCheckpointRemove(CPlayer* sourcePlayer, ENetP
 
     CNetwork::SendPacketToAll(CPacketsID::REMOVE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
     return true;
+}
+
+bool CMissionRuntimeManager::HandleMissionEvent(EventKind eventKind, CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size)
+{
+    switch (eventKind)
+    {
+    case EventKind::OnMissionFlagSync:
+        return HandleOnMissionFlagSync(sourcePlayer, sourcePeer, data, size);
+    case EventKind::MissionFlowSync:
+        return HandleMissionFlowSync(sourcePlayer, sourcePeer, data, size);
+    case EventKind::CheckpointUpdate:
+        return HandleCheckpointUpdate(sourcePlayer, sourcePeer, data, size);
+    case EventKind::CheckpointRemove:
+        return HandleCheckpointRemove(sourcePlayer, sourcePeer, data, size);
+    default:
+        return false;
+    }
 }
 
 void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)

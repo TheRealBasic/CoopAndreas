@@ -1333,7 +1333,7 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayerManager::GetPlayer(peer), peer, data, size);
+			CMissionRuntimeManager::HandleMissionEvent(CMissionRuntimeManager::EventKind::OnMissionFlagSync, CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
@@ -1343,7 +1343,7 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			CMissionRuntimeManager::HandleMissionFlowSync(CPlayerManager::GetPlayer(peer), peer, data, size);
+			CMissionRuntimeManager::HandleMissionEvent(CMissionRuntimeManager::EventKind::MissionFlowSync, CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
@@ -1493,7 +1493,7 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			CMissionRuntimeManager::HandleCheckpointUpdate(CPlayerManager::GetPlayer(peer), peer, data, size);
+			CMissionRuntimeManager::HandleMissionEvent(CMissionRuntimeManager::EventKind::CheckpointUpdate, CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
@@ -1503,7 +1503,7 @@ public:
 
 		static void Handle(ENetPeer* peer, void* data, int size)
 		{
-			CMissionRuntimeManager::HandleCheckpointRemove(CPlayerManager::GetPlayer(peer), peer, data, size);
+			CMissionRuntimeManager::HandleMissionEvent(CMissionRuntimeManager::EventKind::CheckpointRemove, CPlayerManager::GetPlayer(peer), peer, data, size);
 		}
 	};
 
