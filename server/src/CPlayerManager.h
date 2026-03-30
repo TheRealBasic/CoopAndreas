@@ -170,6 +170,8 @@ public:
 		uint8_t outcome = 0;
 		uint8_t participantCount = 0;
 		uint8_t currArea = 0;
+		CSubmissionMissionPackets::ReplicatedCheckpointState checkpointState{};
+		CSubmissionMissionPackets::ReplicatedTimerState timerState{};
 		uint64_t stateTimestampMs = 0;
 		uint32_t stateVersion = 0;
 	};
@@ -299,6 +301,8 @@ public:
 			entry.outcome = state.outcome;
 			entry.participantCount = state.participantCount;
 			entry.currArea = state.currArea;
+			entry.checkpointState = state.checkpointState;
+			entry.timerState = state.timerState;
 			entry.stateTimestampMs = state.stateTimestampMs;
 			entry.stateVersion = state.stateVersion;
 			CNetwork::SendPacket(peer, CPacketsID::SUBMISSION_MISSION_SNAPSHOT_ENTRY, &entry, sizeof(entry), ENET_PACKET_FLAG_RELIABLE);
@@ -617,6 +621,8 @@ public:
 				state.outcome = packet->outcome;
 				state.participantCount = packet->participantCount;
 				state.currArea = packet->currArea;
+				state.checkpointState = packet->checkpointState;
+				state.timerState = packet->timerState;
 				state.stateTimestampMs = packet->stateTimestampMs;
 				state.stateVersion = packet->stateVersion;
 

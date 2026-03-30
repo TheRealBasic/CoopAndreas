@@ -213,6 +213,20 @@ public:
 		uint8_t submissionCount;
 	};
 
+	struct ReplicatedCheckpointState
+	{
+		uint16_t currentIndex;
+		uint16_t totalCount;
+		uint8_t activeFlag;
+	};
+
+	struct ReplicatedTimerState
+	{
+		uint32_t startTick;
+		int32_t remaining;
+		uint8_t paused;
+	};
+
 	struct SubmissionMissionSnapshotEntry
 	{
 		uint8_t submissionType;
@@ -226,6 +240,8 @@ public:
 		uint8_t outcome;
 		uint8_t participantCount;
 		uint8_t currArea;
+		ReplicatedCheckpointState checkpointState;
+		ReplicatedTimerState timerState;
 		uint64_t stateTimestampMs;
 		uint32_t stateVersion;
 	};

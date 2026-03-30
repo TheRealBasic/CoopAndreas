@@ -91,13 +91,21 @@ namespace
         uint8_t outcome = 0;
         uint8_t participantCount = 0;
         uint8_t currArea = 0;
+        CPackets::ReplicatedCheckpointState checkpointState{};
+        CPackets::ReplicatedTimerState timerState{};
         uint64_t stateTimestampMs = 0;
         uint32_t stateVersion = 0;
-        uint64_t startedAtMs = 0;
         int32_t lastBroadcastSecond = -1;
     };
 
     std::unordered_map<uint8_t, SubmissionState> ms_submissionStates{};
+    CPackets::ReplicatedCheckpointState ms_authoritativeCheckpointState{};
+    CPackets::ReplicatedTimerState ms_authoritativeTimerState{};
+    bool ms_hasAuthoritativeFlowState = false;
+
+    constexpr int32_t kTimerDriftSnapThresholdMs = 350;
+    constexpr int32_t kTimerDriftSmoothStepMs = 45;
+    constexpr uint16_t kCheckpointDriftSnapThreshold = 1;
 
     constexpr uint16_t OP_END_SCENE_SKIP = 0x0701;
     constexpr uint16_t OP_START_CUTSCENE = 0x02E7;
@@ -225,6 +233,8 @@ namespace
         packet.outcome = state.outcome;
         packet.participantCount = state.participantCount;
         packet.currArea = static_cast<uint8_t>(CGame::currArea);
+        packet.checkpointState = state.checkpointState;
+        packet.timerState = state.timerState;
         packet.stateTimestampMs = GetTickCount64();
         packet.stateVersion = ++ms_submissionStateVersion;
 
@@ -274,6 +284,64 @@ namespace
         CHud::m_BigMessage[0][0] = 0;
         CHud::m_BigMessage[1][0] = 0;
         CDraw::FadeValue = 0;
+    }
+
+    bool ShouldSnapCheckpointState(const SideContentAttemptState& state, const CPackets::ReplicatedCheckpointState& target)
+    {
+        const uint16_t currentIndex = state.checkpointIndex;
+        const uint16_t currentCount = state.checkpointCount;
+        const uint8_t currentActive = currentCount > 0 ? 1 : 0;
+
+        return static_cast<uint16_t>(std::abs(static_cast<int>(currentIndex) - static_cast<int>(target.currentIndex))) > kCheckpointDriftSnapThreshold
+            || currentCount != target.totalCount
+            || currentActive != target.activeFlag;
+    }
+
+    int32_t ResolveAuthoritativeTimerRemainingMs(uint32_t nowTick)
+    {
+        if (ms_authoritativeTimerState.paused != 0)
+        {
+            return std::max(ms_authoritativeTimerState.remaining, 0);
+        }
+
+        const uint32_t elapsed = nowTick - ms_authoritativeTimerState.startTick;
+        return std::max(ms_authoritativeTimerState.remaining - static_cast<int32_t>(elapsed), 0);
+    }
+
+    void ProcessFlowStateDriftCorrection()
+    {
+        if (CLocalPlayer::m_bIsHost || !ms_hasAuthoritativeFlowState)
+        {
+            return;
+        }
+
+        const uint32_t nowTick = GetTickCount();
+        const int32_t authoritativeRemaining = ResolveAuthoritativeTimerRemainingMs(nowTick);
+        const int32_t timerDelta = authoritativeRemaining - ms_sideContentAttemptState.timerMs;
+
+        if (std::abs(timerDelta) >= kTimerDriftSnapThresholdMs)
+        {
+            ms_sideContentAttemptState.timerMs += std::clamp(timerDelta, -kTimerDriftSmoothStepMs, kTimerDriftSmoothStepMs);
+        }
+        else
+        {
+            ms_sideContentAttemptState.timerMs = authoritativeRemaining;
+        }
+
+        const int checkpointDelta = static_cast<int>(ms_authoritativeCheckpointState.currentIndex) - static_cast<int>(ms_sideContentAttemptState.checkpointIndex);
+        if (checkpointDelta != 0)
+        {
+            ms_sideContentAttemptState.checkpointIndex = static_cast<uint16_t>(
+                static_cast<int>(ms_sideContentAttemptState.checkpointIndex) + (checkpointDelta > 0 ? 1 : -1));
+        }
+
+        if (ms_sideContentAttemptState.checkpointCount != ms_authoritativeCheckpointState.totalCount)
+        {
+            const int checkpointCountDelta =
+                static_cast<int>(ms_authoritativeCheckpointState.totalCount) - static_cast<int>(ms_sideContentAttemptState.checkpointCount);
+            ms_sideContentAttemptState.checkpointCount = static_cast<uint16_t>(
+                static_cast<int>(ms_sideContentAttemptState.checkpointCount) + (checkpointCountDelta > 0 ? 1 : -1));
+        }
     }
 
     void PopulateMissionFlowStatePayload(CPackets::MissionFlowSync& packet, const SideContentAttemptState& state)
@@ -360,6 +428,9 @@ void CMissionSyncState::Init()
     ms_runtimeSnapshotExpectedActorCount = 0;
     ms_runtimeSnapshotActors.clear();
     ms_runtimeSnapshotState = {};
+    ms_hasAuthoritativeFlowState = false;
+    ms_authoritativeCheckpointState = {};
+    ms_authoritativeTimerState = {};
     ms_submissionStates.clear();
     ms_sideContentAttemptState = {};
 }
@@ -616,13 +687,13 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     if (newAttempt)
     {
         ms_sideContentAttemptState = {};
+        ms_hasAuthoritativeFlowState = false;
+        ms_authoritativeCheckpointState = {};
+        ms_authoritativeTimerState = {};
     }
 
     ms_sideContentAttemptState.missionId = packet.missionId;
-    ms_sideContentAttemptState.timerMs = std::max(packet.timerMs, 0);
     ms_sideContentAttemptState.objectivePhaseIndex = packet.objectivePhaseIndex;
-    ms_sideContentAttemptState.checkpointIndex = packet.checkpointIndex;
-    ms_sideContentAttemptState.checkpointCount = packet.checkpointCount;
     ms_sideContentAttemptState.timerVisible = packet.timerVisible;
     ms_sideContentAttemptState.timerFrozen = packet.timerFrozen;
     ms_sideContentAttemptState.timerDirection = packet.timerDirection;
@@ -634,6 +705,35 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.cutscenePhase = packet.cutscenePhase;
     ms_sideContentAttemptState.cutsceneSessionToken = packet.cutsceneSessionToken;
     ApplyInboundObjectiveTextState(ms_sideContentAttemptState, packet);
+
+    CPackets::ReplicatedCheckpointState authoritativeCheckpoint{};
+    authoritativeCheckpoint.currentIndex = packet.checkpointIndex;
+    authoritativeCheckpoint.totalCount = packet.checkpointCount;
+    authoritativeCheckpoint.activeFlag = packet.checkpointCount > 0 ? 1 : 0;
+
+    CPackets::ReplicatedTimerState authoritativeTimer{};
+    authoritativeTimer.startTick = GetTickCount();
+    authoritativeTimer.remaining = std::max(packet.timerMs, 0);
+    authoritativeTimer.paused = packet.timerFrozen ? 1 : 0;
+
+    const bool shouldBlendCheckpoint = ms_hasAuthoritativeFlowState
+        && ShouldSnapCheckpointState(ms_sideContentAttemptState, authoritativeCheckpoint);
+    const bool shouldBlendTimer = ms_hasAuthoritativeFlowState
+        && std::abs(ms_sideContentAttemptState.timerMs - authoritativeTimer.remaining) >= kTimerDriftSnapThresholdMs;
+
+    ms_authoritativeCheckpointState = authoritativeCheckpoint;
+    ms_authoritativeTimerState = authoritativeTimer;
+    ms_hasAuthoritativeFlowState = true;
+
+    if (!shouldBlendCheckpoint)
+    {
+        ms_sideContentAttemptState.checkpointIndex = authoritativeCheckpoint.currentIndex;
+        ms_sideContentAttemptState.checkpointCount = authoritativeCheckpoint.totalCount;
+    }
+    if (!shouldBlendTimer)
+    {
+        ms_sideContentAttemptState.timerMs = authoritativeTimer.remaining;
+    }
 
     if (ms_sideContentAttemptState.passFailPending == 0)
     {
@@ -741,6 +841,14 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.objectiveTextToken = ms_runtimeSnapshotState.objectiveTextToken;
     ms_sideContentAttemptState.objectiveTextSemantics = ms_runtimeSnapshotState.objectiveTextSemantics;
     std::memcpy(ms_sideContentAttemptState.objective, ms_runtimeSnapshotState.objective, sizeof(ms_sideContentAttemptState.objective));
+
+    ms_authoritativeCheckpointState.currentIndex = ms_runtimeSnapshotState.checkpointIndex;
+    ms_authoritativeCheckpointState.totalCount = ms_runtimeSnapshotState.checkpointCount;
+    ms_authoritativeCheckpointState.activeFlag = ms_runtimeSnapshotState.checkpointCount > 0 ? 1 : 0;
+    ms_authoritativeTimerState.startTick = GetTickCount();
+    ms_authoritativeTimerState.remaining = std::max(ms_runtimeSnapshotState.timerMs, 0);
+    ms_authoritativeTimerState.paused = ms_runtimeSnapshotState.timerFrozen ? 1 : 0;
+    ms_hasAuthoritativeFlowState = true;
 
     SetMissionAuthorityMetadata(ms_runtimeSnapshotState.missionEpoch, ms_runtimeSnapshotState.sequenceId);
     HandleMissionFlagSync(ms_runtimeSnapshotState.onMission != 0);
@@ -858,6 +966,8 @@ void CMissionSyncState::ApplyAdjudicatedTerminalState(const CPackets::MissionFlo
 
 void CMissionSyncState::ProcessSubmissionMissionSync()
 {
+    ProcessFlowStateDriftCorrection();
+
     if (!CLocalPlayer::m_bIsHost)
     {
         return;
@@ -885,6 +995,8 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
             {
                 it->second.active = 0;
                 it->second.timerMs = 0;
+                it->second.checkpointState = {};
+                it->second.timerState = {};
                 EmitSubmissionMissionDelta(mode, 0, it->second);
             }
             continue;
@@ -904,23 +1016,30 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
             state.score = 0;
             state.rewardCash = 0;
             state.outcome = 0;
-            state.startedAtMs = GetTickCount64();
+            state.checkpointState.currentIndex = ms_sideContentAttemptState.checkpointIndex;
+            state.checkpointState.totalCount = ms_sideContentAttemptState.checkpointCount;
+            state.checkpointState.activeFlag = ms_sideContentAttemptState.checkpointCount > 0 ? 1 : 0;
+            state.timerState.startTick = GetTickCount();
+            state.timerState.remaining = std::max(ms_sideContentAttemptState.timerMs, 0);
+            state.timerState.paused = ms_sideContentAttemptState.timerFrozen ? 1 : 0;
+            state.timerMs = state.timerState.remaining;
             state.lastBroadcastSecond = -1;
             EmitSubmissionMissionDelta(mode, 0, state);
             continue;
         }
 
-        if (state.startedAtMs == 0)
-        {
-            state.startedAtMs = GetTickCount64();
-        }
+        state.checkpointState.currentIndex = ms_sideContentAttemptState.checkpointIndex;
+        state.checkpointState.totalCount = ms_sideContentAttemptState.checkpointCount;
+        state.checkpointState.activeFlag = ms_sideContentAttemptState.checkpointCount > 0 ? 1 : 0;
+        state.timerState.startTick = GetTickCount();
+        state.timerState.remaining = std::max(ms_sideContentAttemptState.timerMs, 0);
+        state.timerState.paused = ms_sideContentAttemptState.timerFrozen ? 1 : 0;
+        state.timerMs = state.timerState.remaining;
 
-        const int32_t elapsedMs = static_cast<int32_t>(GetTickCount64() - state.startedAtMs);
-        const int32_t elapsedSeconds = elapsedMs / 1000;
-        state.timerMs = std::max<int32_t>(0, elapsedMs);
-        if (elapsedSeconds != state.lastBroadcastSecond)
+        const int32_t timerSecond = state.timerState.remaining / 1000;
+        if (timerSecond != state.lastBroadcastSecond)
         {
-            state.lastBroadcastSecond = elapsedSeconds;
+            state.lastBroadcastSecond = timerSecond;
             EmitSubmissionMissionDelta(mode, 0, state);
         }
     }
@@ -947,6 +1066,8 @@ void CMissionSyncState::HandleSubmissionMissionSnapshotEntry(const CPackets::Sub
     state.outcome = packet.outcome;
     state.participantCount = packet.participantCount;
     state.currArea = packet.currArea;
+    state.checkpointState = packet.checkpointState;
+    state.timerState = packet.timerState;
     state.stateTimestampMs = packet.stateTimestampMs;
     state.stateVersion = packet.stateVersion;
     ms_submissionStates[packet.submissionType] = state;
@@ -1004,7 +1125,13 @@ void CMissionSyncState::TriggerSubmissionMissionRewardDelta(int rewardDelta)
     state.rewardCash += rewardDelta;
     state.outcome = 0;
     state.participantCount = CountVehicleParticipants(localPlayer->m_pVehicle);
-    state.timerMs = std::max<int32_t>(0, state.timerMs);
+    state.checkpointState.currentIndex = ms_sideContentAttemptState.checkpointIndex;
+    state.checkpointState.totalCount = ms_sideContentAttemptState.checkpointCount;
+    state.checkpointState.activeFlag = ms_sideContentAttemptState.checkpointCount > 0 ? 1 : 0;
+    state.timerState.startTick = GetTickCount();
+    state.timerState.remaining = std::max(ms_sideContentAttemptState.timerMs, 0);
+    state.timerState.paused = ms_sideContentAttemptState.timerFrozen ? 1 : 0;
+    state.timerMs = state.timerState.remaining;
     EmitSubmissionMissionDelta(submissionType, 0, state);
 }
 
