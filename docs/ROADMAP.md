@@ -197,8 +197,9 @@ Use a lightweight parity tag in implementation and QA artifacts to keep roadmap 
 ## Milestone: Optional Content
 
 ### P2
-- [~] Property purchase sync. **[P2][M]** 🚧 In progress (2026-03-26).
-  - **Status update (2026-03-26):** added server-authoritative property state cache + delta replication channel (`PROPERTY_STATE_*`) with late-join snapshot replay and host-migration resync broadcast; added QA checklist coverage for purchase/rejoin/late-join/post-migration parity.
+- [x] Property purchase sync. **[P2][M]** ✅ Completed (2026-03-30).
+  - **Completion note (2026-03-30):** all four parity gates are now explicitly represented in the QA matrix (`PP-01..PP-04`) with expected/observed evidence sections covering purchase flow, reconnect restore, late-join hydration, and post-host-migration consistency.
+  - **Validation artifact:** `docs/qa/property-purchase-sync-checklist.md`.
 - [x] Submissions sync framework (`Taxi`, `Firefighter`, `Vigilante`, `Paramedic`, `Pimp`, `Freight Train`). **[P2][L]** ✅ Completed (2026-03-26).
   - **Shared sync layer:** ✅ host-authoritative generic submission state module now tracks mode, level/stage, timer, progress, score/reward, pass/fail outcome, and participant count; supports reconnect/late-join snapshot hydration.
   - **Taxi:** ✅ SS-02..SS-11 multiplayer QA complete.
