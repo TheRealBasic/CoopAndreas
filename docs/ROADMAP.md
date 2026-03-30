@@ -79,6 +79,23 @@ Use a lightweight parity tag in implementation and QA artifacts to keep roadmap 
 ### P1
 - [ ] Storyline mission parity checklist (`Cleaning The Hood` → `End Of The Line`, excluding already complete: `Big Smoke`, `Ryder`, `Tagging Up Turf`). **[P1][L]**
 
+### Storyline parity waves (script-family rollout)
+
+Wave execution rule: advance one wave at a time; each wave keeps a named owner, explicit status, and fixed acceptance checkpoints.
+
+| Wave | Script family scope | Owner | Wave status | Opcode audit status | Acceptance checkpoints |
+| --- | --- | --- | --- | --- | --- |
+| W1 | `SWEET` | Mission Sync Pod (Sweet stream) | `in progress` | `clear` (0 missing on 2026-03-30) | `C1` owner assigned, `C2` mission rows created in QA evidence doc, `C3` start/objective/fail/pass/reconnect notes captured per mission before promotion, `C4` reconnect replay validated on 2+ peers, `C5` `tools/opcode_audit.py` rerun and delta logged in storyline backlog, `C6` wave sign-off attached. |
+| W2 | `RYDER` | Mission Sync Pod (Ryder stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W2 missions. |
+| W3 | `SMOKE` | Mission Sync Pod (Smoke stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W3 missions. |
+
+Wave evidence + status gate source of truth: `docs/qa/storyline-wave-mission-evidence.md`.
+
+Opcode gap tracking rule per wave:
+1. Run `python3 tools/opcode_audit.py --output docs/qa/storyline-opcode-backlog.md` at wave start and wave end.
+2. Update the matching wave ledger row in `docs/qa/storyline-opcode-backlog.md` with any newly discovered gaps (or explicit `none`).
+3. Do not mark a wave `done` until wave-end audit is recorded.
+
 | Mission | Script | Status | Blocking dependencies (opcodes/commands) | Quick acceptance criteria |
 | --- | --- | --- | --- | --- |
 | Cleaning The Hood | `scm/scripts/SWEET.txt` | `in progress` | `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
@@ -169,25 +186,6 @@ Use a lightweight parity tag in implementation and QA artifacts to keep roadmap 
 | End Of The Line (1) | `scm/scripts/RIOT.txt` | `not started` | `task_go_to_coord_any_means`, `task_kill_char_on_foot`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | End Of The Line (2) | `scm/scripts/RIOT.txt` | `not started` | `create_car`, `task_car_chase`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | End Of The Line (3) | `scm/scripts/RIOT.txt` | `not started` | `start_cutscene`, `task_kill_char_on_foot`, `Mission.LoadAndLaunchInternal` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-
-#### SWEET mission wave 1 implementation notes (selected from first two `not started` rows)
-
-- **Cleaning The Hood** (`Mission.LoadAndLaunchInternal(14)` in `SWEET.txt`)
-  - Blocking opcodes: `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means`.
-  - Mission state transitions covered in sync flow:
-    - **start:** mission launch + cutscene start trigger propagation.
-    - **active objectives:** objective/help text propagation (`print_big`, `print_now`, `print_help`).
-    - **fail:** `fail_current_mission` propagation.
-    - **pass:** `register_mission_passed` propagation.
-    - **reconnect resume:** server snapshot replay of mission flag + latest mission flow event.
-- **Drive-Thru** (`Mission.LoadAndLaunchInternal(15)` in `SWEET.txt`)
-  - Blocking opcodes: `create_car`, `task_drive_by`, `set_char_obj_destroy_car`.
-  - Mission state transitions covered in sync flow:
-    - **start:** mission launch + cutscene start trigger propagation.
-    - **active objectives:** objective/help text propagation (`print_big`, `print_now`, `print_help`).
-    - **fail:** `fail_current_mission` propagation.
-    - **pass:** `register_mission_passed` propagation.
-    - **reconnect resume:** server snapshot replay of mission flag + latest mission flow event.
 
 ## Milestone: Launcher UX
 
