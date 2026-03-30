@@ -60,6 +60,12 @@ For each mission row in `docs/qa/storyline-wave-mission-evidence.md`, capture an
 4. Pass validation
 5. Reconnect validation
 6. Late-join validation
+7. Host-migration replay stability validation
+
+For multi-stage final missions, also capture:
+
+8. Stage-by-stage functional sign-off (`stage-N` readiness, no cross-stage regressions)
+9. Stage terminal fail/pass idempotency per stage
 
 ## 5) Promotion rule (mandatory)
 
