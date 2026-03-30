@@ -10,6 +10,9 @@ This checklist is the promotion gate for storyline-wave statuses in `docs/ROADMA
 - A mission may move to `done` **only after** all six validation gates are marked `pass` with concrete evidence references (session id, log, clip, or trace).
 - A mission may move to `functional` **only after** all six core gameplay gates are `pass`; `functional` should be treated as equivalent to parity-complete gameplay readiness for wave promotion.
 - If reconnect behavior regresses, mission status must roll back to `in progress` until reconnect notes are refreshed.
+- Final storyline missions (high-transition combat/chase/cutscene arcs) must explicitly carry forward hardened systems from prior waves (`WB-FIX-001..WB-FIX-004`) in their evidence notes.
+- Multi-stage final missions must record terminal handling per stage (fail/pass) and prove stage-local terminal idempotency.
+- Final storyline rows may be promoted to `done` only after stage-by-stage functional sign-off plus stable replay evidence under reconnect **and** host migration.
 - A wave may not be promoted to `complete` until `python3 tools/opcode_audit.py --output docs/qa/storyline-opcode-backlog.md` has been run at both wave start and wave end, and the review entries are recorded in `docs/qa/storyline-opcode-backlog.md`.
 
 ## Evidence notation
@@ -57,3 +60,16 @@ Wave status: `in progress`
 | Running Dog | `done` | `pass` — `RDG-01` actor spawn/cutscene sync verified in `NET-WB-2026-03-30-C`. | `pass` — `RDG-02` chase-to-recovery objective transitions stayed monotonic and host-authoritative. | `pass` — `RDG-04` fail branch produced one terminal event under player death and abort branches. | `pass` — `RDG-05` package recovery pass branch emitted once with idempotent reward replay. | `pass` — `RDG-06` reconnect restored chase/recovery stage and actor bindings without reset. | `pass` — `RDG-07` late-join hydration replayed active actor/objective state without intro rerun. | Wave B completion on 2026-03-30; template: `docs/qa/storyline-mission-template.md`; blocking fix refs: `WB-FIX-001`, `WB-FIX-004`. |
 | Wrong Side Of The Tracks | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | Required before W3 may move to `in progress`. |
 | Just Business | `done` | `pass` — `JBU-01` intro-to-action phase transition synchronized in `NET-WB-2026-03-30-D`. | `pass` — `JBU-02` interior/escape/chase objective chain matched host ordering under jitter. | `pass` — `JBU-05` fail branch emitted one terminal fail on death and vehicle-destroyed conditions. | `pass` — `JBU-06` pass branch emitted one completion + reward packet across peers. | `pass` — `JBU-07` reconnect restored phase, wave index, and pursuit vehicle health budget. | `pass` — `JBU-07` late-join hydration restored active wave state and objective text without duplication. | Wave B completion on 2026-03-30; template: `docs/qa/storyline-mission-template.md`; blocking fix refs: `WB-FIX-003`, `WB-FIX-004`. |
+
+## W4 — RIOT/Endgame finale family (`scm/scripts/RIOT.txt`)
+
+Owner: **Mission Sync Pod (Finale stream)**  
+Wave status: `not started`
+
+| Mission | Status | Stage map | Start/cutscene validation | Objective validation | Stage terminal validation (fail/pass per stage) | Reconnect validation | Host-migration validation | Notes / evidence refs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Riot | `not started` | `single-stage` | `not started` | `not started` | `not started` | `not started` | `not started` | Endgame target mission: apply `WB-FIX-001..WB-FIX-004` before mission-local exceptions. |
+| Los Desperados | `not started` | `single-stage` | `not started` | `not started` | `not started` | `not started` | `not started` | Endgame target mission: heavy combat transitions; require replay idempotency evidence. |
+| End Of The Line (1) | `not started` | `stage-1` | `not started` | `not started` | `not started` | `not started` | `not started` | Multi-stage finale handling required: stage-local terminal fail/pass evidence + stable replay under reconnect/migration. |
+| End Of The Line (2) | `not started` | `stage-2` | `not started` | `not started` | `not started` | `not started` | `not started` | Multi-stage finale handling required: stage-local terminal fail/pass evidence + stable replay under reconnect/migration. |
+| End Of The Line (3) | `not started` | `stage-3` | `not started` | `not started` | `not started` | `not started` | `not started` | Multi-stage finale handling required: stage-local terminal fail/pass evidence + stable replay under reconnect/migration. |

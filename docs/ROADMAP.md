@@ -85,10 +85,14 @@ A storyline mission may only be promoted to `done` after all of the following ga
 - reconnect parity
 - late-join parity
 - evidence link
+- functional sign-off (stage-by-stage for multi-stage finales)
+- reconnect/host-migration stable replay sign-off
 
 Use the dedicated sign-off checklist: `docs/qa/storyline-mission-signoff-checklist.md`.
 
 Status transition rule (`in progress` -> `done`): every roadmap status update must include the checklist reference and completion date (`YYYY-MM-DD`).
+
+Endgame hardening rule: for late-story and finale missions with heavy combat/chase/cutscene transitions, apply all reusable hardened systems validated in earlier waves (`WB-FIX-001..WB-FIX-004`) before mission-specific patches are accepted.
 
 ### P1
 - [ ] Storyline mission parity checklist (`Cleaning The Hood` → `End Of The Line`, excluding already complete: `Big Smoke`, `Ryder`, `Tagging Up Turf`). **[P1][L]**
@@ -161,6 +165,15 @@ Reusable blocking-fix ledger (engine-first policy):
 | Just Business | interior shootout + escape drive-by + chase waves | `done` | 2026-03-30 | `WB-FIX-003`, `WB-FIX-004` |
 
 Wave B completion evidence source of truth: `docs/qa/storyline-wave-mission-evidence.md` and `docs/qa/storyline-shared-command-mini-tickets.md`.
+
+#### Endgame/finale targeting policy (Wave C)
+
+Execution focus: prioritize missions with dense transition churn (combat <-> chase <-> cutscene) and enforce engine-first hardening reuse before mission-local logic.
+
+Required controls for Wave C rollout:
+- Reuse and explicitly re-verify `WB-FIX-001..WB-FIX-004` in each targeted mission evidence row.
+- For multi-stage finales (for example, `End Of The Line (1..3)`), track terminal fail/pass handling per stage, not only for the combined arc.
+- Do not mark a final-storyline row `done` until stage-by-stage functional sign-off is complete and replay remains stable under reconnect and host migration scenarios.
 
 
 | Mission | Script | Status | Blocking dependencies (opcodes/commands) | Quick acceptance criteria |
@@ -250,9 +263,9 @@ Wave B completion evidence source of truth: `docs/qa/storyline-wave-mission-evid
 | Grove 4 Life | `scm/scripts/GROVE.txt` | `not started` | `task_gang_war`, `set_zone_gang_strength`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Riot | `scm/scripts/RIOT.txt` | `not started` | `create_actor`, `set_riot_mode`, `task_kill_char_on_foot` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Los Desperados | `scm/scripts/RIOT.txt` | `not started` | `create_actor`, `task_kill_char_on_foot`, `set_char_accuracy` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| End Of The Line (1) | `scm/scripts/RIOT.txt` | `not started` | `task_go_to_coord_any_means`, `task_kill_char_on_foot`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| End Of The Line (2) | `scm/scripts/RIOT.txt` | `not started` | `create_car`, `task_car_chase`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| End Of The Line (3) | `scm/scripts/RIOT.txt` | `not started` | `start_cutscene`, `task_kill_char_on_foot`, `Mission.LoadAndLaunchInternal` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+| End Of The Line (1) | `scm/scripts/RIOT.txt` | `not started` | `task_go_to_coord_any_means`, `task_kill_char_on_foot`, `set_objective` | Endgame hardening target: heavy combat/cutscene transition mission; validate stage-local terminal handling and reconnect/host-migration replay stability before `done`. |
+| End Of The Line (2) | `scm/scripts/RIOT.txt` | `not started` | `create_car`, `task_car_chase`, `set_char_obj_destroy_car` | Endgame hardening target: chase-heavy stage; require stage-local fail/pass adjudication and reconnect/host-migration replay stability before `done`. |
+| End Of The Line (3) | `scm/scripts/RIOT.txt` | `not started` | `start_cutscene`, `task_kill_char_on_foot`, `Mission.LoadAndLaunchInternal` | Endgame hardening target: cutscene -> combat finale stage; require stage-local terminal handling, full functional sign-off, and reconnect/host-migration stable replay before `done`. |
 
 ## Milestone: Launcher UX
 
