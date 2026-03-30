@@ -163,6 +163,13 @@ def main():
 
     must_add = [0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0256, 0x03EE, 0x0417]
 
+    existing_review_log = None
+    if out_md.exists():
+        previous_text = out_md.read_text(encoding='utf-8')
+        marker = '\n## Wave audit review log\n'
+        if marker in previous_text:
+            existing_review_log = previous_text.split(marker, 1)[1].strip()
+
     lines = [
         '# Storyline opcode parity backlog',
         '',
@@ -205,7 +212,9 @@ def main():
         '',
         f'- Last generated: {date.today().isoformat()}',
         '- Command: `python3 tools/opcode_audit.py --output docs/qa/storyline-opcode-backlog.md`',
-        '- Workflow: rerun at wave start and wave end; record newly discovered coverage gaps (or `none`) before changing wave status in the roadmap.',
+        '- Workflow: rerun at wave start and wave end; commit the refreshed backlog output with each wave progress update.',
+        '- Review gate: do not promote any wave status to `complete` until the latest start+end audit output has been reviewed and recorded here.',
+        '- Triage rule: if new commands/opcodes appear, append a short triage note with why the command is needed, where it is used, and which mission list is blocked pending support.',
         '',
         '| Wave | Script family | Owner | Missing opcode count | Newly discovered command coverage gaps |',
         '| --- | --- | --- | ---: | --- |',
@@ -213,6 +222,22 @@ def main():
 
     for wave_id, family, owner, count, gaps in wave_missing_rows(triaged):
         lines.append(f"| {wave_id} | `{family}` | {owner} | {count} | {gaps} |")
+
+    lines += [
+        '',
+        '## Wave audit review log',
+        '',
+    ]
+
+    if existing_review_log:
+        lines.append(existing_review_log)
+    else:
+        lines += [
+            'Record one entry at wave start and one at wave end.',
+            '',
+            '| Date | Wave | Audit checkpoint | Missing opcode count | Review result | Notes / triage refs |',
+            '| --- | --- | --- | ---: | --- | --- |',
+        ]
 
     out_md.parent.mkdir(parents=True, exist_ok=True)
     out_md.write_text('\n'.join(lines) + '\n', encoding='utf-8')
