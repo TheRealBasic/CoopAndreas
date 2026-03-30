@@ -85,9 +85,9 @@ Wave execution rule: advance one wave at a time; each wave keeps a named owner, 
 
 | Wave | Script family scope | Owner | Wave status | Opcode audit status | Acceptance checkpoints |
 | --- | --- | --- | --- | --- | --- |
-| W1 | `SWEET` | Mission Sync Pod (Sweet stream) | `in progress` | `clear` (0 missing on 2026-03-30) | `C1` owner assigned, `C2` mission rows created in QA evidence doc, `C3` start/objective/fail/pass/reconnect notes captured per mission before promotion, `C4` reconnect replay validated on 2+ peers, `C5` `tools/opcode_audit.py` rerun and delta logged in storyline backlog, `C6` wave sign-off attached. |
-| W2 | `RYDER` | Mission Sync Pod (Ryder stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W2 missions. |
-| W3 | `SMOKE` | Mission Sync Pod (Smoke stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W3 missions. |
+| W1 | `SWEET` | Mission Sync Pod (Sweet stream) | `in progress` | `clear` (0 missing on 2026-03-30) | `C1` owner assigned, `C2` mission rows created in QA evidence doc, `C3` start/objective/fail/pass/reconnect notes captured per mission before promotion + onboarding template reference (`docs/qa/storyline-mission-template.md`), `C4` reconnect replay validated on 2+ peers, `C5` `tools/opcode_audit.py` rerun and delta logged in storyline backlog, `C6` wave sign-off attached. |
+| W2 | `RYDER` | Mission Sync Pod (Ryder stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W2 missions and template reference is present. |
+| W3 | `SMOKE` | Mission Sync Pod (Smoke stream) | `not started` | `clear` (0 missing on 2026-03-30) | Same checkpoints `C1..C6`; may not move to `in progress` until QA evidence rows exist for all W3 missions and template reference is present. |
 
 Wave evidence + status gate source of truth: `docs/qa/storyline-wave-mission-evidence.md`.
 

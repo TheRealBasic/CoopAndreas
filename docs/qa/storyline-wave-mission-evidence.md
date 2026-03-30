@@ -6,6 +6,7 @@ This checklist is the promotion gate for storyline-wave statuses in `docs/ROADMA
 
 - A mission may remain `not started` with blank validation notes.
 - A mission may move to `in progress` **only after** initial notes are captured for all six validation gates: `start/cutscene`, `objective`, `fail`, `pass`, `reconnect`, and `late-join`.
+- A mission may move to `in progress` only if its notes/evidence explicitly reference `docs/qa/storyline-mission-template.md` (mission onboarding template).
 - A mission may move to `done` **only after** all six validation gates are marked `pass` with concrete evidence references (session id, log, clip, or trace).
 - If reconnect behavior regresses, mission status must roll back to `in progress` until reconnect notes are refreshed.
 
