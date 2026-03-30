@@ -346,6 +346,12 @@ public:
 		uint8_t terminalSourceEventType;
 		uint16_t terminalSourceOpcode;
 		uint32_t terminalSourceSequence;
+		uint8_t respawnEligible;
+		uint8_t participantDeathCount;
+		uint8_t participantIncapacitationCount;
+		uint8_t respawnCount;
+		uint8_t missionFailThreshold;
+		uint8_t incapacitationFailThreshold;
 	};
 
 	struct UpdateCheckpoint
@@ -408,6 +414,12 @@ public:
 		uint8_t passFailPending;
 		uint8_t cutscenePhase;
 		uint32_t cutsceneSessionToken;
+		uint8_t respawnEligible;
+		uint8_t participantDeathCount;
+		uint8_t participantIncapacitationCount;
+		uint8_t respawnCount;
+		uint8_t missionFailThreshold;
+		uint8_t incapacitationFailThreshold;
 	};
 
 	struct MissionRuntimeSnapshotActor

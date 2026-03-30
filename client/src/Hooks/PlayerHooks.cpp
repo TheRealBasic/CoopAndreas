@@ -4,6 +4,7 @@
 #include "CAimSync.h"
 #include "CStatsSync.h"
 #include "CWantedSync.h"
+#include "CMissionSyncState.h"
 #include <game_sa/CPedDamageResponseInfo.h>
 
 static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
@@ -175,6 +176,7 @@ void CReferences__RemoveReferencesToPlayer_Hook()
     if (CNetwork::m_bConnected)
     {
         CStatsSync::TriggerWantedLevelReset();
+        CMissionSyncState::HandleLocalPlayerRespawned();
 
         CPackets::RespawnPlayer packet{};
         CNetwork::SendPacket(CPacketsID::RESPAWN_PLAYER, &packet, sizeof packet, ENET_PACKET_FLAG_RELIABLE);
@@ -306,6 +308,7 @@ void __fastcall CRunningScript__DoDeatharrestCheck_Hook(CRunningScript* This, SK
         playerInfo->m_nPlayerState == ePlayerState::PLAYERSTATE_HASBEENARRESTED)
     {
         wastedOrBusted = true;
+        CMissionSyncState::EmitParticipantRuntimeEvent(CPackets::MISSION_FLOW_EVENT_PARTICIPANT_DEATH, false);
     }
 
     if (!wastedOrBusted)
@@ -319,6 +322,11 @@ void __fastcall CRunningScript__DoDeatharrestCheck_Hook(CRunningScript* This, SK
                     (ped->m_ePedState == PEDSTATE_DIE && ped->m_nPedFlags.bIsDyingStuck))
                 {
                     wastedOrBusted = true;
+                    CMissionSyncState::EmitParticipantRuntimeEvent(CPackets::MISSION_FLOW_EVENT_PARTICIPANT_DEATH, false);
+                }
+                else if (ped->m_ePedState == PEDSTATE_DIE)
+                {
+                    CMissionSyncState::EmitParticipantRuntimeEvent(CPackets::MISSION_FLOW_EVENT_PARTICIPANT_INCAPACITATED, false);
                 }
             }
         }
