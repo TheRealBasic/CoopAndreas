@@ -198,6 +198,12 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     g_objectiveState.timerDirection = packet->timerDirection;
     g_objectiveState.passFailPending = packet->passFailPending;
     g_objectiveState.playerControlState = packet->playerControlState;
+    g_objectiveState.movementLocked = packet->movementLocked;
+    g_objectiveState.firingLocked = packet->firingLocked;
+    g_objectiveState.cameraLocked = packet->cameraLocked;
+    g_objectiveState.hudHidden = packet->hudHidden;
+    g_objectiveState.cutscenePhase = packet->cutscenePhase;
+    g_objectiveState.cutsceneSessionToken = packet->cutsceneSessionToken;
     std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
     if (g_hasFlow)

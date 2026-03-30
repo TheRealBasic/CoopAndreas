@@ -20,6 +20,7 @@ namespace
     bool ms_bProcessingTaskSequence = false;
     bool ms_bMissionActive = false;
     bool ms_bCutsceneActive = false;
+    uint32_t ms_lastAuthoritativeCutsceneSkipToken = 0;
 
     bool ms_bScriptWideScreenForced = false;
     bool ms_bScriptWideScreenValue = false;
@@ -96,6 +97,14 @@ namespace
     constexpr uint16_t OP_PRINT_HELP = 0x03E5;
     constexpr uint16_t OP_REGISTER_MISSION_PASSED = 0x0318;
     constexpr uint16_t OP_FAIL_CURRENT_MISSION = 0x045C;
+    constexpr uint16_t OP_SET_PLAYER_FIRE_BUTTON = 0x0881;
+    constexpr uint16_t OP_DISPLAY_HUD = 0x0826;
+    constexpr uint16_t OP_SET_CAMERA_CONTROL = 0x0E60;
+
+    constexpr uint8_t CUTSCENE_PHASE_NONE = 0;
+    constexpr uint8_t CUTSCENE_PHASE_INTRO = 1;
+    constexpr uint8_t CUTSCENE_PHASE_SKIP = 2;
+    constexpr uint8_t CUTSCENE_PHASE_END = 3;
 
     constexpr OpCodeHandlerEntry kPreExecuteOpCodeHandlers[] = {
         { OP_END_SCENE_SKIP, &CMissionSyncState::HandleEndSceneSkip },
@@ -210,6 +219,27 @@ namespace
 
         CNetwork::SendPacket(CPacketsID::SUBMISSION_MISSION_STATE_DELTA, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
     }
+
+    void ApplyReplicatedControlLocks(const SideContentAttemptState& state)
+    {
+        CPad* pad = CPad::GetPad(0);
+        if (!pad)
+        {
+            return;
+        }
+
+        const bool movementLocked = state.movementLocked != 0;
+        const bool firingLocked = state.firingLocked != 0;
+        const bool hudHidden = state.hudHidden != 0;
+
+        pad->bDisablePlayerEnterCar = movementLocked ? 1 : 0;
+        pad->bDisablePlayerDuck = movementLocked ? 1 : 0;
+        pad->bDisablePlayerCycleWeapon = movementLocked ? 1 : 0;
+        pad->bDisablePlayerJump = movementLocked ? 1 : 0;
+        pad->bDisablePlayerFireWeapon = firingLocked ? 1 : 0;
+        pad->bDisablePlayerFireWeaponWithL1 = firingLocked ? 1 : 0;
+        pad->bDisablePlayerDisplayVitalStats = hudHidden ? 1 : 0;
+    }
 }
 
 void CMissionSyncState::Init()
@@ -219,6 +249,7 @@ void CMissionSyncState::Init()
     ms_bProcessingTaskSequence = false;
     ms_bMissionActive = false;
     ms_bCutsceneActive = false;
+    ms_lastAuthoritativeCutsceneSkipToken = 0;
 
     ms_bScriptWideScreenForced = false;
     ms_bScriptWideScreenValue = false;
@@ -344,7 +375,7 @@ uint16_t CMissionSyncState::GetMissionInstanceId()
     return ms_runtimeMissionInstanceId;
 }
 
-void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName, uint8_t currArea)
+void CMissionSyncState::EmitMissionFlowCutscenePhase(uint8_t phase, const char* cutsceneName, uint8_t currArea, uint32_t cutsceneSessionToken)
 {
     if (!CLocalPlayer::m_bIsHost)
     {
@@ -352,7 +383,18 @@ void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName,
     }
 
     CPackets::MissionFlowSync packet{};
-    packet.eventType = CPackets::MISSION_FLOW_EVENT_CUTSCENE_TRIGGER;
+    if (phase == CUTSCENE_PHASE_SKIP)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_CUTSCENE_SKIP;
+    }
+    else if (phase == CUTSCENE_PHASE_END)
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_CUTSCENE_END;
+    }
+    else
+    {
+        packet.eventType = CPackets::MISSION_FLOW_EVENT_CUTSCENE_INTRO;
+    }
     packet.currArea = currArea;
     packet.onMission = (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? 1 : 0;
     packet.sequence = ++ms_nMissionFlowSequence;
@@ -366,6 +408,12 @@ void CMissionSyncState::EmitMissionFlowCutsceneTrigger(const char* cutsceneName,
     packet.timerDirection = ms_sideContentAttemptState.timerDirection;
     packet.passFailPending = ms_sideContentAttemptState.passFailPending;
     packet.playerControlState = ms_sideContentAttemptState.playerControlState;
+    packet.movementLocked = ms_sideContentAttemptState.movementLocked;
+    packet.firingLocked = ms_sideContentAttemptState.firingLocked;
+    packet.cameraLocked = ms_sideContentAttemptState.cameraLocked;
+    packet.hudHidden = ms_sideContentAttemptState.hudHidden;
+    packet.cutscenePhase = phase;
+    packet.cutsceneSessionToken = cutsceneSessionToken;
     strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
     strncpy_s(packet.cutsceneName, cutsceneName ? cutsceneName : "", sizeof(packet.cutsceneName));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
@@ -417,6 +465,12 @@ void CMissionSyncState::EmitMissionFlowText(uint16_t opcode, const HostTextMessa
     packet.timerDirection = ms_sideContentAttemptState.timerDirection;
     packet.passFailPending = ms_sideContentAttemptState.passFailPending;
     packet.playerControlState = ms_sideContentAttemptState.playerControlState;
+    packet.movementLocked = ms_sideContentAttemptState.movementLocked;
+    packet.firingLocked = ms_sideContentAttemptState.firingLocked;
+    packet.cameraLocked = ms_sideContentAttemptState.cameraLocked;
+    packet.hudHidden = ms_sideContentAttemptState.hudHidden;
+    packet.cutscenePhase = ms_sideContentAttemptState.cutscenePhase;
+    packet.cutsceneSessionToken = ms_sideContentAttemptState.cutsceneSessionToken;
     strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
     strncpy_s(packet.gxt, message.gxt ? message.gxt : "", sizeof(packet.gxt));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
@@ -451,6 +505,12 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
     packet.timerDirection = ms_sideContentAttemptState.timerDirection;
     packet.passFailPending = ms_sideContentAttemptState.passFailPending;
     packet.playerControlState = ms_sideContentAttemptState.playerControlState;
+    packet.movementLocked = ms_sideContentAttemptState.movementLocked;
+    packet.firingLocked = ms_sideContentAttemptState.firingLocked;
+    packet.cameraLocked = ms_sideContentAttemptState.cameraLocked;
+    packet.hudHidden = ms_sideContentAttemptState.hudHidden;
+    packet.cutscenePhase = ms_sideContentAttemptState.cutscenePhase;
+    packet.cutsceneSessionToken = ms_sideContentAttemptState.cutsceneSessionToken;
     strncpy_s(packet.objective, ms_sideContentAttemptState.objective, sizeof(packet.objective));
     CNetwork::SendPacket(CPacketsID::MISSION_FLOW_SYNC, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
 }
@@ -486,6 +546,12 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.timerFrozen = packet.timerFrozen;
     ms_sideContentAttemptState.timerDirection = packet.timerDirection;
     ms_sideContentAttemptState.playerControlState = packet.playerControlState;
+    ms_sideContentAttemptState.movementLocked = packet.movementLocked;
+    ms_sideContentAttemptState.firingLocked = packet.firingLocked;
+    ms_sideContentAttemptState.cameraLocked = packet.cameraLocked;
+    ms_sideContentAttemptState.hudHidden = packet.hudHidden;
+    ms_sideContentAttemptState.cutscenePhase = packet.cutscenePhase;
+    ms_sideContentAttemptState.cutsceneSessionToken = packet.cutsceneSessionToken;
     if (packet.objective[0])
     {
         strncpy_s(ms_sideContentAttemptState.objective, packet.objective, sizeof(ms_sideContentAttemptState.objective));
@@ -499,6 +565,18 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     {
         ms_sideContentAttemptState.passFailPending = packet.passFailPending;
     }
+
+    if (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_INTRO)
+    {
+        ms_bCutsceneActive = true;
+    }
+    else if (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_SKIP || packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_END)
+    {
+        ms_bCutsceneActive = false;
+        ResetScriptWideScreenOverride();
+    }
+
+    ApplyReplicatedControlLocks(ms_sideContentAttemptState);
 
     if (packet.eventType == CPackets::MISSION_FLOW_EVENT_OBJECTIVE
         || packet.eventType == CPackets::MISSION_FLOW_EVENT_FAIL
@@ -752,11 +830,26 @@ bool CMissionSyncState::HandleOpCodePreExecute(uint16_t opcode)
         return false;
     }
 
+    if (!CLocalPlayer::m_bIsHost
+        && IsMissionContextActive()
+        && (opcode == 0x01B4
+            || opcode == OP_SET_PLAYER_FIRE_BUTTON
+            || opcode == OP_DISPLAY_HUD
+            || opcode == OP_SET_CAMERA_CONTROL))
+    {
+        return false;
+    }
+
     return true;
 }
 
 bool CMissionSyncState::HandleEndSceneSkip()
 {
+    if (CLocalPlayer::m_bIsHost)
+    {
+        EmitMissionFlowCutscenePhase(CUTSCENE_PHASE_SKIP, CCutsceneMgr::ms_cutsceneName, (uint8_t)CGame::currArea, 0);
+    }
+
     ms_bCutsceneActive = false;
     ms_nWidescreenEventId++;
     ResetScriptWideScreenOverride();
@@ -780,8 +873,27 @@ bool CMissionSyncState::HandleStartCutscene()
 
 bool CMissionSyncState::HandleClearCutscene()
 {
+    if (CLocalPlayer::m_bIsHost)
+    {
+        EmitMissionFlowCutscenePhase(CUTSCENE_PHASE_END, CCutsceneMgr::ms_cutsceneName, (uint8_t)CGame::currArea, 0);
+    }
+
     ms_bCutsceneActive = false;
     ms_nWidescreenEventId++;
     ResetScriptWideScreenOverride();
     return true;
+}
+
+void CMissionSyncState::HandleAuthoritativeCutsceneSkip(uint32_t sessionToken)
+{
+    if (sessionToken != 0 && sessionToken == ms_lastAuthoritativeCutsceneSkipToken)
+    {
+        return;
+    }
+
+    ms_lastAuthoritativeCutsceneSkipToken = sessionToken;
+    ms_bCutsceneActive = false;
+    ms_sideContentAttemptState.cutscenePhase = CUTSCENE_PHASE_SKIP;
+    ms_sideContentAttemptState.cutsceneSessionToken = sessionToken;
+    EmitMissionFlowCutscenePhase(CUTSCENE_PHASE_SKIP, CCutsceneMgr::ms_cutsceneName, (uint8_t)CGame::currArea, sessionToken);
 }

@@ -25,10 +25,11 @@ public:
     static void ProcessWidescreenPolicy();
 
     static void HandleMissionFlagSync(bool onMission);
-    static void EmitMissionFlowCutsceneTrigger(const char* cutsceneName, uint8_t currArea);
+    static void EmitMissionFlowCutscenePhase(uint8_t phase, const char* cutsceneName, uint8_t currArea, uint32_t cutsceneSessionToken);
     static void EmitMissionFlowText(uint16_t opcode, const HostTextMessage& message);
     static void EmitMissionFlowOpcode(uint16_t opcode, const int* params, uint16_t paramCount, const char* text);
     static void HandleMissionFlowSync(const CPackets::MissionFlowSync& packet);
+    static void HandleAuthoritativeCutsceneSkip(uint32_t sessionToken);
     static bool HandleNetworkSwitchWidescreen(bool enabled);
     static void ProcessSubmissionMissionSync();
     static void HandleSubmissionMissionSnapshotBegin(const CPackets::SubmissionMissionSnapshotBegin& packet);

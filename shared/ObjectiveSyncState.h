@@ -18,6 +18,12 @@ namespace ObjectiveSync
         uint8_t timerDirection = 0;
         uint8_t passFailPending = 0;
         uint8_t playerControlState = 0;
+        uint8_t movementLocked = 0;
+        uint8_t firingLocked = 0;
+        uint8_t cameraLocked = 0;
+        uint8_t hudHidden = 0;
+        uint8_t cutscenePhase = 0;
+        uint32_t cutsceneSessionToken = 0;
         char objective[8]{};
     };
 
@@ -92,6 +98,46 @@ namespace ObjectiveSync
                 if (state.playerControlState != nextState)
                 {
                     state.playerControlState = nextState;
+                    result.changed = true;
+                }
+
+                const uint8_t nextMovementLocked = nextState ? 0 : 1;
+                if (state.movementLocked != nextMovementLocked)
+                {
+                    state.movementLocked = nextMovementLocked;
+                    result.changed = true;
+                }
+            }
+            break;
+        case 0x0881: // set_player_fire_button
+            if (params && paramCount > 1)
+            {
+                const uint8_t nextFiringLocked = params[1] ? 0 : 1;
+                if (state.firingLocked != nextFiringLocked)
+                {
+                    state.firingLocked = nextFiringLocked;
+                    result.changed = true;
+                }
+            }
+            break;
+        case 0x0E60: // set_camera_control
+            if (params && paramCount > 0)
+            {
+                const uint8_t nextCameraLocked = params[0] ? 0 : 1;
+                if (state.cameraLocked != nextCameraLocked)
+                {
+                    state.cameraLocked = nextCameraLocked;
+                    result.changed = true;
+                }
+            }
+            break;
+        case 0x0826: // display_hud
+            if (params && paramCount > 0)
+            {
+                const uint8_t nextHudHidden = params[0] ? 0 : 1;
+                if (state.hudHidden != nextHudHidden)
+                {
+                    state.hudHidden = nextHudHidden;
                     result.changed = true;
                 }
             }
