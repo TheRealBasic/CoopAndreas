@@ -228,6 +228,20 @@ static CRunningScript* lastProcessedScript;
 static uint8_t currentStringIdx = 0;
 
 static uint16_t argCount = 0;
+
+static bool ShouldDeferNetworkOpcodeExecution(uint16_t opcode)
+{
+    return !CMissionSyncState::HandleOpCodePreExecute(opcode);
+}
+
+static bool ShouldSkipNetworkWidescreenOpcode(const CPacketHandler::PacketOpCodeSync& header)
+{
+    return !CLocalPlayer::m_bIsHost
+        && header.opcode == OP_SWITCH_WIDESCREEN
+        && scriptParamCount > 0
+        && !CMissionSyncState::HandleNetworkSwitchWidescreen(scriptParamsBuffer[0].value != 0);
+}
+
 void __fastcall CRunningScript__CollectParameters_Hook_SwitchParametersContext(CRunningScript* script, SKIP_EDX, uint16_t count)
 {
     for (uint8_t i = argCount; i < count + argCount; i++)
@@ -810,16 +824,12 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
     //    //CChat::AddMessage("0x%04x", header.opcode);
     //}
     
-    // TODO: refactor
-    if (!CMissionSyncState::HandleOpCodePreExecute(lastOpCodeProcessed))
+    if (ShouldDeferNetworkOpcodeExecution(lastOpCodeProcessed))
     {
         return; // defer opcode execution until mission state is ready
     }
 
-    if (!CLocalPlayer::m_bIsHost
-        && header.opcode == 0x02A3
-        && scriptParamCount > 0
-        && !CMissionSyncState::HandleNetworkSwitchWidescreen(scriptParamsBuffer[0].value != 0))
+    if (ShouldSkipNetworkWidescreenOpcode(header))
     {
         return;
     }
