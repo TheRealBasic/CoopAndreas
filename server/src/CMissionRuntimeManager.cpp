@@ -222,9 +222,27 @@ namespace
 
     bool CommitTerminalOutcome(CMissionRuntimeManager::MissionFlowPayload& packet, uint8_t terminalReasonCode)
     {
+        const auto terminalPriority = [](uint8_t reason) -> uint8_t
+        {
+            switch (reason)
+            {
+            case CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL: return 3;
+            case CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS: return 2;
+            case CMissionRuntimePackets::MISSION_TERMINAL_REASON_ON_MISSION_CLEARED: return 1;
+            default: return 0;
+            }
+        };
+
         if (HasCommittedTerminalOutcome())
         {
-            return false;
+            const uint8_t currentPriority = terminalPriority(g_terminalReasonCode);
+            const uint8_t incomingPriority = terminalPriority(terminalReasonCode);
+            const bool shouldOverride = incomingPriority > currentPriority
+                || (incomingPriority == currentPriority && packet.sequence >= g_terminalSourceSequence);
+            if (!shouldOverride)
+            {
+                return false;
+            }
         }
 
         g_terminalEventSeen = true;
@@ -256,6 +274,7 @@ namespace
         packet.terminalSourceEventType = g_terminalSourceEventType;
         packet.terminalSourceOpcode = g_terminalSourceOpcode;
         packet.terminalSourceSequence = g_terminalSourceSequence;
+        packet.terminalTieBreaker = terminalPriority(g_terminalReasonCode);
         return true;
     }
 
@@ -286,6 +305,13 @@ namespace
 
     void WriteTerminalMetadata(CMissionRuntimeManager::MissionFlowPayload& packet)
     {
+        switch (g_terminalReasonCode)
+        {
+        case CMissionRuntimePackets::MISSION_TERMINAL_REASON_FAIL: packet.terminalTieBreaker = 3; break;
+        case CMissionRuntimePackets::MISSION_TERMINAL_REASON_PASS: packet.terminalTieBreaker = 2; break;
+        case CMissionRuntimePackets::MISSION_TERMINAL_REASON_ON_MISSION_CLEARED: packet.terminalTieBreaker = 1; break;
+        default: packet.terminalTieBreaker = 0; break;
+        }
         packet.terminalReasonCode = g_terminalReasonCode;
         packet.terminalSourceEventType = g_terminalSourceEventType;
         packet.terminalSourceOpcode = g_terminalSourceOpcode;
@@ -548,6 +574,10 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.respawnCount = packet->respawnCount;
         g_objectiveState.missionFailThreshold = packet->missionFailThreshold == 0 ? 1 : packet->missionFailThreshold;
         g_objectiveState.incapacitationFailThreshold = packet->incapacitationFailThreshold;
+        g_objectiveState.vehicleTaskState = packet->vehicleTaskState;
+        g_objectiveState.pursuitState = packet->pursuitState;
+        g_objectiveState.destroyEscapeState = packet->destroyEscapeState;
+        g_objectiveState.vehicleTaskSequence = packet->vehicleTaskSequence;
         std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
         if (packet->sourceOpcode == 0x0417 || (packet->missionId != 0 && packet->missionId != g_lastFlow.missionId))
@@ -630,6 +660,10 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->respawnCount = g_objectiveState.respawnCount;
     packet->missionFailThreshold = g_objectiveState.missionFailThreshold;
     packet->incapacitationFailThreshold = g_objectiveState.incapacitationFailThreshold;
+    packet->vehicleTaskState = g_objectiveState.vehicleTaskState;
+    packet->pursuitState = g_objectiveState.pursuitState;
+    packet->destroyEscapeState = g_objectiveState.destroyEscapeState;
+    packet->vehicleTaskSequence = g_objectiveState.vehicleTaskSequence;
     WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
@@ -773,6 +807,11 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     snapshotState.respawnCount = g_objectiveState.respawnCount;
     snapshotState.missionFailThreshold = g_objectiveState.missionFailThreshold;
     snapshotState.incapacitationFailThreshold = g_objectiveState.incapacitationFailThreshold;
+    snapshotState.vehicleTaskState = g_objectiveState.vehicleTaskState;
+    snapshotState.pursuitState = g_objectiveState.pursuitState;
+    snapshotState.destroyEscapeState = g_objectiveState.destroyEscapeState;
+    snapshotState.vehicleTaskSequence = g_objectiveState.vehicleTaskSequence;
+    snapshotState.terminalTieBreaker = g_lastFlow.terminalTieBreaker;
     CNetwork::SendPacket(peer, CPacketsID::MISSION_RUNTIME_SNAPSHOT_STATE, &snapshotState, sizeof(snapshotState), ENET_PACKET_FLAG_RELIABLE);
 
     for (size_t i = 0; i < std::min<size_t>(g_snapshotActors.size(), UINT8_MAX); ++i)

@@ -748,6 +748,10 @@ void BuildAndSendOpcode()
         lastOpCodeProcessed == 0x0881 || // set_player_fire_button
         lastOpCodeProcessed == 0x0E60 || // set_camera_control
         lastOpCodeProcessed == 0x0826 || // display_hud
+        lastOpCodeProcessed == 0x05CA || // task_enter_car_as_passenger (vehicle mission task transition)
+        lastOpCodeProcessed == 0x05CB || // task_enter_car_as_driver (vehicle mission task transition)
+        lastOpCodeProcessed == 0x0672 || // task_destroy_car (authoritative destroy condition progression)
+        lastOpCodeProcessed == 0x0713 || // task_drive_by (authoritative pursuit phase progression)
         lastOpCodeProcessed == 0x06D5 || // checkpoint_create (checkpoint progression, including race checkpoint setup)
         lastOpCodeProcessed == 0x07F3 || // checkpoint_set_coords (checkpoint progression, including set_car_race_checkpoint flows)
         lastOpCodeProcessed == 0x014E || // set_timers

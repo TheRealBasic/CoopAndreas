@@ -405,6 +405,13 @@ namespace
         packet.respawnCount = state.respawnCount;
         packet.missionFailThreshold = state.missionFailThreshold;
         packet.incapacitationFailThreshold = state.incapacitationFailThreshold;
+        packet.vehicleTaskState = state.vehicleTaskState;
+        packet.pursuitState = state.pursuitState;
+        packet.destroyEscapeState = state.destroyEscapeState;
+        packet.vehicleTaskSequence = state.vehicleTaskSequence;
+        packet.terminalTieBreaker =
+            state.passFailPending == 2 ? 3 :
+            (state.passFailPending == 1 ? 2 : 0);
     }
 
     void ApplyInboundObjectiveTextState(SideContentAttemptState& state, const CPackets::MissionFlowSync& packet)
@@ -821,6 +828,10 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
     ms_sideContentAttemptState.respawnCount = packet.respawnCount;
     ms_sideContentAttemptState.missionFailThreshold = packet.missionFailThreshold == 0 ? 1 : packet.missionFailThreshold;
     ms_sideContentAttemptState.incapacitationFailThreshold = packet.incapacitationFailThreshold;
+    ms_sideContentAttemptState.vehicleTaskState = packet.vehicleTaskState;
+    ms_sideContentAttemptState.pursuitState = packet.pursuitState;
+    ms_sideContentAttemptState.destroyEscapeState = packet.destroyEscapeState;
+    ms_sideContentAttemptState.vehicleTaskSequence = packet.vehicleTaskSequence;
     ApplyInboundObjectiveTextState(ms_sideContentAttemptState, packet);
 
     CPackets::ReplicatedCheckpointState authoritativeCheckpoint{};
@@ -988,6 +999,10 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     ms_sideContentAttemptState.respawnCount = ms_runtimeSnapshotState.respawnCount;
     ms_sideContentAttemptState.missionFailThreshold = ms_runtimeSnapshotState.missionFailThreshold == 0 ? 1 : ms_runtimeSnapshotState.missionFailThreshold;
     ms_sideContentAttemptState.incapacitationFailThreshold = ms_runtimeSnapshotState.incapacitationFailThreshold;
+    ms_sideContentAttemptState.vehicleTaskState = ms_runtimeSnapshotState.vehicleTaskState;
+    ms_sideContentAttemptState.pursuitState = ms_runtimeSnapshotState.pursuitState;
+    ms_sideContentAttemptState.destroyEscapeState = ms_runtimeSnapshotState.destroyEscapeState;
+    ms_sideContentAttemptState.vehicleTaskSequence = ms_runtimeSnapshotState.vehicleTaskSequence;
     ms_sideContentAttemptState.objectiveTextToken = ms_runtimeSnapshotState.objectiveTextToken;
     ms_sideContentAttemptState.objectiveTextSemantics = ms_runtimeSnapshotState.objectiveTextSemantics;
     std::memcpy(ms_sideContentAttemptState.objective, ms_runtimeSnapshotState.objective, sizeof(ms_sideContentAttemptState.objective));
@@ -1010,6 +1025,7 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     terminalView.terminalSourceSequence = ms_runtimeSnapshotState.terminalSourceSequence;
     terminalView.runtimeSessionToken = ms_runtimeSnapshotState.runtimeSessionToken;
     terminalView.passFailPending = ms_runtimeSnapshotState.passFailPending;
+    terminalView.terminalTieBreaker = ms_runtimeSnapshotState.terminalTieBreaker;
     ApplyAdjudicatedTerminalState(terminalView);
     ApplyReplicatedControlLocks(ms_sideContentAttemptState);
 

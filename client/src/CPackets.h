@@ -667,6 +667,11 @@ public:
 		uint8_t respawnCount = 0;
 		uint8_t missionFailThreshold = 1;
 		uint8_t incapacitationFailThreshold = UINT8_MAX;
+		uint8_t vehicleTaskState = 0;
+		uint8_t pursuitState = 0;
+		uint8_t destroyEscapeState = 0;
+		uint16_t vehicleTaskSequence = 0;
+		uint8_t terminalTieBreaker = 0;
 	};
 
 	struct UpdateEntityBlip
@@ -783,6 +788,11 @@ public:
 		uint8_t respawnCount = 0;
 		uint8_t missionFailThreshold = 1;
 		uint8_t incapacitationFailThreshold = UINT8_MAX;
+		uint8_t vehicleTaskState = 0;
+		uint8_t pursuitState = 0;
+		uint8_t destroyEscapeState = 0;
+		uint16_t vehicleTaskSequence = 0;
+		uint8_t terminalTieBreaker = 0;
 	};
 
 	struct MissionRuntimeSnapshotActor
