@@ -96,10 +96,33 @@ Opcode gap tracking rule per wave:
 2. Update the matching wave ledger row in `docs/qa/storyline-opcode-backlog.md` with any newly discovered gaps (or explicit `none`).
 3. Do not mark a wave `done` until wave-end audit is recorded.
 
+#### Wave 1 stabilization (does not block Wave 2 kickoff)
+
+| Mission | Script family | Wave | Current status | Wave 1 exit note |
+| --- | --- | --- | --- | --- |
+| Cleaning The Hood | `SWEET` | W1 | `in progress` | `stabilization before done` (kept in Wave 1 while Wave 2 starts). |
+| Drive-Thru | `SWEET` | W1 | `in progress` | `stabilization before done` (kept in Wave 1 while Wave 2 starts). |
+
+#### Wave 2 mission kickoff plan
+
+Grouped by script family; each mission carries owner, target date, and next status transition (`not started -> in progress`).
+
+| Mission | Script family | Owner | Target date | Next status |
+| --- | --- | --- | --- | --- |
+| Nines And AK's | `SWEET` | Mission Sync Pod (Sweet stream) | 2026-04-01 | `not started -> in progress` |
+| Drive-By | `SWEET` | Mission Sync Pod (Sweet stream) | 2026-04-01 | `not started -> in progress` |
+| Sweet's Girl | `SWEET` | Mission Sync Pod (Sweet stream) | 2026-04-02 | `not started -> in progress` |
+| Cesar Vialpando | `SWEET` | Mission Sync Pod (Sweet stream) | 2026-04-02 | `not started -> in progress` |
+| Home Invasion | `RYDER` | Mission Sync Pod (Ryder stream) | 2026-04-03 | `not started -> in progress` |
+| Catalyst | `RYDER` | Mission Sync Pod (Ryder stream) | 2026-04-03 | `not started -> in progress` |
+| Robbing Uncle Sam | `RYDER` | Mission Sync Pod (Ryder stream) | 2026-04-04 | `not started -> in progress` |
+| OG Loc | `SMOKE` | Mission Sync Pod (Smoke stream) | 2026-04-04 | `not started -> in progress` |
+
+
 | Mission | Script | Status | Blocking dependencies (opcodes/commands) | Quick acceptance criteria |
 | --- | --- | --- | --- | --- |
-| Cleaning The Hood | `scm/scripts/SWEET.txt` | `in progress` | `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
-| Drive-Thru | `scm/scripts/SWEET.txt` | `in progress` | `create_car`, `task_drive_by`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+| Cleaning The Hood | `scm/scripts/SWEET.txt` | `in progress` (`Wave 1 stabilization before done`; does not block Wave 2 kickoff) | `Mission.LoadAndLaunchInternal`, `create_actor`, `set_char_obj_kill_char_any_means` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
+| Drive-Thru | `scm/scripts/SWEET.txt` | `in progress` (`Wave 1 stabilization before done`; does not block Wave 2 kickoff) | `create_car`, `task_drive_by`, `set_char_obj_destroy_car` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Nines And AK's | `scm/scripts/SWEET.txt` | `not started` | `create_pickup`, `task_go_to_coord_any_means`, `set_objective` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Drive-By | `scm/scripts/SWEET.txt` | `not started` | `task_drive_by`, `set_char_obj_destroy_car`, `set_mission_audio_position` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
 | Sweet's Girl | `scm/scripts/SWEET.txt` | `not started` | `create_actor`, `set_char_obj_flee_char_on_foot_till_safe`, `task_enter_car_as_driver` | Cutscene sync, objective sync, fail/pass sync, reconnect resumes mission state. |
