@@ -91,4 +91,5 @@ void CPlayerManager::AssignHostToFirstPlayer()
 	CPlayerPackets::BroadcastPickupBootstrapResync();
 	CPlayerPackets::BroadcastPropertyStateResync();
 	CPlayerPackets::BroadcastSubmissionMissionStateResync();
+	CPlayerPackets::BroadcastMissionRuntimeStateResync();
 }

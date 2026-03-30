@@ -242,4 +242,69 @@ public:
 	#pragma pack()
 };
 
+class CMissionRuntimePackets
+{
+public:
+	#pragma pack(1)
+	enum eMissionRuntimeState : uint8_t
+	{
+		MISSION_RUNTIME_IDLE = 0,
+		MISSION_RUNTIME_STARTING = 1,
+		MISSION_RUNTIME_ACTIVE = 2,
+		MISSION_RUNTIME_PASS_PENDING = 3,
+		MISSION_RUNTIME_FAIL_PENDING = 4,
+		MISSION_RUNTIME_COMPLETED = 5
+	};
+
+	struct OnMissionFlagSync
+	{
+		uint8_t bOnMission : 1;
+	};
+
+	struct MissionFlowSync
+	{
+		uint8_t eventType;
+		uint8_t messageType;
+		uint32_t time;
+		uint8_t flag;
+		uint8_t currArea;
+		uint8_t onMission;
+		uint8_t replay;
+		uint32_t sequence;
+		char gxt[8];
+		char cutsceneName[8];
+		uint16_t sourceOpcode;
+		uint16_t missionId;
+		int32_t timerMs;
+		uint16_t checkpointIndex;
+		uint8_t timerVisible;
+		uint8_t timerFrozen;
+		uint8_t passFailPending;
+		uint8_t playerControlState;
+		char objective[8];
+		uint8_t runtimeState;
+		uint16_t objectiveVersion;
+		uint16_t checkpointVersion;
+		uint32_t runtimeSessionToken;
+	};
+
+	struct UpdateCheckpoint
+	{
+		int playerid;
+		CVector position;
+		CVector radius;
+		uint16_t checkpointIndex;
+		uint16_t checkpointVersion;
+		uint32_t runtimeSessionToken;
+	};
+
+	struct RemoveCheckpoint
+	{
+		int playerid;
+		uint16_t checkpointVersion;
+		uint32_t runtimeSessionToken;
+	};
+	#pragma pack()
+};
+
 #endif
