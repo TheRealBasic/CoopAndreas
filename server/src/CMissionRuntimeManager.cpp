@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <unordered_map>
 #include <vector>
 
 #include "CNetwork.h"
@@ -33,6 +34,36 @@ namespace
     int g_missionAuthorityPlayerId = -1;
     ObjectiveSync::State g_objectiveState{};
     std::vector<CMissionRuntimePackets::MissionRuntimeSnapshotActor> g_snapshotActors{};
+    struct RegistryActorKey
+    {
+        uint32_t missionEpoch = 0;
+        uint32_t scriptLocalIdentifier = 0;
+        uint16_t opcode = 0;
+        uint8_t slot = 0;
+        uint8_t entityType = 0;
+
+        bool operator==(const RegistryActorKey& rhs) const
+        {
+            return missionEpoch == rhs.missionEpoch
+                && scriptLocalIdentifier == rhs.scriptLocalIdentifier
+                && opcode == rhs.opcode
+                && slot == rhs.slot
+                && entityType == rhs.entityType;
+        }
+    };
+
+    struct RegistryActorKeyHash
+    {
+        size_t operator()(const RegistryActorKey& key) const
+        {
+            return std::hash<uint64_t>{}(
+                (uint64_t)key.missionEpoch << 32
+                | (uint64_t)key.scriptLocalIdentifier
+                | (uint64_t)key.opcode);
+        }
+    };
+
+    std::unordered_map<RegistryActorKey, CMissionRuntimePackets::MissionRuntimeSnapshotActor, RegistryActorKeyHash> g_registryActors{};
     
     struct MigrationSnapshot
     {
@@ -300,6 +331,62 @@ namespace
         }
 
         return CanAcceptEvent(eventKind, g_runtimeState);
+    }
+}
+
+void CMissionRuntimeManager::HandleOpcodeRegistrySync(const void* data, int size)
+{
+    if (!data || size < (int)sizeof(COpCodePackets::OpCodeSyncHeader))
+    {
+        return;
+    }
+
+    const auto* header = static_cast<const COpCodePackets::OpCodeSyncHeader*>(data);
+    if (header->missionEpoch == 0 || header->scriptLocalIdentifier == 0 || header->missionEpoch != g_missionEpoch)
+    {
+        return;
+    }
+
+    const int maxParams = std::min<int>(header->intParamCount, 4);
+    const auto* params = reinterpret_cast<const COpCodePackets::OpcodeParameter*>(
+        static_cast<const uint8_t*>(data) + sizeof(COpCodePackets::OpCodeSyncHeader));
+
+    for (int i = 0; i < maxParams; ++i)
+    {
+        if (params[i].entityId < 0)
+        {
+            continue;
+        }
+
+        if (params[i].entityType < 1 || params[i].entityType > 3)
+        {
+            continue;
+        }
+
+        RegistryActorKey key{};
+        key.missionEpoch = header->missionEpoch;
+        key.scriptLocalIdentifier = header->scriptLocalIdentifier;
+        key.opcode = header->opcode;
+        key.slot = static_cast<uint8_t>(i);
+        key.entityType = static_cast<uint8_t>(params[i].entityType);
+
+        CMissionRuntimePackets::MissionRuntimeSnapshotActor actor{};
+        actor.actorType = key.entityType;
+        actor.actorNetworkId = params[i].entityId;
+        actor.roleFlags = 0;
+        actor.isAlive = 1;
+        actor.missionEpoch = key.missionEpoch;
+        actor.scriptLocalIdentifier = key.scriptLocalIdentifier;
+        actor.sourceOpcode = key.opcode;
+        actor.sourceSlot = key.slot;
+        g_registryActors[key] = actor;
+    }
+
+    g_snapshotActors.clear();
+    g_snapshotActors.reserve(g_registryActors.size());
+    for (const auto& [_, actor] : g_registryActors)
+    {
+        g_snapshotActors.push_back(actor);
     }
 }
 
@@ -658,6 +745,26 @@ uint32_t CMissionRuntimeManager::HandleHostMigration(int newHostPlayerId)
         }
     }
 
+    if (!g_registryActors.empty())
+    {
+        std::unordered_map<RegistryActorKey, CMissionRuntimePackets::MissionRuntimeSnapshotActor, RegistryActorKeyHash> remapped{};
+        remapped.reserve(g_registryActors.size());
+        for (auto& [key, actor] : g_registryActors)
+        {
+            key.missionEpoch = g_missionEpoch;
+            actor.missionEpoch = g_missionEpoch;
+            remapped[key] = actor;
+        }
+        g_registryActors = std::move(remapped);
+    }
+
+    g_snapshotActors.clear();
+    g_snapshotActors.reserve(g_registryActors.size());
+    for (const auto& [_, actor] : g_registryActors)
+    {
+        g_snapshotActors.push_back(actor);
+    }
+
     return g_missionEpoch;
 }
 
@@ -689,6 +796,7 @@ void CMissionRuntimeManager::Teardown()
     g_missionAuthorityPlayerId = -1;
     g_objectiveState = {};
     g_snapshotActors.clear();
+    g_registryActors.clear();
     g_terminalReasonCode = CMissionRuntimePackets::MISSION_TERMINAL_REASON_NONE;
     g_terminalSourceEventType = 0;
     g_terminalSourceOpcode = 0;

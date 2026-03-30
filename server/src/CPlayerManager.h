@@ -1266,6 +1266,11 @@ public:
 				return;
 			}
 
+			if (player->m_bIsHost)
+			{
+				CMissionRuntimeManager::HandleOpcodeRegistrySync(data, size);
+			}
+
 			CNetwork::SendPacketToAll(CPacketsID::OPCODE_SYNC, data, size, ENET_PACKET_FLAG_RELIABLE, peer);
 		}
 	};

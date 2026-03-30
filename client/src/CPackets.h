@@ -768,6 +768,10 @@ public:
 		int32_t actorNetworkId = 0;
 		uint8_t roleFlags = 0;
 		uint8_t isAlive = 0;
+		uint32_t missionEpoch = 0;
+		uint32_t scriptLocalIdentifier = 0;
+		uint16_t sourceOpcode = 0;
+		uint8_t sourceSlot = 0;
 	};
 
 	struct MissionRuntimeSnapshotEnd

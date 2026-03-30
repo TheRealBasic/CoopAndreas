@@ -284,15 +284,15 @@ namespace
 
     struct MissionEntityHandleKey
     {
-        uint16_t missionInstanceId = 0;
-        uint32_t scriptIdentifier = 0;
+        uint32_t missionEpoch = 0;
+        uint32_t scriptLocalIdentifier = 0;
         eSyncedParamType entityType = eSyncedParamType::NONE;
         int handle = -1;
 
         bool operator==(const MissionEntityHandleKey& rhs) const
         {
-            return missionInstanceId == rhs.missionInstanceId
-                && scriptIdentifier == rhs.scriptIdentifier
+            return missionEpoch == rhs.missionEpoch
+                && scriptLocalIdentifier == rhs.scriptLocalIdentifier
                 && entityType == rhs.entityType
                 && handle == rhs.handle;
         }
@@ -300,16 +300,16 @@ namespace
 
     struct MissionEntitySlotKey
     {
-        uint16_t missionInstanceId = 0;
-        uint32_t scriptIdentifier = 0;
+        uint32_t missionEpoch = 0;
+        uint32_t scriptLocalIdentifier = 0;
         uint16_t opcode = 0;
         uint8_t slot = 0;
         eSyncedParamType entityType = eSyncedParamType::NONE;
 
         bool operator==(const MissionEntitySlotKey& rhs) const
         {
-            return missionInstanceId == rhs.missionInstanceId
-                && scriptIdentifier == rhs.scriptIdentifier
+            return missionEpoch == rhs.missionEpoch
+                && scriptLocalIdentifier == rhs.scriptLocalIdentifier
                 && opcode == rhs.opcode
                 && slot == rhs.slot
                 && entityType == rhs.entityType;
@@ -321,8 +321,8 @@ namespace
         size_t operator()(const MissionEntityHandleKey& key) const
         {
             return std::hash<uint64_t>{}(
-                (uint64_t)key.missionInstanceId << 48
-                | (uint64_t)key.scriptIdentifier << 16
+                (uint64_t)key.missionEpoch << 32
+                | (uint64_t)key.scriptLocalIdentifier
                 | (uint64_t)key.entityType << 12
                 | (uint64_t)(key.handle & 0xFFF));
         }
@@ -330,8 +330,8 @@ namespace
         size_t operator()(const MissionEntitySlotKey& key) const
         {
             return std::hash<uint64_t>{}(
-                (uint64_t)key.missionInstanceId << 48
-                | (uint64_t)key.scriptIdentifier << 16
+                (uint64_t)key.missionEpoch << 32
+                | (uint64_t)key.scriptLocalIdentifier
                 | (uint64_t)key.opcode);
         }
     };
@@ -339,15 +339,14 @@ namespace
     std::unordered_map<MissionEntityHandleKey, int, MissionEntityKeyHash> s_missionEntityHandleRegistry{};
     std::unordered_map<MissionEntitySlotKey, int, MissionEntityKeyHash> s_missionEntitySlotRegistry{};
 
-    uint32_t ComputeScriptIdentifier(const CRunningScript* script)
+    uint32_t ComputeScriptLocalIdentifier(const CRunningScript* script)
     {
         if (!script)
         {
             return 0;
         }
 
-        const std::string scriptName = script->m_szName;
-        return std::hash<std::string>{}(scriptName);
+        return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(script->m_pBaseIP) & 0xFFFFFFFFu);
     }
 
     bool IsMissionCriticalTaskOpcode(uint16_t opcode)
@@ -368,19 +367,19 @@ namespace
         }
     }
 
-    void RememberRegistryByHandle(uint16_t missionInstanceId, uint32_t scriptIdentifier, eSyncedParamType entityType, int handle, int networkId)
+    void RememberRegistryByHandle(uint32_t missionEpoch, uint32_t scriptLocalIdentifier, eSyncedParamType entityType, int handle, int networkId)
     {
-        if (missionInstanceId == 0 || scriptIdentifier == 0 || handle < 0 || networkId < 0)
+        if (missionEpoch == 0 || scriptLocalIdentifier == 0 || handle < 0 || networkId < 0)
         {
             return;
         }
 
-        s_missionEntityHandleRegistry[{missionInstanceId, scriptIdentifier, entityType, handle}] = networkId;
+        s_missionEntityHandleRegistry[{missionEpoch, scriptLocalIdentifier, entityType, handle}] = networkId;
     }
 
-    bool ResolveRegistryByHandle(uint16_t missionInstanceId, uint32_t scriptIdentifier, eSyncedParamType entityType, int handle, int& outNetworkId)
+    bool ResolveRegistryByHandle(uint32_t missionEpoch, uint32_t scriptLocalIdentifier, eSyncedParamType entityType, int handle, int& outNetworkId)
     {
-        const auto it = s_missionEntityHandleRegistry.find({ missionInstanceId, scriptIdentifier, entityType, handle });
+        const auto it = s_missionEntityHandleRegistry.find({ missionEpoch, scriptLocalIdentifier, entityType, handle });
         if (it == s_missionEntityHandleRegistry.end())
         {
             return false;
@@ -390,19 +389,19 @@ namespace
         return outNetworkId >= 0;
     }
 
-    void RememberRegistryBySlot(uint16_t missionInstanceId, uint32_t scriptIdentifier, uint16_t opcode, uint8_t slot, eSyncedParamType entityType, int networkId)
+    void RememberRegistryBySlot(uint32_t missionEpoch, uint32_t scriptLocalIdentifier, uint16_t opcode, uint8_t slot, eSyncedParamType entityType, int networkId)
     {
-        if (missionInstanceId == 0 || scriptIdentifier == 0 || networkId < 0)
+        if (missionEpoch == 0 || scriptLocalIdentifier == 0 || networkId < 0)
         {
             return;
         }
 
-        s_missionEntitySlotRegistry[{missionInstanceId, scriptIdentifier, opcode, slot, entityType}] = networkId;
+        s_missionEntitySlotRegistry[{missionEpoch, scriptLocalIdentifier, opcode, slot, entityType}] = networkId;
     }
 
-    bool ResolveRegistryBySlot(uint16_t missionInstanceId, uint32_t scriptIdentifier, uint16_t opcode, uint8_t slot, eSyncedParamType entityType, int& outNetworkId)
+    bool ResolveRegistryBySlot(uint32_t missionEpoch, uint32_t scriptLocalIdentifier, uint16_t opcode, uint8_t slot, eSyncedParamType entityType, int& outNetworkId)
     {
-        const auto it = s_missionEntitySlotRegistry.find({ missionInstanceId, scriptIdentifier, opcode, slot, entityType });
+        const auto it = s_missionEntitySlotRegistry.find({ missionEpoch, scriptLocalIdentifier, opcode, slot, entityType });
         if (it == s_missionEntitySlotRegistry.end())
         {
             return false;
@@ -483,8 +482,8 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
 
     OpcodeSyncHeader header;
     header.opcode = lastOpCodeProcessed;
-    header.missionInstanceId = CMissionSyncState::GetMissionInstanceId();
-    header.scriptIdentifier = ComputeScriptIdentifier(lastProcessedScript);
+    header.missionEpoch = CMissionSyncState::GetMissionAuthorityEpoch();
+    header.scriptLocalIdentifier = ComputeScriptLocalIdentifier(lastProcessedScript);
     header.intParamCount = scriptParamCount;
     header.stringParamCount = textParamCount;
 
@@ -515,7 +514,7 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
                                 {
                                     scriptParamsBuffer[i].entityId = networkPed->m_nPedId;
                                     scriptParamsBuffer[i].entityType = eSyncedParamType::PED;
-                                    RememberRegistryByHandle(header.missionInstanceId, header.scriptIdentifier, eSyncedParamType::PED, originalHandle, networkPed->m_nPedId);
+                                    RememberRegistryByHandle(header.missionEpoch, header.scriptLocalIdentifier, eSyncedParamType::PED, originalHandle, networkPed->m_nPedId);
                                     //CChat::AddMessage("Parsed ped id %d...", networkPed->m_nPedId);
                                 }
                                 else scriptParamsBuffer[i].value = -1;
@@ -528,12 +527,12 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
                             if (ped == FindPlayerPed(0))
                             {
                                 scriptParamsBuffer[i].entityId = CNetworkPlayerManager::m_nMyId;
-                                RememberRegistryByHandle(header.missionInstanceId, header.scriptIdentifier, eSyncedParamType::PLAYER, originalHandle, CNetworkPlayerManager::m_nMyId);
+                                RememberRegistryByHandle(header.missionEpoch, header.scriptLocalIdentifier, eSyncedParamType::PLAYER, originalHandle, CNetworkPlayerManager::m_nMyId);
                             }
                             else if (auto networkPlayer = CNetworkPlayerManager::GetPlayer(ped))
                             {
                                 scriptParamsBuffer[i].entityId = networkPlayer->m_iPlayerId;
-                                RememberRegistryByHandle(header.missionInstanceId, header.scriptIdentifier, eSyncedParamType::PLAYER, originalHandle, networkPlayer->m_iPlayerId);
+                                RememberRegistryByHandle(header.missionEpoch, header.scriptLocalIdentifier, eSyncedParamType::PLAYER, originalHandle, networkPlayer->m_iPlayerId);
                             }
                             else
                             {
@@ -545,7 +544,7 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
                     else
                     {
                         int fallbackNetworkId = -1;
-                        if (ResolveRegistryByHandle(header.missionInstanceId, header.scriptIdentifier, eSyncedParamType::PED, originalHandle, fallbackNetworkId))
+                        if (ResolveRegistryByHandle(header.missionEpoch, header.scriptLocalIdentifier, eSyncedParamType::PED, originalHandle, fallbackNetworkId))
                         {
                             scriptParamsBuffer[i].entityType = eSyncedParamType::PED;
                             scriptParamsBuffer[i].entityId = fallbackNetworkId;
@@ -594,7 +593,7 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
                         {
                             scriptParamsBuffer[i].entityId = networkVehicle->m_nVehicleId;
                             scriptParamsBuffer[i].entityType = eSyncedParamType::VEHICLE;
-                            RememberRegistryByHandle(header.missionInstanceId, header.scriptIdentifier, eSyncedParamType::VEHICLE, originalHandle, networkVehicle->m_nVehicleId);
+                            RememberRegistryByHandle(header.missionEpoch, header.scriptLocalIdentifier, eSyncedParamType::VEHICLE, originalHandle, networkVehicle->m_nVehicleId);
                             //CChat::AddMessage("Parsed vehicle id %d...", networkVehicle->m_nVehicleId);
                         }
                         else scriptParamsBuffer[i].value = -1;
@@ -602,7 +601,7 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
                     else
                     {
                         int fallbackNetworkId = -1;
-                        if (ResolveRegistryByHandle(header.missionInstanceId, header.scriptIdentifier, eSyncedParamType::VEHICLE, originalHandle, fallbackNetworkId))
+                        if (ResolveRegistryByHandle(header.missionEpoch, header.scriptLocalIdentifier, eSyncedParamType::VEHICLE, originalHandle, fallbackNetworkId))
                         {
                             scriptParamsBuffer[i].entityType = eSyncedParamType::VEHICLE;
                             scriptParamsBuffer[i].entityId = fallbackNetworkId;
@@ -855,7 +854,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                     {
                         if (scriptParamsBuffer[i].entityId < 0 && IsMissionCriticalTaskOpcode(header.opcode))
                         {
-                            ResolveRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PED, scriptParamsBuffer[i].entityId);
+                            ResolveRegistryBySlot(header.missionEpoch, header.scriptLocalIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PED, scriptParamsBuffer[i].entityId);
                         }
                         /*if (header.opcode == 0x0605)
                             CChat::AddMessage("Trying to parse as a regular ped...");*/
@@ -896,7 +895,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 if (delayedPed->m_pPed)
                                 {
                                     scriptParamsBuffer[i].value = CPools::GetPedRef(delayedPed->m_pPed);
-                                    RememberRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PED, scriptParamsBuffer[i].entityId);
+                                    RememberRegistryBySlot(header.missionEpoch, header.scriptLocalIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PED, scriptParamsBuffer[i].entityId);
                                     break;
                                 }
                             }
@@ -937,7 +936,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                     }
 
                                     scriptParamsBuffer[i].value = CPools::GetPedRef(ped);
-                                    RememberRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PLAYER, scriptParamsBuffer[i].entityId);
+                                    RememberRegistryBySlot(header.missionEpoch, header.scriptLocalIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::PLAYER, scriptParamsBuffer[i].entityId);
                                     /*if (header.opcode == 0x0605)
                                         CChat::AddMessage("Parsed player id as ped %d...", networkPlayer->m_iPlayerId);*/
                                 }
@@ -1022,7 +1021,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             }
 
                             scriptParamsBuffer[i].value = CPools::GetVehicleRef(vehicle);
-                            RememberRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, scriptParamsBuffer[i].entityId);
+                            RememberRegistryBySlot(header.missionEpoch, header.scriptLocalIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, scriptParamsBuffer[i].entityId);
                             /*if (header.opcode == 0x0605)
                                 CChat::AddMessage("Parsed vehicle id %d...", networkVehicle->m_nVehicleId);*/
                         }
@@ -1034,7 +1033,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 if (networkVehicle->m_pVehicle)
                                 {
                                     scriptParamsBuffer[i].value = CPools::GetVehicleRef(networkVehicle->m_pVehicle);
-                                    RememberRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, scriptParamsBuffer[i].entityId);
+                                    RememberRegistryBySlot(header.missionEpoch, header.scriptLocalIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, scriptParamsBuffer[i].entityId);
                                     break;
                                 }
                             }
@@ -1051,7 +1050,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                         if (scriptParamsBuffer[i].entityId < 0 && IsMissionCriticalTaskOpcode(header.opcode))
                         {
                             int fallbackVehicleId = -1;
-                            if (ResolveRegistryBySlot(header.missionInstanceId, header.scriptIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, fallbackVehicleId))
+                            if (ResolveRegistryBySlot(header.missionEpoch, header.scriptLocalIdentifier, header.opcode, (uint8_t)i, eSyncedParamType::VEHICLE, fallbackVehicleId))
                             {
                                 scriptParamsBuffer[i].entityId = fallbackVehicleId;
                                 if (auto fallbackVehicle = CNetworkVehicleManager::GetVehicle(scriptParamsBuffer[i].entityId))
@@ -1246,6 +1245,56 @@ void COpCodeSync::ProcessDeferredPackets()
     if (!pending.empty())
     {
         s_deferredOpcodePackets.insert(s_deferredOpcodePackets.end(), pending.begin(), pending.end());
+    }
+}
+
+std::vector<COpCodeSync::RegistrySnapshotEntry> COpCodeSync::ExportRegistrySnapshotEntries(uint32_t missionEpoch)
+{
+    std::vector<RegistrySnapshotEntry> entries{};
+    for (const auto& [key, networkId] : s_missionEntitySlotRegistry)
+    {
+        if (key.missionEpoch != missionEpoch || networkId < 0)
+        {
+            continue;
+        }
+
+        RegistrySnapshotEntry entry{};
+        entry.missionEpoch = key.missionEpoch;
+        entry.scriptLocalIdentifier = key.scriptLocalIdentifier;
+        entry.opcode = key.opcode;
+        entry.slot = key.slot;
+        entry.entityType = key.entityType;
+        entry.networkId = networkId;
+        entries.push_back(entry);
+    }
+
+    return entries;
+}
+
+void COpCodeSync::ImportRegistrySnapshotEntry(const RegistrySnapshotEntry& entry)
+{
+    if (entry.missionEpoch == 0 || entry.scriptLocalIdentifier == 0 || entry.networkId < 0)
+    {
+        return;
+    }
+
+    s_missionEntitySlotRegistry[{entry.missionEpoch, entry.scriptLocalIdentifier, entry.opcode, entry.slot, entry.entityType}] = entry.networkId;
+}
+
+void COpCodeSync::ClearRegistryForEpoch(uint32_t missionEpoch)
+{
+    if (missionEpoch == 0)
+    {
+        return;
+    }
+
+    for (auto it = s_missionEntitySlotRegistry.begin(); it != s_missionEntitySlotRegistry.end();)
+    {
+        it = (it->first.missionEpoch == missionEpoch) ? s_missionEntitySlotRegistry.erase(it) : std::next(it);
+    }
+    for (auto it = s_missionEntityHandleRegistry.begin(); it != s_missionEntityHandleRegistry.end();)
+    {
+        it = (it->first.missionEpoch == missionEpoch) ? s_missionEntityHandleRegistry.erase(it) : std::next(it);
     }
 }
 

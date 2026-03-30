@@ -16,8 +16,23 @@ public:
 	struct OpCodeSyncHeader
 	{
 		uint16_t opcode;
-		uint16_t intParamCount;
-		uint16_t stringParamCount;
+		uint32_t missionEpoch;
+		uint32_t scriptLocalIdentifier;
+		uint8_t intParamCount;
+		uint8_t stringParamCount;
+	};
+
+	struct OpcodeParameter
+	{
+		union
+		{
+			struct
+			{
+				uint32_t entityType : 4;
+				int32_t entityId : 28;
+			};
+			int32_t value;
+		};
 	};
 	#pragma pack()
 };
@@ -394,6 +409,10 @@ public:
 		int32_t actorNetworkId;
 		uint8_t roleFlags;
 		uint8_t isAlive;
+		uint32_t missionEpoch;
+		uint32_t scriptLocalIdentifier;
+		uint16_t sourceOpcode;
+		uint8_t sourceSlot;
 	};
 
 	struct MissionRuntimeSnapshotEnd
