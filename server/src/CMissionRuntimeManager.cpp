@@ -46,6 +46,7 @@ namespace
         uint16_t objectiveVersion = 0;
         uint16_t checkpointVersion = 0;
         uint32_t runtimeSessionToken = 0;
+        uint32_t lastSequence = 0;
         ObjectiveSync::State objectiveState{};
     };
 
@@ -201,6 +202,7 @@ namespace
         snapshot.objectiveVersion = g_objectiveVersion;
         snapshot.checkpointVersion = g_checkpointVersion;
         snapshot.runtimeSessionToken = g_runtimeSessionToken;
+        snapshot.lastSequence = g_lastSequence;
         snapshot.objectiveState = g_objectiveState;
         return snapshot;
     }
@@ -221,6 +223,7 @@ namespace
         g_objectiveVersion = snapshot.objectiveVersion;
         g_checkpointVersion = snapshot.checkpointVersion;
         g_runtimeSessionToken = snapshot.runtimeSessionToken;
+        g_lastSequence = snapshot.lastSequence;
         g_objectiveState = snapshot.objectiveState;
     }
 
@@ -275,6 +278,10 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
     {
         return false;
     }
+    if (packet->sequenceId <= g_lastSequence)
+    {
+        return false;
+    }
 
     const bool nextOnMission = packet->bOnMission != 0;
 
@@ -314,7 +321,11 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
         }
     }
 
-    CNetwork::SendPacketToAll(CPacketsID::ON_MISSION_FLAG_SYNC, (void*)packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
+    g_lastSequence = packet->sequenceId;
+    OnMissionFlagPayload outbound = *packet;
+    outbound.missionEpoch = g_missionEpoch;
+    outbound.sequenceId = g_lastSequence;
+    CNetwork::SendPacketToAll(CPacketsID::ON_MISSION_FLAG_SYNC, &outbound, sizeof(outbound), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
     return true;
 }
 
@@ -331,7 +342,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         return false;
     }
 
-    if (packet->sequence <= g_lastSequence)
+    if (packet->sequenceId <= g_lastSequence)
     {
         return false;
     }
@@ -381,13 +392,14 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     g_isOnMission = packet->onMission != 0;
 
     const uint16_t previousMissionId = g_hasFlow ? g_lastFlow.missionId : 0;
-    g_lastSequence = packet->sequence;
+    g_lastSequence = packet->sequenceId;
     g_lastFlow = *packet;
     g_lastFlow.replay = 0;
     g_lastFlow.runtimeState = static_cast<uint8_t>(g_runtimeState);
     g_lastFlow.objectiveVersion = g_objectiveVersion;
     g_lastFlow.checkpointVersion = g_checkpointVersion;
     g_lastFlow.missionEpoch = g_missionEpoch;
+    g_lastFlow.sequenceId = g_lastSequence;
     WriteTerminalMetadata(g_lastFlow);
 
     if (g_runtimeSessionToken == 0 || (g_hasFlow && packet->missionId != previousMissionId))
@@ -402,6 +414,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
     packet->missionEpoch = g_missionEpoch;
+    packet->sequenceId = g_lastSequence;
     WriteTerminalMetadata(*packet);
 
     g_hasFlow = true;
@@ -421,6 +434,10 @@ bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetP
     {
         return false;
     }
+    if (packet->sequenceId <= g_lastSequence)
+    {
+        return false;
+    }
 
     if (packet->checkpointIndex < g_lastCheckpoint.checkpointIndex)
     {
@@ -432,11 +449,14 @@ bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetP
     g_lastCheckpoint.checkpointVersion = g_checkpointVersion;
     g_lastCheckpoint.runtimeSessionToken = g_runtimeSessionToken;
     g_lastCheckpoint.missionEpoch = g_missionEpoch;
+    g_lastCheckpoint.sequenceId = packet->sequenceId;
+    g_lastSequence = packet->sequenceId;
     g_hasCheckpoint = true;
 
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
     packet->missionEpoch = g_missionEpoch;
+    packet->sequenceId = g_lastSequence;
     CNetwork::SendPacketToAll(CPacketsID::UPDATE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
     return true;
 }
@@ -453,11 +473,17 @@ bool CMissionRuntimeManager::HandleCheckpointRemove(CPlayer* sourcePlayer, ENetP
     {
         return false;
     }
+    if (packet->sequenceId <= g_lastSequence)
+    {
+        return false;
+    }
 
     ++g_checkpointVersion;
     packet->checkpointVersion = g_checkpointVersion;
     packet->runtimeSessionToken = g_runtimeSessionToken;
     packet->missionEpoch = g_missionEpoch;
+    g_lastSequence = packet->sequenceId;
+    packet->sequenceId = g_lastSequence;
     g_hasCheckpoint = false;
 
     CNetwork::SendPacketToAll(CPacketsID::REMOVE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
@@ -491,6 +517,7 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
     OnMissionFlagPayload onMissionPacket{};
     onMissionPacket.bOnMission = g_isOnMission ? 1 : 0;
     onMissionPacket.missionEpoch = g_missionEpoch;
+    onMissionPacket.sequenceId = g_lastSequence;
     CNetwork::SendPacket(peer, CPacketsID::ON_MISSION_FLAG_SYNC, &onMissionPacket, sizeof(onMissionPacket), ENET_PACKET_FLAG_RELIABLE);
 
     if (g_hasFlow)
@@ -502,6 +529,7 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
         replayPacket.checkpointVersion = g_checkpointVersion;
         replayPacket.runtimeSessionToken = g_runtimeSessionToken;
         replayPacket.missionEpoch = g_missionEpoch;
+        replayPacket.sequenceId = g_lastSequence;
         WriteTerminalMetadata(replayPacket);
         CNetwork::SendPacket(peer, CPacketsID::MISSION_FLOW_SYNC, &replayPacket, sizeof(replayPacket), ENET_PACKET_FLAG_RELIABLE);
     }
@@ -512,6 +540,7 @@ void CMissionRuntimeManager::SendSnapshotTo(ENetPeer* peer)
         checkpointPacket.checkpointVersion = g_checkpointVersion;
         checkpointPacket.runtimeSessionToken = g_runtimeSessionToken;
         checkpointPacket.missionEpoch = g_missionEpoch;
+        checkpointPacket.sequenceId = g_lastSequence;
         CNetwork::SendPacket(peer, CPacketsID::UPDATE_CHECKPOINT, &checkpointPacket, sizeof(checkpointPacket), ENET_PACKET_FLAG_RELIABLE);
     }
 }
@@ -521,21 +550,26 @@ uint32_t CMissionRuntimeManager::HandleHostMigration(int newHostPlayerId)
     const MigrationSnapshot snapshot = BuildMigrationSnapshot();
     ++g_missionEpoch;
     g_missionAuthorityPlayerId = newHostPlayerId;
-    g_lastSequence = 0;
+    g_lastSequence = snapshot.lastSequence;
 
     if (snapshot.hasFlow || snapshot.hasCheckpoint || snapshot.isOnMission)
     {
         RestoreMigrationSnapshot(snapshot);
-        g_lastSequence = 0;
         if (g_hasFlow)
         {
-            g_lastFlow.sequence = 0;
+            g_lastFlow.sequence = g_lastSequence;
             g_lastFlow.runtimeState = static_cast<uint8_t>(g_runtimeState);
             g_lastFlow.objectiveVersion = g_objectiveVersion;
             g_lastFlow.checkpointVersion = g_checkpointVersion;
             g_lastFlow.runtimeSessionToken = g_runtimeSessionToken;
             g_lastFlow.missionEpoch = g_missionEpoch;
+            g_lastFlow.sequenceId = g_lastSequence;
             WriteTerminalMetadata(g_lastFlow);
+        }
+        if (g_hasCheckpoint)
+        {
+            g_lastCheckpoint.missionEpoch = g_missionEpoch;
+            g_lastCheckpoint.sequenceId = g_lastSequence;
         }
     }
 
@@ -545,6 +579,11 @@ uint32_t CMissionRuntimeManager::HandleHostMigration(int newHostPlayerId)
 uint32_t CMissionRuntimeManager::GetMissionEpoch()
 {
     return g_missionEpoch;
+}
+
+uint32_t CMissionRuntimeManager::GetLastSequenceId()
+{
+    return g_lastSequence;
 }
 
 void CMissionRuntimeManager::Teardown()

@@ -854,6 +854,7 @@ public:
 	{
 		int playerid;
 		uint32_t missionEpoch;
+		uint32_t sequenceId;
 	};
 
 	struct AddExplosion

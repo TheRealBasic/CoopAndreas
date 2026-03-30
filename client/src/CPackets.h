@@ -233,6 +233,7 @@ public:
 	{
 		int playerid;
 		uint32_t missionEpoch;
+		uint32_t sequenceId;
 	};
 
 	struct AddExplosion
@@ -582,6 +583,7 @@ public:
 	{
 		uint8_t bOnMission : 1;
 		uint32_t missionEpoch = 0;
+		uint32_t sequenceId = 0;
 	};
 
 	enum eMissionFlowEventType : uint8_t
@@ -643,6 +645,7 @@ public:
 		uint16_t checkpointVersion = 0;
 		uint32_t runtimeSessionToken = 0;
 		uint32_t missionEpoch = 0;
+		uint32_t sequenceId = 0;
 		uint8_t terminalReasonCode = MISSION_TERMINAL_REASON_NONE;
 		uint8_t terminalSourceEventType = MISSION_FLOW_EVENT_NONE;
 		uint16_t terminalSourceOpcode = 0;
@@ -702,11 +705,20 @@ public:
 		int playerid;
 		CVector position;
 		CVector radius;
+		uint16_t checkpointIndex = 0;
+		uint16_t checkpointVersion = 0;
+		uint32_t runtimeSessionToken = 0;
+		uint32_t missionEpoch = 0;
+		uint32_t sequenceId = 0;
 	};
 
 	struct RemoveCheckpoint
 	{
 		int playerid;
+		uint16_t checkpointVersion = 0;
+		uint32_t runtimeSessionToken = 0;
+		uint32_t missionEpoch = 0;
+		uint32_t sequenceId = 0;
 	};
 
 	struct CreateStaticBlip
