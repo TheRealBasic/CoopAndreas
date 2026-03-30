@@ -236,24 +236,96 @@ static uint16_t argCount = 0;
 
 namespace
 {
+    enum class DeferredOpcodeReason : uint8_t
+    {
+        None = 0,
+        MissionStateNotReady,
+        InvalidEntityPointer,
+        MissingNetworkPed,
+        MissingNetworkVehicle,
+        MissingNetworkPlayer,
+        MissingEntityHandle,
+        Unknown
+    };
+
     struct DeferredOpcodePacket
     {
         std::vector<uint8_t> payload{};
         uint16_t opcode = 0;
         uint16_t retries = 0;
+        uint32_t queuedAtMs = 0;
+        DeferredOpcodeReason reason = DeferredOpcodeReason::Unknown;
     };
 
     std::vector<DeferredOpcodePacket> s_deferredOpcodePackets{};
-    constexpr uint16_t kDeferredOpcodeMaxRetries = 600;
+    constexpr uint32_t kDeferredOpcodeTimeoutMs = 10000;
+    constexpr size_t kDeferredOpcodeQueueCapacity = 512;
 
-    bool IsDeferredResolutionOpcode(uint16_t opcode)
+    struct DeferredOpcodeTelemetry
+    {
+        uint32_t queued = 0;
+        uint32_t retried = 0;
+        uint32_t resolved = 0;
+        uint32_t droppedTimeout = 0;
+        uint32_t droppedCapacity = 0;
+    };
+
+    DeferredOpcodeTelemetry s_deferredOpcodeTelemetry{};
+
+    const char* GetDeferredOpcodeReasonLabel(DeferredOpcodeReason reason)
+    {
+        switch (reason)
+        {
+        case DeferredOpcodeReason::MissionStateNotReady:
+            return "mission_state_not_ready";
+        case DeferredOpcodeReason::InvalidEntityPointer:
+            return "invalid_entity_pointer";
+        case DeferredOpcodeReason::MissingNetworkPed:
+            return "missing_network_ped";
+        case DeferredOpcodeReason::MissingNetworkVehicle:
+            return "missing_network_vehicle";
+        case DeferredOpcodeReason::MissingNetworkPlayer:
+            return "missing_network_player";
+        case DeferredOpcodeReason::MissingEntityHandle:
+            return "missing_entity_handle";
+        case DeferredOpcodeReason::Unknown:
+            return "unknown";
+        default:
+            return "none";
+        }
+    }
+
+    bool IsMissionCriticalTaskOpcode(uint16_t opcode)
     {
         switch (opcode)
         {
+        case 0x05CA: // task_enter_car_as_passenger
         case 0x05CB: // task_enter_car_as_driver
         case 0x05E2: // task_kill_char_on_foot
+        case 0x0603: // task_go_to_coord_any_means
+        case 0x0634: // task_kill_char_on_foot_while_ducking
         case 0x0672: // task_destroy_car
         case 0x0713: // task_drive_by
+        case COMMAND_TASK_GO_STRAIGHT_TO_COORD:
+        case COMMAND_TASK_TURN_CHAR_TO_FACE_CHAR:
+        case COMMAND_TASK_LOOK_AT_CHAR:
+        case COMMAND_TASK_LEAVE_CAR:
+        case COMMAND_TASK_LEAVE_ANY_CAR:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool IsDeferredResolutionOpcode(uint16_t opcode)
+    {
+        if (IsMissionCriticalTaskOpcode(opcode))
+        {
+            return true;
+        }
+
+        switch (opcode)
+        {
         case 0x014E: // display_onscreen_timer
         case 0x014F: // clear_onscreen_timer
         case 0x03C3: // display_onscreen_timer_with_string
@@ -268,17 +340,27 @@ namespace
         }
     }
 
-    bool TryQueueDeferredOpcodePacket(uint16_t opcode, const uint8_t* buffer, int bufferSize)
+    bool TryQueueDeferredOpcodePacket(uint16_t opcode, const uint8_t* buffer, int bufferSize, DeferredOpcodeReason reason)
     {
         if (!IsDeferredResolutionOpcode(opcode) || !buffer || bufferSize <= 0)
         {
             return false;
         }
 
+        if (s_deferredOpcodePackets.size() >= kDeferredOpcodeQueueCapacity)
+        {
+            s_deferredOpcodeTelemetry.droppedCapacity++;
+            CChat::AddMessage("[opcode.defer] drop opcode=0x%04X reason=queue_capacity queue=%u", opcode, (unsigned int)s_deferredOpcodePackets.size());
+            return false;
+        }
+
         DeferredOpcodePacket deferred{};
         deferred.payload.assign(buffer, buffer + bufferSize);
         deferred.opcode = opcode;
+        deferred.queuedAtMs = CTimer::m_snTimeInMilliseconds;
+        deferred.reason = reason;
         s_deferredOpcodePackets.push_back(std::move(deferred));
+        s_deferredOpcodeTelemetry.queued++;
         return true;
     }
 
@@ -347,24 +429,6 @@ namespace
         }
 
         return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(script->m_pBaseIP) & 0xFFFFFFFFu);
-    }
-
-    bool IsMissionCriticalTaskOpcode(uint16_t opcode)
-    {
-        switch (opcode)
-        {
-        case 0x05CA: // task_enter_car_as_passenger
-        case 0x05CB: // task_enter_car_as_driver
-        case 0x05E2: // task_kill_char_on_foot
-        case 0x0672: // task_destroy_car
-        case 0x0713: // task_drive_by
-        case 0x0634: // task_kill_char_on_foot_while_ducking
-        case COMMAND_TASK_LEAVE_CAR:
-        case COMMAND_TASK_LEAVE_ANY_CAR:
-            return true;
-        default:
-            return false;
-        }
     }
 
     void RememberRegistryByHandle(uint32_t missionEpoch, uint32_t scriptLocalIdentifier, eSyncedParamType entityType, int handle, int networkId)
@@ -821,9 +885,9 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
         return;
     }
 
-    const auto deferIfPossible = [&]() -> bool
+    const auto deferIfPossible = [&](DeferredOpcodeReason reason = DeferredOpcodeReason::Unknown) -> bool
     {
-        return TryQueueDeferredOpcodePacket(header.opcode, buffer, bufferSize);
+        return TryQueueDeferredOpcodePacket(header.opcode, buffer, bufferSize, reason);
     };
 
     if (scriptParamCount)
@@ -866,7 +930,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             {
                                 if (!CUtil::IsValidEntityPtr(ped))
                                 {
-                                    if (!deferIfPossible())
+                                    if (!deferIfPossible(DeferredOpcodeReason::InvalidEntityPointer))
                                     {
                                         return;
                                     }
@@ -881,7 +945,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             {
                                 scriptParamsBuffer[i].value = -1;
                             }
-                            else if (!deferIfPossible())
+                            else if (!deferIfPossible(DeferredOpcodeReason::MissingEntityHandle))
                             {
                                 return;
                             }
@@ -901,7 +965,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             }
                             scriptParamsBuffer[i].value = -1;
                         }
-                        else if (!deferIfPossible())
+                        else if (!deferIfPossible(DeferredOpcodeReason::MissingNetworkPed))
                         {
                             return;
                         }
@@ -928,7 +992,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 {
                                     if (!CUtil::IsValidEntityPtr(ped))
                                     {
-                                        if (!deferIfPossible())
+                                        if (!deferIfPossible(DeferredOpcodeReason::InvalidEntityPointer))
                                         {
                                             return;
                                         }
@@ -944,7 +1008,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                                 {
                                     scriptParamsBuffer[i].value = -1;
                                 }
-                                else if (!deferIfPossible())
+                                else if (!deferIfPossible(DeferredOpcodeReason::MissingNetworkPlayer))
                                 {
                                     return;
                                 }
@@ -954,7 +1018,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             {
                                 scriptParamsBuffer[i].value = -1;
                             }
-                            else if (!deferIfPossible())
+                            else if (!deferIfPossible(DeferredOpcodeReason::MissingNetworkPlayer))
                             {
                                 return;
                             }
@@ -1013,7 +1077,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                         {
                             if (!CUtil::IsValidEntityPtr(vehicle))
                             {
-                                if (!deferIfPossible())
+                                if (!deferIfPossible(DeferredOpcodeReason::InvalidEntityPointer))
                                 {
                                     return;
                                 }
@@ -1039,7 +1103,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                             }
                             scriptParamsBuffer[i].value = -1;
                         }
-                        else if (!deferIfPossible())
+                        else if (!deferIfPossible(DeferredOpcodeReason::MissingNetworkVehicle))
                         {
                             return;
                         }
@@ -1066,7 +1130,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
                         }
                         scriptParamsBuffer[i].value = -1;
                     }
-                    else if (!deferIfPossible())
+                    else if (!deferIfPossible(DeferredOpcodeReason::MissingNetworkVehicle))
                     {
                         return;
                     }
@@ -1123,6 +1187,7 @@ void COpCodeSync::HandlePacket(const uint8_t* buffer, int bufferSize)
     
     if (ShouldDeferNetworkOpcodeExecution(lastOpCodeProcessed))
     {
+        TryQueueDeferredOpcodePacket(header.opcode, buffer, bufferSize, DeferredOpcodeReason::MissionStateNotReady);
         return; // defer opcode execution until mission state is ready
     }
 
@@ -1221,6 +1286,7 @@ void COpCodeSync::ProcessDeferredPackets()
 
     const auto deferredSnapshot = s_deferredOpcodePackets;
     s_deferredOpcodePackets.clear();
+    const uint32_t nowMs = CTimer::m_snTimeInMilliseconds;
 
     for (auto packet : deferredSnapshot)
     {
@@ -1229,16 +1295,32 @@ void COpCodeSync::ProcessDeferredPackets()
             continue;
         }
 
+        if (nowMs - packet.queuedAtMs >= kDeferredOpcodeTimeoutMs)
+        {
+            s_deferredOpcodeTelemetry.droppedTimeout++;
+            CChat::AddMessage(
+                "[opcode.defer] timeout opcode=0x%04X retries=%u waitedMs=%u reason=%s",
+                packet.opcode,
+                packet.retries,
+                nowMs - packet.queuedAtMs,
+                GetDeferredOpcodeReasonLabel(packet.reason));
+            continue;
+        }
+
         const size_t queueSizeBefore = s_deferredOpcodePackets.size();
         COpCodeSync::HandlePacket(packet.payload.data(), (int)packet.payload.size());
         if (s_deferredOpcodePackets.size() > queueSizeBefore)
         {
+            DeferredOpcodePacket latestDeferred = std::move(s_deferredOpcodePackets.back());
             s_deferredOpcodePackets.pop_back();
             packet.retries++;
-            if (packet.retries < kDeferredOpcodeMaxRetries)
-            {
-                pending.push_back(std::move(packet));
-            }
+            packet.reason = latestDeferred.reason;
+            s_deferredOpcodeTelemetry.retried++;
+            pending.push_back(std::move(packet));
+        }
+        else
+        {
+            s_deferredOpcodeTelemetry.resolved++;
         }
     }
 
