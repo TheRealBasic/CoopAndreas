@@ -23,6 +23,7 @@ namespace
     bool ms_bMissionActive = false;
     bool ms_bCutsceneActive = false;
     uint32_t ms_lastAuthoritativeCutsceneSkipToken = 0;
+    uint32_t ms_pendingConsensusCutsceneSkipToken = 0;
 
     bool ms_bScriptWideScreenForced = false;
     bool ms_bScriptWideScreenValue = false;
@@ -125,6 +126,7 @@ namespace
     constexpr uint8_t CUTSCENE_PHASE_INTRO = 1;
     constexpr uint8_t CUTSCENE_PHASE_SKIP = 2;
     constexpr uint8_t CUTSCENE_PHASE_END = 3;
+    uint8_t ms_pendingReplicatedCutscenePhase = CUTSCENE_PHASE_NONE;
 
     constexpr OpCodeHandlerEntry kPreExecuteOpCodeHandlers[] = {
         { OP_END_SCENE_SKIP, &CMissionSyncState::HandleEndSceneSkip },
@@ -404,6 +406,8 @@ void CMissionSyncState::Init()
     ms_bMissionActive = false;
     ms_bCutsceneActive = false;
     ms_lastAuthoritativeCutsceneSkipToken = 0;
+    ms_pendingConsensusCutsceneSkipToken = 0;
+    ms_pendingReplicatedCutscenePhase = CUTSCENE_PHASE_NONE;
 
     ms_bScriptWideScreenForced = false;
     ms_bScriptWideScreenValue = false;
@@ -534,6 +538,8 @@ void CMissionSyncState::HandleMissionFlagSync(bool onMission)
     if (!onMission)
     {
         ResetScriptWideScreenOverride();
+        ms_pendingReplicatedCutscenePhase = CUTSCENE_PHASE_NONE;
+        ms_pendingConsensusCutsceneSkipToken = 0;
     }
 }
 
@@ -745,10 +751,17 @@ void CMissionSyncState::HandleMissionFlowSync(const CPackets::MissionFlowSync& p
 
     if (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_INTRO)
     {
+        ms_pendingReplicatedCutscenePhase = CUTSCENE_PHASE_INTRO;
         ms_bCutsceneActive = true;
     }
     else if (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_SKIP || packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_END)
     {
+        ms_pendingReplicatedCutscenePhase =
+            (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_END) ? CUTSCENE_PHASE_END : CUTSCENE_PHASE_SKIP;
+        if (packet.eventType == CPackets::MISSION_FLOW_EVENT_CUTSCENE_SKIP)
+        {
+            ms_pendingConsensusCutsceneSkipToken = packet.cutsceneSessionToken != 0 ? packet.cutsceneSessionToken : 1;
+        }
         ms_bCutsceneActive = false;
         ResetScriptWideScreenOverride();
     }
@@ -1242,11 +1255,12 @@ bool CMissionSyncState::HandleOpCodePreExecute(uint16_t opcode)
 
 bool CMissionSyncState::HandleEndSceneSkip()
 {
-    if (CLocalPlayer::m_bIsHost)
+    if (ms_pendingConsensusCutsceneSkipToken == 0)
     {
-        EmitMissionFlowCutscenePhase(CUTSCENE_PHASE_SKIP, CCutsceneMgr::ms_cutsceneName, (uint8_t)CGame::currArea, 0);
+        return false;
     }
 
+    ms_pendingConsensusCutsceneSkipToken = 0;
     ms_bCutsceneActive = false;
     ms_nWidescreenEventId++;
     ResetScriptWideScreenOverride();
@@ -1256,6 +1270,15 @@ bool CMissionSyncState::HandleEndSceneSkip()
 
 bool CMissionSyncState::HandleStartCutscene()
 {
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        if (ms_pendingReplicatedCutscenePhase != CUTSCENE_PHASE_INTRO)
+        {
+            return false;
+        }
+        ms_pendingReplicatedCutscenePhase = CUTSCENE_PHASE_NONE;
+    }
+
     ms_bCutsceneActive = true;
     ms_nWidescreenEventId++;
 
@@ -1270,6 +1293,15 @@ bool CMissionSyncState::HandleStartCutscene()
 
 bool CMissionSyncState::HandleClearCutscene()
 {
+    if (!CLocalPlayer::m_bIsHost)
+    {
+        if (ms_pendingReplicatedCutscenePhase != CUTSCENE_PHASE_END)
+        {
+            return false;
+        }
+        ms_pendingReplicatedCutscenePhase = CUTSCENE_PHASE_NONE;
+    }
+
     if (CLocalPlayer::m_bIsHost)
     {
         EmitMissionFlowCutscenePhase(CUTSCENE_PHASE_END, CCutsceneMgr::ms_cutsceneName, (uint8_t)CGame::currArea, 0);
@@ -1289,6 +1321,7 @@ void CMissionSyncState::HandleAuthoritativeCutsceneSkip(uint32_t sessionToken)
     }
 
     ms_lastAuthoritativeCutsceneSkipToken = sessionToken;
+    ms_pendingConsensusCutsceneSkipToken = sessionToken != 0 ? sessionToken : 1;
     ms_bCutsceneActive = false;
     ms_sideContentAttemptState.cutscenePhase = CUTSCENE_PHASE_SKIP;
     ms_sideContentAttemptState.cutsceneSessionToken = sessionToken;
