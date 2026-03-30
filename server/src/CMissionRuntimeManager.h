@@ -16,7 +16,15 @@ public:
         Active = 2,
         PassPending = 3,
         FailPending = 4,
-        Completed = 5,
+        Teardown = 5,
+    };
+
+    enum class EventKind : uint8_t
+    {
+        OnMissionFlagSync,
+        MissionFlowSync,
+        CheckpointUpdate,
+        CheckpointRemove,
     };
 
     using OnMissionFlagPayload = CMissionRuntimePackets::OnMissionFlagSync;
@@ -28,6 +36,7 @@ public:
     static bool HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static bool HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static bool HandleCheckpointRemove(CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
+    static bool HandleMissionEvent(EventKind eventKind, CPlayer* sourcePlayer, ENetPeer* sourcePeer, const void* data, int size);
     static void SendSnapshotTo(ENetPeer* peer);
     static uint32_t HandleHostMigration(int newHostPlayerId);
     static uint32_t GetMissionEpoch();
