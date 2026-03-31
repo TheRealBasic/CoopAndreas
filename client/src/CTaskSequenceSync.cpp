@@ -46,6 +46,7 @@ SSyncedOpCode m_syncedTasks[] =
 	// Vehicle exit tasks
 	{COMMAND_TASK_LEAVE_ANY_CAR, true, eSyncedParamType::PED},
 	// Mission-critical combat/vehicle objective tasks
+	{0x01CB, true, {eSyncedParamType::PED, eSyncedParamType::PED}},
 	{0x05CB, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}},
 	{0x05E2, true, {eSyncedParamType::PED, eSyncedParamType::PED}},
 	{0x0672, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}},

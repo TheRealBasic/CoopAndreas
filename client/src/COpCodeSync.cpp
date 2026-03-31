@@ -153,6 +153,7 @@ const SSyncedOpCode syncedOpcodes[] =
     {COMMAND_TASK_LEAVE_ANY_CAR, true, eSyncedParamType::PED},
 
     // Actors
+    {0x009A}, // create_char / create_actor
     {0x00A1, true, {eSyncedParamType::PED}}, // set_char_coordinates [Char] {x} [float] {y} [float] {z} [float]
     {0x00DF, true, {eSyncedParamType::PED}}, // is_char_in_any_car [Char]
     {0x00FE, true, {eSyncedParamType::PED}}, // is_char_near_point_any_means_3d [Char] ...
@@ -164,6 +165,7 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x0811, true, {eSyncedParamType::PED}}, // get_char_car_is_using [Char] [var Car]
     {0x0245, true, {eSyncedParamType::PED}}, // set_anim_group_for_char[Char] {animGroup} [AnimGroup]
     {0x0860, true, {eSyncedParamType::PED}}, // {0860:} set_char_area_visible [Char] {interiorId} [int]
+    {0x01CB, true, {eSyncedParamType::PED, eSyncedParamType::PED}}, // set_char_obj_kill_char_any_means [Char] [TargetChar]
 
     // Vehicles
     {0x00AB, true, {eSyncedParamType::VEHICLE}}, // set_car_coordinates [Car] {x} [float] {y} [float] {z} [float]
@@ -302,6 +304,7 @@ namespace
         case 0x05CA: // task_enter_car_as_passenger
         case 0x05CB: // task_enter_car_as_driver
         case 0x05E2: // task_kill_char_on_foot
+        case 0x01CB: // set_char_obj_kill_char_any_means
         case 0x0603: // task_go_to_coord_any_means
         case 0x0634: // task_kill_char_on_foot_while_ducking
         case 0x0672: // task_destroy_car
@@ -744,7 +747,9 @@ void BuildAndSendOpcode()
     // This feeds a single replayable payload used for reconnect + late-join hydration.
     const bool isMissionFlowStateOpcode =
         lastOpCodeProcessed == 0x0417 || // Mission.LoadAndLaunchInternal
+        lastOpCodeProcessed == 0x009A || // create_actor/create_char (entity spawn progression)
         lastOpCodeProcessed == 0x01B4 || // set_player_control
+        lastOpCodeProcessed == 0x01CB || // set_char_obj_kill_char_any_means (kill objective progression)
         lastOpCodeProcessed == 0x0881 || // set_player_fire_button
         lastOpCodeProcessed == 0x0E60 || // set_camera_control
         lastOpCodeProcessed == 0x0826 || // display_hud
