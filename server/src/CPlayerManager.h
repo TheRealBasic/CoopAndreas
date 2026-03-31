@@ -167,6 +167,7 @@ public:
 		int32_t timerMs = 0;
 		int32_t score = 0;
 		int32_t rewardCash = 0;
+		uint8_t rewardLatched = 0;
 		uint8_t outcome = 0;
 		uint8_t participantCount = 0;
 		uint8_t currArea = 0;
@@ -298,6 +299,7 @@ public:
 			entry.timerMs = state.timerMs;
 			entry.score = state.score;
 			entry.rewardCash = state.rewardCash;
+			entry.rewardLatched = state.rewardLatched;
 			entry.outcome = state.outcome;
 			entry.participantCount = state.participantCount;
 			entry.currArea = state.currArea;
@@ -618,6 +620,7 @@ public:
 				state.timerMs = packet->timerMs;
 				state.score = packet->score;
 				state.rewardCash = packet->rewardCash;
+				state.rewardLatched = packet->rewardLatched;
 				state.outcome = packet->outcome;
 				state.participantCount = packet->participantCount;
 				state.currArea = packet->currArea;

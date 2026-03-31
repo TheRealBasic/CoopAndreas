@@ -203,6 +203,24 @@
       "recent_commits": []
     },
     {
+      "parity_id": "AMMUNATION-AMMU-NATION-CHALLENGE",
+      "roadmap": {
+        "phase": "Ammu-Nation challenge",
+        "mode": "Ammu-Nation challenge",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-ammu-nation-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+        "server/src/CPlayerManager.h"
+      ],
+      "recent_commits": []
+    },
+    {
       "parity_id": "COURIER-LOS-SANTOS-COURIER",
       "roadmap": {
         "phase": "Courier routes",

@@ -114,6 +114,7 @@ namespace
         int32_t timerMs = 0;
         int32_t score = 0;
         int32_t rewardCash = 0;
+        uint8_t rewardLatched = 0;
         uint8_t outcome = 0;
         uint8_t participantCount = 0;
         uint8_t currArea = 0;
@@ -132,6 +133,7 @@ namespace
     constexpr int32_t kTimerDriftSnapThresholdMs = 350;
     constexpr int32_t kTimerDriftSmoothStepMs = 45;
     constexpr uint16_t kCheckpointDriftSnapThreshold = 1;
+    constexpr uint16_t kAmmuNationChallengeMissionId = 113;
 
     constexpr uint16_t OP_END_SCENE_SKIP = 0x0701;
     constexpr uint16_t OP_START_CUTSCENE = 0x02E7;
@@ -227,6 +229,16 @@ namespace
         return CPackets::SUBMISSION_MISSION_TYPE_MAX;
     }
 
+    uint8_t ResolveSubmissionMissionTypeByAttemptState(const SideContentAttemptState& state)
+    {
+        if (state.missionId == kAmmuNationChallengeMissionId && state.passFailPending == 0)
+        {
+            return CPackets::SUBMISSION_MISSION_AMMU_NATION_CHALLENGE;
+        }
+
+        return CPackets::SUBMISSION_MISSION_TYPE_MAX;
+    }
+
     uint8_t CountVehicleParticipants(CVehicle* vehicle)
     {
         if (!vehicle)
@@ -257,6 +269,7 @@ namespace
         packet.timerMs = state.timerMs;
         packet.score = state.score;
         packet.rewardCash = state.rewardCash;
+        packet.rewardLatched = state.rewardLatched;
         packet.outcome = state.outcome;
         packet.participantCount = state.participantCount;
         packet.currArea = static_cast<uint8_t>(CGame::currArea);
@@ -1208,6 +1221,10 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
     {
         detectedType = ResolveSubmissionMissionTypeByVehicleModel(localPlayer->m_pVehicle->m_nModelIndex);
     }
+    if (detectedType >= CPackets::SUBMISSION_MISSION_TYPE_MAX)
+    {
+        detectedType = ResolveSubmissionMissionTypeByAttemptState(ms_sideContentAttemptState);
+    }
 
     for (uint8_t mode = 0; mode < CPackets::SUBMISSION_MISSION_TYPE_MAX; ++mode)
     {
@@ -1227,7 +1244,9 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
         }
 
         SubmissionState& state = ms_submissionStates[mode];
-        state.participantCount = CountVehicleParticipants(localPlayer->m_pVehicle);
+        state.participantCount = mode == CPackets::SUBMISSION_MISSION_AMMU_NATION_CHALLENGE
+            ? 1
+            : CountVehicleParticipants(localPlayer->m_pVehicle);
 
         if (!state.active)
         {
@@ -1239,6 +1258,7 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
             state.timerMs = 0;
             state.score = 0;
             state.rewardCash = 0;
+            state.rewardLatched = 0;
             state.outcome = 0;
             state.checkpointState.currentIndex = ms_sideContentAttemptState.checkpointIndex;
             state.checkpointState.totalCount = ms_sideContentAttemptState.checkpointCount;
@@ -1247,11 +1267,15 @@ void CMissionSyncState::ProcessSubmissionMissionSync()
             state.timerState.remaining = std::max(ms_sideContentAttemptState.timerMs, 0);
             state.timerState.paused = ms_sideContentAttemptState.timerFrozen ? 1 : 0;
             state.timerMs = state.timerState.remaining;
+            state.stage = static_cast<uint8_t>(std::clamp<int>(ms_sideContentAttemptState.objectivePhaseIndex + 1, 1, UINT8_MAX));
+            state.progress = ms_sideContentAttemptState.checkpointIndex;
             state.lastBroadcastSecond = -1;
             EmitSubmissionMissionDelta(mode, 0, state);
             continue;
         }
 
+        state.stage = static_cast<uint8_t>(std::clamp<int>(ms_sideContentAttemptState.objectivePhaseIndex + 1, 1, UINT8_MAX));
+        state.progress = ms_sideContentAttemptState.checkpointIndex;
         state.checkpointState.currentIndex = ms_sideContentAttemptState.checkpointIndex;
         state.checkpointState.totalCount = ms_sideContentAttemptState.checkpointCount;
         state.checkpointState.activeFlag = ms_sideContentAttemptState.checkpointCount > 0 ? 1 : 0;
@@ -1287,6 +1311,7 @@ void CMissionSyncState::HandleSubmissionMissionSnapshotEntry(const CPackets::Sub
     state.timerMs = packet.timerMs;
     state.score = packet.score;
     state.rewardCash = packet.rewardCash;
+    state.rewardLatched = packet.rewardLatched;
     state.outcome = packet.outcome;
     state.participantCount = packet.participantCount;
     state.currArea = packet.currArea;
@@ -1328,27 +1353,46 @@ void CMissionSyncState::TriggerSubmissionMissionRewardDelta(int rewardDelta)
     }
 
     CPlayerPed* localPlayer = FindPlayerPed(0);
-    if (!localPlayer || !localPlayer->m_pVehicle)
+    if (!localPlayer)
     {
         return;
     }
 
-    const uint8_t submissionType = ResolveSubmissionMissionTypeByVehicleModel(localPlayer->m_pVehicle->m_nModelIndex);
+    uint8_t submissionType = CPackets::SUBMISSION_MISSION_TYPE_MAX;
+    if (localPlayer->m_pVehicle)
+    {
+        submissionType = ResolveSubmissionMissionTypeByVehicleModel(localPlayer->m_pVehicle->m_nModelIndex);
+    }
+    if (submissionType >= CPackets::SUBMISSION_MISSION_TYPE_MAX)
+    {
+        submissionType = ResolveSubmissionMissionTypeByAttemptState(ms_sideContentAttemptState);
+    }
     if (submissionType >= CPackets::SUBMISSION_MISSION_TYPE_MAX)
     {
         return;
     }
 
     SubmissionState& state = ms_submissionStates[submissionType];
+    if (submissionType == CPackets::SUBMISSION_MISSION_AMMU_NATION_CHALLENGE && state.rewardLatched)
+    {
+        return;
+    }
+
     state.submissionType = submissionType;
     state.active = 1;
     state.level = std::max<uint8_t>(state.level, 1);
-    state.stage = std::max<uint8_t>(state.stage, 1);
+    state.stage = static_cast<uint8_t>(std::clamp<int>(ms_sideContentAttemptState.objectivePhaseIndex + 1, 1, UINT8_MAX));
     state.progress = static_cast<uint16_t>(std::min<int>(UINT16_MAX, static_cast<int>(state.progress) + 1));
     state.score = std::max<int32_t>(0, state.score + rewardDelta);
     state.rewardCash += rewardDelta;
+    if (submissionType == CPackets::SUBMISSION_MISSION_AMMU_NATION_CHALLENGE)
+    {
+        state.rewardLatched = 1;
+    }
     state.outcome = 0;
-    state.participantCount = CountVehicleParticipants(localPlayer->m_pVehicle);
+    state.participantCount = submissionType == CPackets::SUBMISSION_MISSION_AMMU_NATION_CHALLENGE
+        ? 1
+        : CountVehicleParticipants(localPlayer->m_pVehicle);
     state.checkpointState.currentIndex = ms_sideContentAttemptState.checkpointIndex;
     state.checkpointState.totalCount = ms_sideContentAttemptState.checkpointCount;
     state.checkpointState.activeFlag = ms_sideContentAttemptState.checkpointCount > 0 ? 1 : 0;

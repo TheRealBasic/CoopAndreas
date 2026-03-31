@@ -219,7 +219,8 @@ public:
 		SUBMISSION_MISSION_PARAMEDIC = 3,
 		SUBMISSION_MISSION_PIMP = 4,
 		SUBMISSION_MISSION_FREIGHT_TRAIN = 5,
-		SUBMISSION_MISSION_TYPE_MAX = 6
+		SUBMISSION_MISSION_AMMU_NATION_CHALLENGE = 6,
+		SUBMISSION_MISSION_TYPE_MAX = 7
 	};
 
 	struct SubmissionMissionSnapshotBegin
@@ -252,6 +253,7 @@ public:
 		int32_t timerMs;
 		int32_t score;
 		int32_t rewardCash;
+		uint8_t rewardLatched;
 		uint8_t outcome;
 		uint8_t participantCount;
 		uint8_t currArea;

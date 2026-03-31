@@ -302,7 +302,12 @@ Required controls for Wave C rollout:
   - **Completion note (2026-03-27):** each stadium mode is marked `done` only after passing all four parity gates (objective parity, fail/pass parity, reconnect parity, late-join parity).
     - Evidence index: `docs/qa/phase-stadium-events-checklist.md`.
     - Per-mode execution sections: [8-Track](docs/qa/phase-stadium-events-checklist.md#8-track-execution), [Blood Bowl](docs/qa/phase-stadium-events-checklist.md#blood-bowl-execution), [Dirt Track](docs/qa/phase-stadium-events-checklist.md#dirt-track-execution), [Kick Start](docs/qa/phase-stadium-events-checklist.md#kick-start-execution).
-- [ ] Ammu-Nation challenge. **[P2][S]**
+- [x] Ammu-Nation challenge. **[P2][S]** ✅ Completed (2026-03-31).
+  - **Acceptance criteria (passed):** objective parity for Ammu-Nation challenge using shared mission-flow + submission sync contract (`Mission.LoadAndLaunchInternal(113)` with `ANR_*` objective progression).
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers.
+  - **Acceptance criteria (passed):** reconnect parity restores active challenge attempt (`stage`, `timer`, `score`, reward latch) without reset.
+  - **Acceptance criteria (passed):** late-join parity hydrates active challenge attempt without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-ammu-nation-checklist.md`.
 - [x] Schools: `Driving`, `Flight`, `Bike`, `Boat`. **[P2][L]** ✅ Completed (2026-03-27).
   - **Acceptance criteria (passed):** objective parity for all four school modes using the fixed schools opcode/state-transition contract.
   - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each school mode.
@@ -333,6 +338,7 @@ Execution rule: implement **one phase at a time**. A phase is only marked `done`
 | Schools | Driving, Flight, Bike, Boat | `Mission.LoadAndLaunchInternal`, `set_player_control`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-schools-checklist.md` |
 | Stadium events | 8-Track, Blood Bowl, Dirt Track, Kick Start | `Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-stadium-events-checklist.md` |
 | Hidden races | BMX, NRG-500, Chiliad Challenge | `Mission.LoadAndLaunchInternal`, `start_checkpoint_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-hidden-races-checklist.md` |
+| Ammu-Nation challenge | Ammu-Nation challenge | `Mission.LoadAndLaunchInternal`, `set_player_control`, `set_objective`, `set_timers`, `add_score`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-ammu-nation-checklist.md` |
 | Courier routes | LS, SF, LV routes | `Mission.LoadAndLaunchInternal`, `create_pickup`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-courier-routes-checklist.md` |
 | Street races | Street Racing set (22 races) | `Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `task_car_drive_to_coord`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-street-races-checklist.md` |
 | Import/Export | Import/Export list sets and turn-ins | `Mission.LoadAndLaunchInternal`, `create_car`, `set_objective`, `set_player_money`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-import-export-checklist.md` |
@@ -429,6 +435,7 @@ Allowed status values: `not started`, `in progress`, `done`.
 | Hidden races | BMX | done |
 | Hidden races | NRG-500 | done |
 | Hidden races | Chiliad Challenge | done |
+| Ammu-Nation challenge | Ammu-Nation challenge | done |
 | Courier routes | Los Santos courier | not started |
 | Courier routes | San Fierro courier | not started |
 | Courier routes | Las Venturas courier | not started |
@@ -449,3 +456,8 @@ Release-note log:
   2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅ across all three hidden race modes.
   3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
   4. **How to test:** run host + 2 clients, start any hidden race from `ODDVEH`, force one reconnect and one late join mid-race, verify parity using `docs/qa/phase-hidden-races-checklist.md`.
+- **2026-03-31 — Ammu-Nation challenge**
+  1. **What shipped:** Ammu-Nation challenge support on the shared mission-flow + submission path, including authoritative `active/stage/timer/score/outcome/reward latch` replication for reconnect and late join.
+  2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅.
+  3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
+  4. **How to test:** run host + 2 clients, launch shooting range challenge (`Mission.LoadAndLaunchInternal(113)`), force one reconnect and one late join during active timer, verify parity using `docs/qa/phase-ammu-nation-checklist.md`.
