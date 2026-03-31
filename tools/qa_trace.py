@@ -31,6 +31,10 @@ PHASE_MODULE_HINTS: Dict[str, List[str]] = {
         "client/src/CMissionSyncState.cpp",
         "client/src/COpCodeSync.cpp",
     ],
+    "Ammu-Nation challenge": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+    ],
     "Courier routes": [
         "client/src/CMissionSyncState.cpp",
         "client/src/COpCodeSync.cpp",
@@ -43,15 +47,21 @@ PHASE_MODULE_HINTS: Dict[str, List[str]] = {
         "client/src/CMissionSyncState.cpp",
         "client/src/COpCodeSync.cpp",
     ],
+    "Asset missions": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp",
+    ],
 }
 
 PHASE_TAG_PREFIX = {
     "Schools": "SCHOOLS",
     "Stadium events": "STADIUM",
     "Hidden races": "HIDDEN",
+    "Ammu-Nation challenge": "AMMU",
     "Courier routes": "COURIER",
     "Street races": "STREET",
     "Import/Export": "IMPORTEXPORT",
+    "Asset missions": "ASSET",
 }
 
 

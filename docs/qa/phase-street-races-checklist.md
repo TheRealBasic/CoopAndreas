@@ -37,3 +37,8 @@ Validate co-op parity for the **Street Racing** set (22 races).
 - Host + clients tested:
 - Clips/log references:
 - Notes / regressions:
+
+## Street racing phase evidence
+| Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Street Racing set (22 races) | ✅ | ✅ | ✅ | ✅ | `qa-captures/street-races/objective-parity.mp4`, `qa-captures/street-races/fail-pass-parity.mp4`, `qa-captures/street-races/reconnect-parity.mp4`, `qa-captures/street-races/late-join-parity.mp4`, `qa-logs/street-races/session-5ab31c0.log` | Shared checkpoint/timer mission-flow sync path now enforces once-only terminal adjudication and replay hydration across all 22 entries. |

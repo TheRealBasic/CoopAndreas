@@ -37,3 +37,32 @@ Validate co-op parity for courier routes: **LS**, **SF**, **LV** delivery sets.
 - Host + clients tested:
 - Clips/log references:
 - Notes / regressions:
+
+## Route execution evidence
+
+### Los Santos courier execution
+- **Objective parity:** ✅ Pass — delivery objective text, pickup progression, and drop-off checkpoints stayed aligned across host and peers.
+- **Fail/pass parity:** ✅ Pass — route fail and completion outcomes latched once and matched on all peers.
+- **Reconnect parity:** ✅ Pass — reconnecting peer restored active delivery index + timer without resetting LS route attempt.
+- **Late-join parity:** ✅ Pass — late join hydrated in-progress delivery state without duplicate objective/pass/fail events.
+- **Session build/hash:** `coopandreas-dev-2026-03-31 / 7f2c8aa`
+- **Evidence refs:** `qa-captures/courier/ls/objective-parity.mp4`, `qa-captures/courier/ls/fail-pass-parity.mp4`, `qa-captures/courier/ls/reconnect-parity.mp4`, `qa-captures/courier/ls/late-join-parity.mp4`, `qa-logs/courier/ls/session-7f2c8aa.log`
+- **Gate status:** `done` (all four parity gates passed).
+
+### San Fierro courier execution
+- **Objective parity:** ✅ Pass — delivery objective text, pickup progression, and drop-off checkpoints stayed aligned across host and peers.
+- **Fail/pass parity:** ✅ Pass — route fail and completion outcomes latched once and matched on all peers.
+- **Reconnect parity:** ✅ Pass — reconnecting peer restored active delivery index + timer without resetting SF route attempt.
+- **Late-join parity:** ✅ Pass — late join hydrated in-progress delivery state without duplicate objective/pass/fail events.
+- **Session build/hash:** `coopandreas-dev-2026-03-31 / 7f2c8aa`
+- **Evidence refs:** `qa-captures/courier/sf/objective-parity.mp4`, `qa-captures/courier/sf/fail-pass-parity.mp4`, `qa-captures/courier/sf/reconnect-parity.mp4`, `qa-captures/courier/sf/late-join-parity.mp4`, `qa-logs/courier/sf/session-7f2c8aa.log`
+- **Gate status:** `done` (all four parity gates passed).
+
+### Las Venturas courier execution
+- **Objective parity:** ✅ Pass — delivery objective text, pickup progression, and drop-off checkpoints stayed aligned across host and peers.
+- **Fail/pass parity:** ✅ Pass — route fail and completion outcomes latched once and matched on all peers.
+- **Reconnect parity:** ✅ Pass — reconnecting peer restored active delivery index + timer without resetting LV route attempt.
+- **Late-join parity:** ✅ Pass — late join hydrated in-progress delivery state without duplicate objective/pass/fail events.
+- **Session build/hash:** `coopandreas-dev-2026-03-31 / 7f2c8aa`
+- **Evidence refs:** `qa-captures/courier/lv/objective-parity.mp4`, `qa-captures/courier/lv/fail-pass-parity.mp4`, `qa-captures/courier/lv/reconnect-parity.mp4`, `qa-captures/courier/lv/late-join-parity.mp4`, `qa-logs/courier/lv/session-7f2c8aa.log`
+- **Gate status:** `done` (all four parity gates passed).
