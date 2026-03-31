@@ -284,6 +284,7 @@ namespace ObjectiveSync
 
         switch (opcode)
         {
+        case 0x01CB: // set_char_obj_kill_char_any_means
         case 0x05E2: // task_kill_char_on_foot
         case 0x0634: // task_kill_char_on_foot_while_ducking
             if (params && paramCount > 1)

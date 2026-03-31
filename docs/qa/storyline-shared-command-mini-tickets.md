@@ -23,7 +23,14 @@ Each mission can be promoted to `functional` only when all core gameplay gates i
 
 ## Nines And AK's (`scm/scripts/SWEET.txt`)
 
-Status: `in progress` (blocking mapping + QA scenario list documented)
+Status: `done` (2026-03-31; Wave W1 shared-command closure + parity evidence captured)
+
+### Pipeline execution ledger
+- [x] **command mapping** — `create_actor` (`0x009A` / `create_char`), `set_char_obj_kill_char_any_means` (`0x01CB`), and `set_objective` (`print_*` objective text path) mapped through shared mission flow/task surfaces (`COpCodeSync`, `CTaskSequenceSync`, `ObjectiveSync`).
+- [x] **actor registry hookup** — actor lifecycle payloads continue using mission epoch + script-local registry/deferred resolution paths for reconnect/late-join ordering races.
+- [x] **objective/checkpoint integration** — objective text semantics + monotonic objective phase progression replayed through mission flow snapshots.
+- [x] **cutscene/control sync** — intro/control lock sequencing validated on shared W1 mission flow path.
+- [x] **pass/fail adjudication** — terminal pass/fail remains once-only via shared adjudication latch behavior (`WB-FIX-003` pattern reuse).
 
 ### Blocking commands
 - `create_actor` — spawn and network ownership assignment for tutorial targets + enemies.
