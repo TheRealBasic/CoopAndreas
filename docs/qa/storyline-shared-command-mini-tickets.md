@@ -54,7 +54,14 @@ Status: `done` (2026-03-31; Wave W1 shared-command closure + parity evidence cap
 
 ## Drive-By (`scm/scripts/SWEET.txt`)
 
-Status: `in progress` (blocking mapping + QA scenario list documented)
+Status: `done` (2026-03-31; Wave W1 shared-command closure + parity evidence captured)
+
+### Pipeline execution ledger
+- [x] **command mapping** — `create_car`, `task_drive_by`, and `set_objective` mapped through shared mission flow/task surfaces (`COpCodeSync`, `CTaskSequenceSync`, `ObjectiveSync`) with deterministic route-phase fan-out.
+- [x] **actor registry hookup** — mission vehicle + occupant bindings hydrate through mission epoch scoped registry with deferred resolution for reconnect/late-join ordering races.
+- [x] **objective/checkpoint integration** — route node progression, wave index, and kill quota objective text/state replay through monotonic objective phase snapshots.
+- [x] **cutscene/control sync** — launch intro and vehicle-control handoff validated on shared W1 mission flow path with duplicate-start suppression.
+- [x] **pass/fail adjudication** — terminal pass/fail branches remain once-only via shared adjudication latch + hydration epoch filter (`WB-FIX-003`, `WB-FIX-004`).
 
 ### Blocking commands
 - `create_car` — mission vehicle creation/ownership and occupant seat hydration.
@@ -75,6 +82,13 @@ Status: `in progress` (blocking mapping + QA scenario list documented)
 - `DBY-05` Pass parity: all required enemies eliminated -> single terminal pass event.
 - `DBY-06` Reconnect: reconnect peer restores current route node, wave index, and vehicle condition.
 - `DBY-07` Late-join: late peer hydrates to active wave with correct kill quota progress.
+
+### Completed evidence links
+- `DBY-01` / `DBY-02` / `DBY-03`: `docs/qa/storyline-wave-mission-evidence.md` (W1 `Drive-By` row) + mission trace `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/drive-by-route-wave-sync.log`.
+- `DBY-04` / `DBY-05`: terminal parity traces `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/drive-by-terminal-parity.log` and clip `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/drive-by-terminals.mp4`.
+- `DBY-06`: reconnect restore proof `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/drive-by-reconnect-restore.log`.
+- `DBY-07`: late-join hydration proof `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/drive-by-late-join-hydration.log`.
+- Mission sign-off checklist: `docs/qa/storyline-mission-signoff-checklist.md#drive-by-sign-off-record`.
 
 ## Sweet's Girl (`scm/scripts/SWEET.txt`)
 
