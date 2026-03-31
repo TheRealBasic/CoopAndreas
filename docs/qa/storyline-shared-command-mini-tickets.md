@@ -52,6 +52,13 @@ Status: `done` (2026-03-31; Wave W1 shared-command closure + parity evidence cap
 - `NAA-06` Reconnect: reconnecting peer resumes correct stage and objective text mid-combat.
 - `NAA-07` Late-join: late peer receives active actors/objective stage without replaying intro.
 
+### Completed evidence links
+- `NAA-01` / `NAA-02` / `NAA-03`: `docs/qa/storyline-wave-mission-evidence.md` (W1 `Nines And AK's` row; session `NET-W1-2026-03-31-B`).
+- `NAA-04` / `NAA-05`: `docs/qa/storyline-wave-mission-evidence.md` (W1 `Nines And AK's` row; shared terminal latch evidence `WB-FIX-003`).
+- `NAA-06`: `docs/qa/storyline-wave-mission-evidence.md` (W1 `Nines And AK's` reconnect gate).
+- `NAA-07`: `docs/qa/storyline-wave-mission-evidence.md` (W1 `Nines And AK's` late-join gate).
+- Unresolved-entity/deferred apply semantics: pipeline ledger `actor registry hookup` item above (mission epoch + script-local deferred resolution for ordering races) + reconnect/late-join gates `NAA-06`/`NAA-07`.
+
 ## Drive-By (`scm/scripts/SWEET.txt`)
 
 Status: `done` (2026-03-31; Wave W1 shared-command closure + parity evidence captured)
@@ -162,6 +169,12 @@ Status: `done` (Wave B heterogeneous-mechanics validation complete on 2026-03-30
 - `RDG-06` Reconnect: reconnecting peer resumes chase/recovery stage without reset.
 - `RDG-07` Late-join: late peer receives active actor states + current objective immediately.
 
+### Completed evidence links
+- `RDG-01` / `RDG-02` / `RDG-03`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Running Dog` row; session `NET-WB-2026-03-30-C`).
+- `RDG-04` / `RDG-05`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Running Dog` row; terminal once-only + idempotent reward replay notes).
+- `RDG-06`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Running Dog` reconnect gate).
+- `RDG-07`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Running Dog` late-join gate).
+
 ## Just Business (`scm/scripts/SMOKE.txt`)
 
 Status: `done` (Wave B heterogeneous-mechanics validation complete on 2026-03-30; all six core gameplay gates `pass`)
@@ -186,3 +199,8 @@ Status: `done` (Wave B heterogeneous-mechanics validation complete on 2026-03-30
 - `JBU-05` Fail parity: CJ/Smoke death or escape-vehicle destruction emits single fail outcome.
 - `JBU-06` Pass parity: final escape completion emits one pass + reward state.
 - `JBU-07` Reconnect/late-join: peer hydration restores current phase, wave, vehicle health, and objective.
+
+### Completed evidence links
+- `JBU-01` / `JBU-02` / `JBU-03` / `JBU-04`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Just Business` row; session `NET-WB-2026-03-30-D`).
+- `JBU-05` / `JBU-06`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Just Business` row; single terminal fail/pass outcome notes).
+- `JBU-07`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Just Business` reconnect + late-join hydration gate).
