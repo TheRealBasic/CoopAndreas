@@ -204,3 +204,30 @@ Status: `done` (Wave B heterogeneous-mechanics validation complete on 2026-03-30
 - `JBU-01` / `JBU-02` / `JBU-03` / `JBU-04`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Just Business` row; session `NET-WB-2026-03-30-D`).
 - `JBU-05` / `JBU-06`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Just Business` row; single terminal fail/pass outcome notes).
 - `JBU-07`: `docs/qa/storyline-wave-mission-evidence.md` (W3 `Just Business` reconnect + late-join hydration gate).
+
+## CRASH/RYDER shared-command closure addendum (2026-03-31)
+
+Scope: tie active RYDER (`W2`) and CRASH (`WC`) mission artifacts back to shared command conformance semantics while those waves are still `in progress`.
+
+### Mission-to-command evidence mapping
+
+| Mission | Shared command(s) in scope | Authority evidence | Replay evidence (reconnect/late-join) | Idempotency evidence | Unresolved-entity handling evidence | Current command verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| Robbing Uncle Sam (`RUS`) | `set_char_obj_kill_char_any_means` (wave blocker order includes kill objective) | `RUS-04` fail-path template + `RUS-05` pass-path template in session `NET-W2-2026-03-31-C` confirm host-owned terminal objective decisions. | `RUS-06` reconnect restore scaffold + `RUS-07` late-join hydration scaffold explicitly track kill-objective stage replay. | `RUS-05` template includes reward/terminal once-only assertions (same latch family used by closed W1/W3 missions). | W2 rows require `WB-FIX-001` unresolved-entity deferral/rebind retry; `RUS` is explicitly bound to this guard set in wave evidence. | `complete` (shared command row), mission proof **in progress**. |
+| Gray Imports (`GI`) | `create_actor`, `set_char_obj_kill_char_any_means` | `GI-01` launch authority scaffold + `GI-02` objective scaffold cover host actor spawn/kill chain ownership in session `NET-WC-TBD-GI`. | `GI-06` reconnect scaffold + `GI-07` late-join scaffold track hydration across combat-to-detonation transitions. | `GI-04`/`GI-05` fail/pass templates include terminal once-only assertions for kill objective + detonation completion transitions. | CRASH wave checklist requires unresolved ordering guards (`WB-FIX-001`..`WB-FIX-004`); `GI` checklist explicitly references these as mandatory reuse. | `complete` (shared command row), mission proof **in progress**. |
+
+### Newly discovered command-level gaps (mission-tied)
+
+- **`RUS-CMD-GAP-01` (`Robbing Uncle Sam`)**: kill-objective row scaffolds exist, but no attached artifact yet proving duplicate kill-event suppression under reconnect race in the same attempt (`RUS-06` restore boundary).
+  - Required closure artifact: reconnect test log where pre-disconnect kill packet replays once and does not double-advance terminal state.
+- **`GI-CMD-GAP-01` (`Gray Imports`)**: actor-spawn-to-kill chain has scaffolded authority/replay checks, but no captured artifact yet showing deferred resolution when target actor net id arrives after kill-objective packet.
+  - Required closure artifact: deferred queue telemetry + eventual apply trace for `GI-02`/`GI-06` mixed ordering run.
+
+### Command applicability note for active W2/WC scope
+
+- No active W2/WC mission currently introduces new `create_car` or `task_drive_by` command-level behavior beyond already closed evidence in `Drive-By` and `Just Business`; therefore no new mini-ticket gaps were opened for those two command rows in this addendum.
+
+### Wave promotion readiness re-check (post command-row closure)
+
+- `W2` (RYDER): **not ready** — all three missions remain `in progress` in `docs/qa/storyline-wave-mission-evidence.md`, and command-tied gaps `RUS-CMD-GAP-01` plus mission gate checklists are still open.
+- `WC` (CRASH): **not ready** — `Burning Desire` and `Gray Imports` remain `in progress`; `GI-CMD-GAP-01` plus unresolved six-gate mission parity evidence blocks promotion.
