@@ -32,3 +32,28 @@ When updating `docs/ROADMAP.md` from `in progress` to `done`, include:
 2. The completion date in `YYYY-MM-DD` format.
 3. The mission-specific evidence link proving all required gates passed.
 4. For multi-stage final missions, evidence that each stage has independent functional + terminal-event sign-off before the aggregated storyline row is marked `done`.
+
+
+## Drive-By sign-off record
+
+### Required gates (Drive-By)
+
+- [x] Objective parity
+- [x] Fail/pass parity
+- [x] Reconnect parity
+- [x] Late-join parity
+- [x] Host-migration stable replay
+- [x] Evidence link
+- [x] Functional sign-off
+- [x] Stage-by-stage functional sign-off (required for multi-stage finals)
+- [x] Stage terminal fail/pass idempotency evidence (required for multi-stage finals)
+
+| Field | Value |
+| --- | --- |
+| Mission | Drive-By |
+| Script family | SWEET (`scm/scripts/SWEET.txt`) |
+| Roadmap status change | `in progress` -> `done` |
+| Completion date (`YYYY-MM-DD`) | 2026-03-31 |
+| Evidence link | `docs/qa/storyline-wave-mission-evidence.md` (W1 `Drive-By` row), `docs/qa/storyline-shared-command-mini-tickets.md#drive-by-scmscriptssweettxt`, `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/` |
+
+Mission note: reused shared hardening fixes `WB-FIX-003` (terminal once-only adjudication) and `WB-FIX-004` (reconnect/late-join hydration epoch filter); evidence artifacts are stored under `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/`.
