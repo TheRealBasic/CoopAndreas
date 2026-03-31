@@ -203,7 +203,7 @@
       "recent_commits": []
     },
     {
-      "parity_id": "AMMUNATION-AMMU-NATION-CHALLENGE",
+      "parity_id": "AMMU-AMMU-NATION-CHALLENGE",
       "roadmap": {
         "phase": "Ammu-Nation challenge",
         "mode": "Ammu-Nation challenge",
@@ -215,8 +215,7 @@
       ],
       "module_refs": [
         "client/src/CMissionSyncState.cpp",
-        "client/src/COpCodeSync.cpp",
-        "server/src/CPlayerManager.h"
+        "client/src/COpCodeSync.cpp"
       ],
       "recent_commits": []
     },
@@ -225,7 +224,7 @@
       "roadmap": {
         "phase": "Courier routes",
         "mode": "Los Santos courier",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
@@ -242,7 +241,7 @@
       "roadmap": {
         "phase": "Courier routes",
         "mode": "San Fierro courier",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
@@ -259,7 +258,7 @@
       "roadmap": {
         "phase": "Courier routes",
         "mode": "Las Venturas courier",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
@@ -276,7 +275,7 @@
       "roadmap": {
         "phase": "Street races",
         "mode": "Street Racing set (22 races)",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
@@ -293,11 +292,62 @@
       "roadmap": {
         "phase": "Import/Export",
         "mode": "Import/Export",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
         "docs/qa/phase-import-export-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "ASSET-TRUCKER",
+      "roadmap": {
+        "phase": "Asset missions",
+        "mode": "Trucker",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-asset-missions-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "ASSET-VALET",
+      "roadmap": {
+        "phase": "Asset missions",
+        "mode": "Valet",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-asset-missions-checklist.md"
+      ],
+      "module_refs": [
+        "client/src/CMissionSyncState.cpp",
+        "client/src/COpCodeSync.cpp"
+      ],
+      "recent_commits": []
+    },
+    {
+      "parity_id": "ASSET-CAREER",
+      "roadmap": {
+        "phase": "Asset missions",
+        "mode": "Career",
+        "status": "done",
+        "source": "docs/ROADMAP.md#progress-tracking-per-mode"
+      },
+      "evidence_docs": [
+        "docs/qa/phase-asset-missions-checklist.md"
       ],
       "module_refs": [
         "client/src/CMissionSyncState.cpp",

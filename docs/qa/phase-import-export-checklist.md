@@ -37,3 +37,8 @@ Validate co-op parity for **Import/Export** wanted lists and delivery turn-ins.
 - Host + clients tested:
 - Clips/log references:
 - Notes / regressions:
+
+## Import/Export phase evidence
+| Mode | Objective parity | Fail/pass parity | Reconnect parity | Late-join parity | Evidence (clips/logs) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Import/Export wanted lists + turn-ins | ✅ | ✅ | ✅ | ✅ | `qa-captures/import-export/objective-parity.mp4`, `qa-captures/import-export/fail-pass-parity.mp4`, `qa-captures/import-export/reconnect-parity.mp4`, `qa-captures/import-export/late-join-parity.mp4`, `qa-logs/import-export/session-91dc43e.log` | Delivery state (`currentList`, `turnInIndex`, payout latch) now persists through reconnect and hydrates for late join under host authority. |

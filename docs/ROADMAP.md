@@ -332,10 +332,30 @@ Previously `not started` W3 missions are isolated in a focused kickoff lane so i
   - **Completion note (2026-03-27):** all schools modes are `done` after passing the fixed parity gates (objective parity, fail/pass parity, reconnect parity, late-join parity).
     - Evidence index: `docs/qa/phase-schools-checklist.md`.
     - Per-mode sign-off logs/clips: [Driving school evidence](docs/qa/phase-schools-checklist.md#driving-school-evidence), [Flight school evidence](docs/qa/phase-schools-checklist.md#flight-school-evidence), [Bike school evidence](docs/qa/phase-schools-checklist.md#bike-school-evidence), [Boat school evidence](docs/qa/phase-schools-checklist.md#boat-school-evidence).
-- [ ] Asset missions: `Trucker`, `Valet`, `Career`. **[P2][L]**
-- [ ] Courier sets: LS/SF/LV routes. **[P2][M]**
-- [ ] Street Racing set (22 races). **[P2][L]**
-- [ ] Import / Export. **[P2][M]**
+- [x] Asset missions: `Trucker`, `Valet`, `Career`. **[P2][L]** ✅ Completed (2026-03-31).
+  - **Acceptance criteria (passed):** objective parity for Trucker, Valet, and Career mission loops under shared side-content mission-flow state.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each asset mission mode.
+  - **Acceptance criteria (passed):** reconnect parity restores active asset mission attempt state without resetting progression.
+  - **Acceptance criteria (passed):** late-join parity hydrates active asset mission attempt state without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-asset-missions-checklist.md`.
+- [x] Courier sets: LS/SF/LV routes. **[P2][M]** ✅ Completed (2026-03-31).
+  - **Acceptance criteria (passed):** objective parity for LS, SF, and LV courier routes with synchronized delivery objective/pickup progression.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each courier route.
+  - **Acceptance criteria (passed):** reconnect parity restores active courier delivery progress + timer state without resetting attempts.
+  - **Acceptance criteria (passed):** late-join parity hydrates active courier route state without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-courier-routes-checklist.md`.
+- [x] Street Racing set (22 races). **[P2][L]** ✅ Completed (2026-03-31).
+  - **Acceptance criteria (passed):** objective parity for all 22 street races using shared race checkpoint progression sync.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers.
+  - **Acceptance criteria (passed):** reconnect parity restores active race checkpoint/timer state without attempt reset.
+  - **Acceptance criteria (passed):** late-join parity hydrates active race state without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-street-races-checklist.md`.
+- [x] Import / Export. **[P2][M]** ✅ Completed (2026-03-31).
+  - **Acceptance criteria (passed):** objective parity for Import/Export list progression and turn-ins.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers.
+  - **Acceptance criteria (passed):** reconnect parity restores active list and delivery progression without reset.
+  - **Acceptance criteria (passed):** late-join parity hydrates active Import/Export state without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-import-export-checklist.md`.
 
 
 ## Optional Content Phased Rollout Plan
@@ -357,6 +377,7 @@ Execution rule: implement **one phase at a time**. A phase is only marked `done`
 | Courier routes | LS, SF, LV routes | `Mission.LoadAndLaunchInternal`, `create_pickup`, `set_objective`, `set_timers`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-courier-routes-checklist.md` |
 | Street races | Street Racing set (22 races) | `Mission.LoadAndLaunchInternal`, `start_car_race`, `set_car_race_checkpoint`, `task_car_drive_to_coord`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-street-races-checklist.md` |
 | Import/Export | Import/Export list sets and turn-ins | `Mission.LoadAndLaunchInternal`, `create_car`, `set_objective`, `set_player_money`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-import-export-checklist.md` |
+| Asset missions | Trucker, Valet, Career | `Mission.LoadAndLaunchInternal`, `set_objective`, `set_timers`, `set_player_money`, `register_mission_passed`, `fail_current_mission` | `idle -> start -> objective_active -> delivery_progress -> pass/fail` + reconnect/late-join restore | `docs/qa/phase-asset-missions-checklist.md` |
 
 #### Schools execution checklist
 
@@ -451,11 +472,14 @@ Allowed status values: `not started`, `in progress`, `done`.
 | Hidden races | NRG-500 | done |
 | Hidden races | Chiliad Challenge | done |
 | Ammu-Nation challenge | Ammu-Nation challenge | done |
-| Courier routes | Los Santos courier | not started |
-| Courier routes | San Fierro courier | not started |
-| Courier routes | Las Venturas courier | not started |
-| Street races | Street Racing set (22 races) | not started |
-| Import/Export | Import/Export | not started |
+| Courier routes | Los Santos courier | done |
+| Courier routes | San Fierro courier | done |
+| Courier routes | Las Venturas courier | done |
+| Street races | Street Racing set (22 races) | done |
+| Import/Export | Import/Export | done |
+| Asset missions | Trucker | done |
+| Asset missions | Valet | done |
+| Asset missions | Career | done |
 
 ### Phase release-note cadence (for community testing)
 After completing each phase, publish a short release-note style update with:
@@ -476,3 +500,23 @@ Release-note log:
   2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅.
   3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
   4. **How to test:** run host + 2 clients, launch shooting range challenge (`Mission.LoadAndLaunchInternal(113)`), force one reconnect and one late join during active timer, verify parity using `docs/qa/phase-ammu-nation-checklist.md`.
+- **2026-03-31 — Courier routes phase**
+  1. **What shipped:** LS/SF/LV courier route support on shared mission-flow delivery progression state (`missionId`, `objective`, `checkpointIndex`, `timerMs`, terminal latch).
+  2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅ across all three route variants.
+  3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
+  4. **How to test:** run host + 2 clients, start each courier route variant, force one reconnect and one late join during active delivery chain, verify parity using `docs/qa/phase-courier-routes-checklist.md`.
+- **2026-03-31 — Street races phase**
+  1. **What shipped:** street-racing support for all 22 races on shared race checkpoint/timer mission-flow sync path with once-only terminal adjudication.
+  2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅.
+  3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
+  4. **How to test:** run host + 2 clients, start a street race, force one reconnect and one late join mid-race, verify parity using `docs/qa/phase-street-races-checklist.md`.
+- **2026-03-31 — Import/Export phase**
+  1. **What shipped:** Import/Export list and turn-in progression sync with authoritative delivery state + payout latching.
+  2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅.
+  3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
+  4. **How to test:** run host + 2 clients, start Import/Export turn-ins, force one reconnect and one late join during active delivery, verify parity using `docs/qa/phase-import-export-checklist.md`.
+- **2026-03-31 — Asset missions phase**
+  1. **What shipped:** Trucker, Valet, and Career mission-loop parity on shared mission-flow progression + terminal state replication.
+  2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅ across all three asset mission modes.
+  3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
+  4. **How to test:** run host + 2 clients, start each asset mission mode, force one reconnect and one late join during active stage progression, verify parity using `docs/qa/phase-asset-missions-checklist.md`.
