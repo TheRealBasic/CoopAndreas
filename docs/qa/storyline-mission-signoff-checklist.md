@@ -57,3 +57,27 @@ When updating `docs/ROADMAP.md` from `in progress` to `done`, include:
 | Evidence link | `docs/qa/storyline-wave-mission-evidence.md` (W1 `Drive-By` row), `docs/qa/storyline-shared-command-mini-tickets.md#drive-by-scmscriptssweettxt`, `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/` |
 
 Mission note: reused shared hardening fixes `WB-FIX-003` (terminal once-only adjudication) and `WB-FIX-004` (reconnect/late-join hydration epoch filter); evidence artifacts are stored under `artifacts/qa/storyline/drive-by/NET-W1-2026-03-31-C/`.
+
+## Wave closure sign-off records (2026-03-31)
+
+### Required gates (W2/W3/WC promotion batch)
+
+- [x] Objective parity
+- [x] Fail/pass parity
+- [x] Reconnect parity
+- [x] Late-join parity
+- [x] Host-migration stable replay
+- [x] Evidence link
+- [x] Functional sign-off
+- [x] Stage-by-stage functional sign-off (required for multi-stage finals)
+- [x] Stage terminal fail/pass idempotency evidence (required for multi-stage finals)
+
+| Mission | Script family | Roadmap status change | Completion date (`YYYY-MM-DD`) | Evidence link |
+| --- | --- | --- | --- | --- |
+| Home Invasion | RYDER (`scm/scripts/RYDER.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (W2 row, `NET-W2-2026-03-31-D`) |
+| Catalyst | RYDER (`scm/scripts/RYDER.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (W2 row, `NET-W2-2026-03-31-E`) |
+| Robbing Uncle Sam | RYDER (`scm/scripts/RYDER.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (W2 row, `NET-W2-2026-03-31-F`) |
+| OG Loc | SMOKE (`scm/scripts/SMOKE.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (W3 row, `NET-W3-2026-03-31-A`) |
+| Wrong Side Of The Tracks | SMOKE (`scm/scripts/SMOKE.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (W3 row, `NET-W3-2026-03-31-B`) |
+| Burning Desire | CRASH (`scm/scripts/CRASH.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (WC row, `NET-WC-2026-03-31-A`) |
+| Gray Imports | CRASH (`scm/scripts/CRASH.txt`) | `in progress` -> `done` | 2026-03-31 | `docs/qa/storyline-wave-mission-evidence.md` (WC row, `NET-WC-2026-03-31-B`) |

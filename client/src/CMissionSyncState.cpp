@@ -48,6 +48,7 @@ namespace
     uint32_t ms_runtimeSnapshotVersion = 0;
     uint16_t ms_lastAppliedTargetStateSequence = 0;
     uint8_t ms_runtimeSnapshotExpectedActorCount = 0;
+    uint8_t ms_runtimeSnapshotReceivedActorCount = 0;
     std::vector<CPackets::MissionRuntimeSnapshotActor> ms_runtimeSnapshotActors{};
     CPackets::MissionRuntimeSnapshotState ms_runtimeSnapshotState{};
     // Shared side-content replication state (schools/races/courier/etc).
@@ -978,6 +979,7 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotBegin(const CPackets::Missio
     ms_runtimeSnapshotHydrated = false;
     ms_runtimeSnapshotVersion = packet.snapshotVersion;
     ms_runtimeSnapshotExpectedActorCount = packet.actorCount;
+    ms_runtimeSnapshotReceivedActorCount = 0;
     ms_runtimeSnapshotActors.clear();
     ms_runtimeSnapshotState = {};
 }
@@ -1005,6 +1007,10 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotActor(const CPackets::Missio
     }
 
     ms_runtimeSnapshotActors.push_back(packet);
+    if (ms_runtimeSnapshotReceivedActorCount < UINT8_MAX)
+    {
+        ++ms_runtimeSnapshotReceivedActorCount;
+    }
 
     if (packet.missionEpoch != 0
         && packet.scriptLocalIdentifier != 0
@@ -1029,6 +1035,19 @@ void CMissionSyncState::HandleMissionRuntimeSnapshotEnd(const CPackets::MissionR
     }
 
     if (packet.snapshotVersion != 0 && ms_runtimeSnapshotVersion != 0 && packet.snapshotVersion != ms_runtimeSnapshotVersion)
+    {
+        ms_runtimeSnapshotInProgress = false;
+        return;
+    }
+
+    if (ms_runtimeSnapshotExpectedActorCount != 0
+        && ms_runtimeSnapshotReceivedActorCount < ms_runtimeSnapshotExpectedActorCount)
+    {
+        ms_runtimeSnapshotInProgress = false;
+        return;
+    }
+
+    if (!ShouldAcceptInboundMissionEvent(ms_runtimeSnapshotState.missionEpoch, ms_runtimeSnapshotState.sequenceId))
     {
         ms_runtimeSnapshotInProgress = false;
         return;
