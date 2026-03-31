@@ -27,6 +27,7 @@
 #include "CVehicleManager.h"
 #include "VehicleDoorState.h"
 #include "ConfigManager.h"
+#include "persistence/SnapshotPersistence.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -82,6 +83,21 @@ int main(int argc, char* argv[])
 #endif
 
     CConfigManager::Init();
+
+    const std::filesystem::path persistenceRoot = exeDir / "persistence";
+    CSnapshotPersistence::Initialize(persistenceRoot, "default-session");
+    const auto latestSnapshot = CSnapshotPersistence::LoadLatestSnapshot("default-session");
+    if (latestSnapshot.has_value())
+    {
+        printf("[Persistence] Loaded latest snapshot v%u (%zu bytes) from %llu.\n",
+            latestSnapshot->snapshotVersion,
+            latestSnapshot->blob.size(),
+            (unsigned long long)latestSnapshot->timestampUnixMs);
+    }
+    else
+    {
+        printf("[Persistence] No previous snapshot found for default-session.\n");
+    }
 
     CNetwork::Init(CConfigManager::GetConfigPort());
     return 0;
