@@ -287,7 +287,12 @@ Required controls for Wave C rollout:
   - **Pimp:** ✅ SS-02..SS-11 multiplayer QA complete.
   - **Freight Train:** ✅ SS-02..SS-11 multiplayer QA complete.
   - **Validation artifacts:** `docs/qa/submissions-sync-matrix.md`, `docs/qa/submissions-sync-evidence.md`.
-- [ ] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]**
+- [x] Hidden races: `BMX`, `NRG-500`, `Chiliad Challenge`. **[P2][M]** ✅ Completed (2026-03-31).
+  - **Acceptance criteria (passed):** objective parity for BMX, NRG-500, and Chiliad Challenge using the hidden-races opcode/state-transition contract.
+  - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each hidden race mode.
+  - **Acceptance criteria (passed):** reconnect parity restores active hidden race attempts with checkpoint/timer/completion state without restarting the attempt.
+  - **Acceptance criteria (passed):** late-join parity hydrates active hidden race attempts without duplicate objective/pass/fail events.
+  - **Validation artifact:** `docs/qa/phase-hidden-races-checklist.md`.
 - [x] Stadium events: `8-Track`, `Blood Bowl`, `Dirt Track`, `Kick Start`. **[P2][M]** ✅ Completed (2026-03-27).
   - **Acceptance criteria (passed):** objective parity for all four stadium modes using the fixed stadium opcode/state-transition contract.
   - **Acceptance criteria (passed):** fail/pass parity applies terminal outcomes once across peers for each stadium mode.
@@ -385,6 +390,28 @@ Use the fixed sync gates for every stadium mode with no substitutions: `idle -> 
 - Stadium events phase is `done` because all four parity gates passed for each mode in scope.
 - Validation/evidence source of truth: `docs/qa/phase-stadium-events-checklist.md`.
 
+#### Hidden races execution checklist
+
+Use the fixed sync gates for every hidden race mode with no substitutions: `idle -> start -> objective_active -> checkpoint_progress -> pass/fail` + reconnect/late-join restore.
+
+1. **Shared sync primitives** (common side-content state + restore plumbing)
+   - [x] BMX — owner: _unassigned_; status: `done`
+   - [x] NRG-500 — owner: _unassigned_; status: `done`
+   - [x] Chiliad Challenge — owner: _unassigned_; status: `done`
+2. **Mode-specific script/opcode mapping** (`Mission.LoadAndLaunchInternal`, `start_checkpoint_race`, `set_car_race_checkpoint`, `set_timers`, `register_mission_passed`, `fail_current_mission`)
+   - [x] BMX — owner: _unassigned_; status: `done`
+   - [x] NRG-500 — owner: _unassigned_; status: `done`
+   - [x] Chiliad Challenge — owner: _unassigned_; status: `done`
+3. **QA sign-off** (`docs/qa/phase-hidden-races-checklist.md`)
+   - [x] BMX — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+   - [x] NRG-500 — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+   - [x] Chiliad Challenge — owner: _unassigned_; status: `done` (objective ✅, fail/pass ✅, reconnect ✅, late-join ✅)
+
+#### Hidden races phase completion note (2026-03-31)
+
+- Hidden races phase is `done` because all four parity gates passed for each mode in scope.
+- Validation/evidence source of truth: `docs/qa/phase-hidden-races-checklist.md`.
+
 ### Progress tracking (per-mode)
 
 Allowed status values: `not started`, `in progress`, `done`.
@@ -399,9 +426,9 @@ Allowed status values: `not started`, `in progress`, `done`.
 | Stadium events | Blood Bowl | done |
 | Stadium events | Dirt Track | done |
 | Stadium events | Kick Start | done |
-| Hidden races | BMX | not started |
-| Hidden races | NRG-500 | not started |
-| Hidden races | Chiliad Challenge | not started |
+| Hidden races | BMX | done |
+| Hidden races | NRG-500 | done |
+| Hidden races | Chiliad Challenge | done |
 | Courier routes | Los Santos courier | not started |
 | Courier routes | San Fierro courier | not started |
 | Courier routes | Las Venturas courier | not started |
@@ -417,3 +444,8 @@ After completing each phase, publish a short release-note style update with:
 
 Release-note log:
 - _No phase release notes published yet._
+- **2026-03-31 — Hidden races phase**
+  1. **What shipped:** BMX, NRG-500, Chiliad Challenge on the shared mission-flow sync path (`launch/start`, checkpoint progression, timer parity, deterministic terminal latch).
+  2. **Parity result:** objective ✅, fail/pass ✅, reconnect ✅, late-join ✅ across all three hidden race modes.
+  3. **Known issues:** no phase-blocking regressions recorded during sign-off run.
+  4. **How to test:** run host + 2 clients, start any hidden race from `ODDVEH`, force one reconnect and one late join mid-race, verify parity using `docs/qa/phase-hidden-races-checklist.md`.

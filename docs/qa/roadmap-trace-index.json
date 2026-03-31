@@ -156,7 +156,7 @@
       "roadmap": {
         "phase": "Hidden races",
         "mode": "BMX",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
@@ -173,7 +173,7 @@
       "roadmap": {
         "phase": "Hidden races",
         "mode": "NRG-500",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
@@ -190,7 +190,7 @@
       "roadmap": {
         "phase": "Hidden races",
         "mode": "Chiliad Challenge",
-        "status": "not started",
+        "status": "done",
         "source": "docs/ROADMAP.md#progress-tracking-per-mode"
       },
       "evidence_docs": [
