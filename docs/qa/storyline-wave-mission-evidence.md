@@ -41,13 +41,13 @@ Wave status: `in progress`
 ## W2 — RYDER family (`scm/scripts/RYDER.txt`)
 
 Owner: **Mission Sync Pod (Ryder stream)**  
-Wave status: `not started`
+Wave status: `in progress`
 
 | Mission | Status | Start/cutscene validation | Objective validation | Fail validation | Pass validation | Reconnect validation | Late-join validation | Notes / evidence refs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Home Invasion | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | Required before W2 may move to `in progress`. |
-| Catalyst | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | Required before W2 may move to `in progress`. |
-| Robbing Uncle Sam | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | `not started` | Required before W2 may move to `in progress`. |
+| Home Invasion | `in progress` | `in progress` — `HIN-01` start/cutscene handshake capture plan logged for next Ryder wave run. | `in progress` — `HIN-02` stealth-objective progression trace checklist prepared. | `in progress` — `HIN-04` fail branch (`noise/alert` + `player_death`) validation queued. | `in progress` — `HIN-05` pass branch + reward idempotency validation queued. | `in progress` — `HIN-06` reconnect restore gate defined for active burglary stage replay. | `in progress` — `HIN-07` late-join hydration gate defined for active objective stage. | Owner: Mission Sync Pod (Ryder stream). Onboarding template: `docs/qa/storyline-mission-template.md` (C3). |
+| Catalyst | `in progress` | `in progress` — `CAT-01` launch/cutscene sync notes seeded for train-setup entry. | `in progress` — `CAT-02` chase/jump objective propagation checklist prepared. | `in progress` — `CAT-04` fail branch (`target_escape` + `player_death`) validation queued. | `in progress` — `CAT-05` pass branch + terminal once-only replay guard validation queued. | `in progress` — `CAT-06` reconnect restore gate defined for mid-chase mission phase. | `in progress` — `CAT-07` late-join hydration gate defined for active chase phase. | Owner: Mission Sync Pod (Ryder stream). Onboarding template: `docs/qa/storyline-mission-template.md` (C3). |
+| Robbing Uncle Sam | `in progress` | `in progress` — `RUS-01` start/cutscene sync capture checklist prepared. | `in progress` — `RUS-02` forklift/crate objective propagation trace checklist prepared. | `in progress` — `RUS-04` fail branch (`crate_loss` + `player_death`) validation queued. | `in progress` — `RUS-05` pass branch + reward idempotency validation queued. | `in progress` — `RUS-06` reconnect restore gate defined for crate-load stage replay. | `in progress` — `RUS-07` late-join hydration gate defined for active crate phase. | Owner: Mission Sync Pod (Ryder stream). Onboarding template: `docs/qa/storyline-mission-template.md` (C3). |
 
 ## W3 — SMOKE family (`scm/scripts/SMOKE.txt`)
 
