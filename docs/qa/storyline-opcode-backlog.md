@@ -39,3 +39,9 @@ Record one entry at wave start and one at wave end.
 | 2026-03-30 | W1 (`SWEET`) | start | 0 | reviewed | Baseline audit before SWEET wave progress update; no new command gaps. |
 | 2026-03-30 | W1 (`SWEET`) | end | 0 | reviewed | Exit audit after SWEET wave progress update; no triage additions required. |
 | 2026-03-31 | W1 (`SWEET`) | end | 0 | reviewed | Re-audit during `Nines And AK's` command mapping/evidence closure; no new opcode gaps. |
+| 2026-03-31 | W2 (`RYDER`) | start | 0 | reviewed | Pre-closure audit before W2 mission parity validation; no opcode gaps. |
+| 2026-03-31 | W2 (`RYDER`) | end | 0 | reviewed | Post-closure audit after `Home Invasion`/`Catalyst`/`Robbing Uncle Sam` evidence promotion. |
+| 2026-03-31 | W3 (`SMOKE`) | start | 0 | reviewed | Kickoff audit before `OG Loc` and `Wrong Side Of The Tracks` reconnect/late-join hardening validation. |
+| 2026-03-31 | W3 (`SMOKE`) | end | 0 | reviewed | Exit audit confirms no additional opcode triage needed for W3 promotion batch. |
+| 2026-03-31 | WC (`CRASH`) | start | 0 | reviewed | CRASH-wave baseline audit before fire/detonation lifecycle parity validation. |
+| 2026-03-31 | WC (`CRASH`) | end | 0 | reviewed | Exit audit after `Burning Desire` + `Gray Imports` evidence promotion; no missing command coverage. |
