@@ -705,6 +705,15 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
         g_objectiveState.objectiveModifierFlags = packet->objectiveModifierFlags;
         std::memcpy(g_objectiveState.objective, packet->objective, sizeof(g_objectiveState.objective));
 
+        if (packet->sourceOpcode == 0x020B) // blow_up_car
+        {
+            g_objectiveState.vehicleTaskState = ObjectiveSync::State::VEHICLE_TASK_DESTROY_TARGET;
+            g_objectiveState.destroyEscapeState = ObjectiveSync::State::DESTROY_ESCAPE_STATE_DESTROYED;
+            if (g_objectiveState.vehicleTaskSequence < UINT16_MAX)
+            {
+                ++g_objectiveState.vehicleTaskSequence;
+            }
+        }
         if (packet->sourceOpcode == 0x0417 || (packet->missionId != 0 && packet->missionId != g_lastFlow.missionId))
         {
             const MissionRuntimePolicy policy = ResolveMissionRuntimePolicy(packet->missionId);

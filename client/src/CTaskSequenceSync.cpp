@@ -51,6 +51,7 @@ SSyncedOpCode m_syncedTasks[] =
 	{0x05E2, true, {eSyncedParamType::PED, eSyncedParamType::PED}},
 	{0x0672, true, {eSyncedParamType::PED, eSyncedParamType::VEHICLE}},
 	{0x0713, true, {eSyncedParamType::PED, eSyncedParamType::PED, eSyncedParamType::VEHICLE}},
+	{0x020B, true, {eSyncedParamType::VEHICLE}}, // blow_up_car (CRASH wave vehicle terminal objective)
 };
 
 std::vector<uint8_t> m_serializedSequences[CTaskSequences::NUM_SEQUENCES][CTaskSequences::NUM_TASKS];

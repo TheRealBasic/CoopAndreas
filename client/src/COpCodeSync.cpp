@@ -105,6 +105,7 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x08FB}, // set_checkpoint_type [Checkpoint] {type} [CheckpointType]
     {0x0956}, // find_number_of_players_in_group [var int]
     {0x0996}, // set_checkpoint_heading [Checkpoint] {heading} [float]
+    {0x02CF}, // create_fire {x} [float] {y} [float] {z} [float] {propagation} [float] {sizeAndType} [int]
     {0x0E60}, // set_camera_control {state} [bool]
     {0x0417}, // start_mission {missionNumber} [int]
     {COMMAND_SET_TAG_STATUS_IN_AREA},
@@ -174,6 +175,7 @@ const SSyncedOpCode syncedOpcodes[] =
     {0x096E, true, {eSyncedParamType::VEHICLE}}, // is_car_lowrider [Car]
     
     // Explosions
+    {0x020B, true, {eSyncedParamType::VEHICLE}}, // blow_up_car [Car]
     {0x070C, true, {eSyncedParamType::VEHICLE}}, // explode_car_in_cutscene [Car]
     
     // Audio
@@ -215,7 +217,7 @@ static void VerifyStorylineParityOpcodeCoverage()
 {
     const uint16_t requiredOpcodes[] = {
         0x00BC, 0x00BF, 0x00DF, 0x00FE, 0x00FF, 0x0164, 0x0256, 0x02A7,
-        0x03C0, 0x03EE, 0x0417, 0x045C, 0x0629, 0x0652, 0x0811, 0x08EC, 0x0956, 0x096E
+        0x02CF, 0x03C0, 0x03EE, 0x0417, 0x045C, 0x0629, 0x0652, 0x0811, 0x08EC, 0x0956, 0x096E
     };
     for (const auto opcode : requiredOpcodes)
     {
@@ -309,6 +311,7 @@ namespace
         case 0x0634: // task_kill_char_on_foot_while_ducking
         case 0x0672: // task_destroy_car
         case 0x0713: // task_drive_by
+        case 0x020B: // blow_up_car
         case COMMAND_TASK_GO_STRAIGHT_TO_COORD:
         case COMMAND_TASK_TURN_CHAR_TO_FACE_CHAR:
         case COMMAND_TASK_LOOK_AT_CHAR:
@@ -757,6 +760,10 @@ void BuildAndSendOpcode()
         lastOpCodeProcessed == 0x05CB || // task_enter_car_as_driver (vehicle mission task transition)
         lastOpCodeProcessed == 0x0672 || // task_destroy_car (authoritative destroy condition progression)
         lastOpCodeProcessed == 0x0713 || // task_drive_by (authoritative pursuit phase progression)
+        lastOpCodeProcessed == 0x020B || // blow_up_car (vehicle terminal progression)
+        lastOpCodeProcessed == 0x02CF || // create_fire (burn-zone/environment hazard progression)
+        lastOpCodeProcessed == COMMAND_TASK_LEAVE_CAR || // set_char_obj_leave_car mapping
+        lastOpCodeProcessed == COMMAND_TASK_LEAVE_ANY_CAR || // remove_char_from_car_maintain_position mapping fallback
         lastOpCodeProcessed == 0x06D5 || // checkpoint_create (checkpoint progression, including race checkpoint setup)
         lastOpCodeProcessed == 0x07F3 || // checkpoint_set_coords (checkpoint progression, including set_car_race_checkpoint flows)
         lastOpCodeProcessed == 0x014E || // set_timers

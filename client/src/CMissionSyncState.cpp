@@ -717,7 +717,12 @@ void CMissionSyncState::EmitMissionFlowOpcode(uint16_t opcode, const int* params
 
     const uint16_t previousTargetStateSequence = ms_sideContentAttemptState.targetStateSequence;
     const ObjectiveSync::ApplyResult applyResult = ObjectiveSync::ApplyOpcode(ms_sideContentAttemptState, opcode, params, paramCount, text);
-    if (!applyResult.changed)
+    const bool crashWaveForceEmit =
+        opcode == 0x02CF || // create_fire
+        opcode == 0x020B || // blow_up_car
+        opcode == COMMAND_TASK_LEAVE_CAR || // set_char_obj_leave_car mapping
+        opcode == COMMAND_TASK_LEAVE_ANY_CAR; // remove_char_from_car_maintain_position fallback mapping
+    if (!applyResult.changed && !crashWaveForceEmit)
     {
         return;
     }
