@@ -136,7 +136,8 @@ namespace ObjectiveSync
         char nextObjective[8]{};
         if (text && text[0])
         {
-            strncpy_s(nextObjective, text, sizeof(nextObjective));
+            std::strncpy(nextObjective, text, sizeof(nextObjective) - 1);
+            nextObjective[sizeof(nextObjective) - 1] = '\0';
         }
 
         if (SameObjective(state.objective, nextObjective))
@@ -175,7 +176,8 @@ namespace ObjectiveSync
         char nextObjective[8]{};
         if (semantics == ObjectiveTextSemantics::Replace && text && text[0])
         {
-            strncpy_s(nextObjective, text, sizeof(nextObjective));
+            std::strncpy(nextObjective, text, sizeof(nextObjective) - 1);
+            nextObjective[sizeof(nextObjective) - 1] = '\0';
         }
 
         const uint32_t nextToken = (semantics == ObjectiveTextSemantics::Replace) ? BuildObjectiveTextToken(nextObjective) : 0;
