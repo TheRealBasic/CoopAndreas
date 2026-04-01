@@ -19,7 +19,7 @@ class CPacketListener
 			m_iPacketID = var_id;
 			m_callback = callback;
 		}
-		~CPacketListener();
+			~CPacketListener() = default;
 	
 };
 

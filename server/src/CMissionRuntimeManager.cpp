@@ -1052,11 +1052,14 @@ uint32_t CMissionRuntimeManager::HandleHostMigration(int newHostPlayerId)
     {
         std::unordered_map<RegistryActorKey, CMissionRuntimePackets::MissionRuntimeSnapshotActor, RegistryActorKeyHash> remapped{};
         remapped.reserve(g_registryActors.size());
-        for (auto& [key, actor] : g_registryActors)
+        for (const auto& [key, actor] : g_registryActors)
         {
-            key.missionEpoch = g_missionEpoch;
-            actor.missionEpoch = g_missionEpoch;
-            remapped[key] = actor;
+            RegistryActorKey remappedKey = key;
+            remappedKey.missionEpoch = g_missionEpoch;
+
+            CMissionRuntimePackets::MissionRuntimeSnapshotActor remappedActor = actor;
+            remappedActor.missionEpoch = g_missionEpoch;
+            remapped[remappedKey] = remappedActor;
         }
         g_registryActors = std::move(remapped);
     }
