@@ -1,11 +1,13 @@
 
 #include "CPedManager.h"
+#include "persistence/SnapshotPersistence.h"
 
 std::vector<CPed*> CPedManager::m_pPeds;
 
 void CPedManager::Add(CPed* ped)
 {
 	m_pPeds.push_back(ped);
+	CSnapshotPersistence::MarkDirty("ped_add");
 }
 
 void CPedManager::Remove(CPed* ped)
@@ -15,6 +17,7 @@ void CPedManager::Remove(CPed* ped)
 	if (it != m_pPeds.end())
 	{
 		m_pPeds.erase(it);
+		CSnapshotPersistence::MarkDirty("ped_remove");
 	}
 }
 
@@ -53,6 +56,7 @@ void CPedManager::RemoveAllHostedAndNotify(CPlayer* player)
 			CNetwork::SendPacketToAll(CPacketsID::PED_REMOVE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, player->m_pPeer);
 			delete* it;
 			it = CPedManager::m_pPeds.erase(it);
+			CSnapshotPersistence::MarkDirty("ped_remove_hosted");
 		}
 		else
 		{

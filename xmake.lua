@@ -106,7 +106,9 @@ target("server")
     set_kind("binary")
 
     add_files("server/src/*.cpp")
+    add_files("server/src/persistence/*.cpp")
     add_headerfiles("server/src/*.h")
+    add_headerfiles("server/src/persistence/*.h")
     
     add_files("third_party/enet/*.c")
     add_headerfiles("third_party/enet/*.h")
@@ -114,7 +116,7 @@ target("server")
     add_files("third_party/INIReader/cpp/INIReader.cpp")
     add_files("third_party/INIReader/ini.c")
 
-    add_includedirs("shared", "third_party")
+    add_includedirs("server/src", "shared", "third_party")
 
     if is_mode("debug") then
         add_defines("_DEBUG")
@@ -151,6 +153,7 @@ target("server")
 
 
         add_syslinks("pthread")
+        add_syslinks("sqlite3")
     end
 
 target("proxy")

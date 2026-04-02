@@ -19,6 +19,7 @@
 #include "CPickupManager.h"
 #include "CFireSyncManager.h"
 #include "ConfigManager.h"
+#include "persistence/SnapshotPersistence.h"
 
 #include "semver.h"
 #include "PlayerDisconnectReason.h"
@@ -203,6 +204,7 @@ bool CNetwork::Init(unsigned short port)
     while (m_bRunning) // waiting for event
     {
         CNetwork::ProcessAuthenticationTimeouts(m_pServer);
+        CSnapshotPersistence::TickAutosave();
         CPickupManager::ProcessRespawns();
         CFireSyncManager::Process((uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
         enet_host_service(m_pServer, &event, 1);
@@ -551,6 +553,7 @@ void CNetwork::AddListener(unsigned short id, void(*callback)(ENetPeer*, void*, 
 
 void CNetwork::Shutdown()
 {
+    CSnapshotPersistence::SaveOnShutdown();
     m_bRunning = false;
     m_packetListeners.clear();
     g_peerAuthStates.clear();

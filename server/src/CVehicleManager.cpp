@@ -2,6 +2,7 @@
 #include "CVehicle.h"
 #include "CVehicleManager.h"
 #include <chrono>
+#include "persistence/SnapshotPersistence.h"
 
 std::vector<CVehicle*> CVehicleManager::m_pVehicles;
 static uint32_t s_trailerLinkVersionCounter = 0;
@@ -9,6 +10,7 @@ static uint32_t s_trailerLinkVersionCounter = 0;
 void CVehicleManager::Add(CVehicle* vehicle)
 {
 	m_pVehicles.push_back(vehicle);
+	CSnapshotPersistence::MarkDirty("vehicle_add");
 }
 
 void CVehicleManager::Remove(CVehicle* vehicle)
@@ -17,6 +19,7 @@ void CVehicleManager::Remove(CVehicle* vehicle)
 	if (it != m_pVehicles.end())
 	{
 		m_pVehicles.erase(it);
+		CSnapshotPersistence::MarkDirty("vehicle_remove");
 	}
 }
 
@@ -176,6 +179,7 @@ void CVehicleManager::RemoveAllHostedAndNotify(CPlayer* player)
 			CNetwork::SendPacketToAll(CPacketsID::VEHICLE_REMOVE, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE, player->m_pPeer);
 			delete *it;
 			it = CVehicleManager::m_pVehicles.erase(it);
+			CSnapshotPersistence::MarkDirty("vehicle_remove_hosted");
 		}
 		else
 		{

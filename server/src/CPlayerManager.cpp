@@ -1,6 +1,7 @@
 
 #include "CPlayer.h"
 #include "CPlayerManager.h"
+#include "persistence/SnapshotPersistence.h"
 
 std::vector<CPlayer*> CPlayerManager::m_pPlayers;
 CPlayerPackets::CutsceneSkipVoteState CPlayerPackets::ms_cutsceneSkipVoteState{};
@@ -10,6 +11,7 @@ bool CPlayerPackets::ms_isCutsceneSkipVoteConfigLoaded = false;
 void CPlayerManager::Add(CPlayer* player)
 {
 	m_pPlayers.push_back(player);
+	CSnapshotPersistence::MarkDirty("player_add");
 }
 
 void CPlayerManager::Remove(CPlayer* player)
@@ -18,6 +20,7 @@ void CPlayerManager::Remove(CPlayer* player)
 	if (it != m_pPlayers.end())
 	{
 		m_pPlayers.erase(it);
+		CSnapshotPersistence::MarkDirty("player_remove");
 	}
 }
 

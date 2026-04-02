@@ -5,6 +5,7 @@
 
 #include "CPlayer.h"
 #include "CPlayerManager.h"
+#include "persistence/SnapshotPersistence.h"
 
 uint64_t CPickupManager::BuildCollectibleStateKey(uint8_t category, uint32_t worldCollectibleId)
 {
@@ -99,6 +100,7 @@ uint32_t CPickupManager::CreatePickup(uint8_t type, uint8_t category, const CVec
 	ms_pickups[pickup.networkId] = pickup;
 	PersistCollectibleState(pickup);
 	ms_snapshotVersion++;
+	CSnapshotPersistence::MarkDirty("pickup_create");
 	BroadcastDelta(pickup, pickup.isCollected ? CPickupStatePackets::PICKUP_ACTION_COLLECT : CPickupStatePackets::PICKUP_ACTION_SPAWN);
 
 	if ((pickup.flags & PICKUP_FLAG_DROPPED) != 0)
@@ -254,6 +256,7 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, con
 
 	UpdateStateMetadata(pickup);
 	PersistCollectibleState(pickup);
+	CSnapshotPersistence::MarkDirty("pickup_collect");
 	BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_COLLECT);
 
 	if (isDroppedPickup)
@@ -264,6 +267,7 @@ void CPickupManager::HandleCollectRequest(ENetPeer* peer, uint32_t pickupId, con
 		BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_REMOVE);
 		ms_pickups.erase(it);
 		ms_snapshotVersion++;
+		CSnapshotPersistence::MarkDirty("pickup_drop_resolved");
 	}
 }
 
@@ -289,6 +293,7 @@ void CPickupManager::ProcessRespawns()
 		pickup.collectedAtMs = 0;
 		UpdateStateMetadata(pickup);
 		PersistCollectibleState(pickup);
+		CSnapshotPersistence::MarkDirty("pickup_respawn");
 		BroadcastDelta(pickup, CPickupStatePackets::PICKUP_ACTION_SPAWN);
 	}
 }

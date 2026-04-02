@@ -8,6 +8,7 @@
 #include "CNetwork.h"
 #include "ObjectiveSyncState.h"
 #include "CPlayer.h"
+#include "persistence/SnapshotPersistence.h"
 
 namespace
 {
@@ -637,6 +638,7 @@ bool CMissionRuntimeManager::HandleOnMissionFlagSync(CPlayer* sourcePlayer, ENet
     outbound.missionEpoch = g_missionEpoch;
     outbound.sequenceId = g_lastSequence;
     CNetwork::SendPacketToAll(CPacketsID::ON_MISSION_FLAG_SYNC, &outbound, sizeof(outbound), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
+    CSnapshotPersistence::MarkDirty("mission_onmission");
     return true;
 }
 
@@ -825,6 +827,7 @@ bool CMissionRuntimeManager::HandleMissionFlowSync(CPlayer* sourcePlayer, ENetPe
 
     g_hasFlow = true;
     CNetwork::SendPacketToAll(CPacketsID::MISSION_FLOW_SYNC, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, nullptr);
+    CSnapshotPersistence::MarkDirty("mission_flow");
     return true;
 }
 
@@ -864,6 +867,7 @@ bool CMissionRuntimeManager::HandleCheckpointUpdate(CPlayer* sourcePlayer, ENetP
     packet->missionEpoch = g_missionEpoch;
     packet->sequenceId = g_lastSequence;
     CNetwork::SendPacketToAll(CPacketsID::UPDATE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
+    CSnapshotPersistence::MarkDirty("mission_checkpoint_update");
     return true;
 }
 
@@ -893,6 +897,7 @@ bool CMissionRuntimeManager::HandleCheckpointRemove(CPlayer* sourcePlayer, ENetP
     g_hasCheckpoint = false;
 
     CNetwork::SendPacketToAll(CPacketsID::REMOVE_CHECKPOINT, packet, sizeof(*packet), ENET_PACKET_FLAG_RELIABLE, sourcePeer);
+    CSnapshotPersistence::MarkDirty("mission_checkpoint_remove");
     return true;
 }
 
@@ -1071,6 +1076,7 @@ uint32_t CMissionRuntimeManager::HandleHostMigration(int newHostPlayerId)
         g_snapshotActors.push_back(actor);
     }
 
+    CSnapshotPersistence::MarkDirty("mission_host_migration");
     return g_missionEpoch;
 }
 
@@ -1107,4 +1113,5 @@ void CMissionRuntimeManager::Teardown()
     g_terminalSourceEventType = 0;
     g_terminalSourceOpcode = 0;
     g_terminalSourceSequence = 0;
+    CSnapshotPersistence::MarkDirty("mission_teardown");
 }
